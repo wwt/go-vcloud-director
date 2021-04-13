@@ -2180,29 +2180,39 @@ type QueryResultCatalogItemType struct {
 
 // QueryResultVappTemplateType represents a vApp template as query result
 type QueryResultVappTemplateType struct {
-	HREF               string    `xml:"href,attr,omitempty"`               // The URI of the entity.
-	ID                 string    `xml:"id,attr,omitempty"`                 // vApp template ID.
-	Type               string    `xml:"type,attr,omitempty"`               // The MIME type of the entity.
-	OwnerName          string    `xml:"ownerName,attr,omitempty"`          // Owner name
-	CatalogName        string    `xml:"catalogName,attr,omitempty"`        // Catalog name
-	IsPublished        bool      `xml:"isPublished,attr,omitempty"`        // True if this entity is in a published catalog
-	Name               string    `xml:"name,attr,omitempty"`               // vApp template name.
-	Description        string    `xml:"description,attr,omitempty"`        // vApp template description.
-	Vdc                string    `xml:"vdc,attr,omitempty"`                // VDC reference or ID
-	VdcName            string    `xml:"vdcName,attr,omitempty"`            // VDC name
-	Org                string    `xml:"org,attr,omitempty"`                // Organization reference or ID
-	CreationDate       string    `xml:"creationDate,attr,omitempty"`       // Creation date
-	IsBusy             bool      `xml:"isBusy,attr,omitempty"`             // True if the vApp template is busy
-	IsGoldMaster       bool      `xml:"isGoldMaster,attr,omitempty"`       // True if the vApp template is a gold master
-	IsEnabled          bool      `xml:"isEnabled,attr,omitempty"`          // True if the vApp template is enabled
-	Status             string    `xml:"status,attr,omitempty"`             // Status
-	IsDeployed         bool      `xml:"isDeployed,attr,omitempty"`         // True if this entity is deployed
-	IsExpired          bool      `xml:"isExpired,attr,omitempty"`          // True if this entity is expired
-	StorageProfileName string    `xml:"storageProfileName,attr,omitempty"` // Storage profile name
-	Version            string    `xml:"version,attr,omitempty"`            // Storage profile name
-	LastSuccessfulSync string    `xml:"lastSuccessfulSync,attr,omitempty"` // Date of last successful sync
-	Link               *Link     `xml:"Link,omitempty"`
-	Metadata           *Metadata `xml:"Metadata,omitempty"`
+	HREF                 string    `xml:"href,attr,omitempty"`               // The URI of the entity.
+	ID                   string    `xml:"id,attr,omitempty"`                 // vApp template ID.
+	Type                 string    `xml:"type,attr,omitempty"`               // The MIME type of the entity.
+	OwnerName            string    `xml:"ownerName,attr,omitempty"`          // Owner name
+	CatalogName          string    `xml:"catalogName,attr,omitempty"`        // Catalog name
+	IsPublished          bool      `xml:"isPublished,attr,omitempty"`        // True if this entity is in a published catalog
+	Name                 string    `xml:"name,attr,omitempty"`               // vApp template name.
+	Description          string    `xml:"description,attr,omitempty"`        // vApp template description.
+	Vdc                  string    `xml:"vdc,attr,omitempty"`                // VDC reference or ID
+	VdcName              string    `xml:"vdcName,attr,omitempty"`            // VDC name
+	Org                  string    `xml:"org,attr,omitempty"`                // Organization reference or ID
+	CreationDate         string    `xml:"creationDate,attr,omitempty"`       // Creation date
+	IsBusy               bool      `xml:"isBusy,attr,omitempty"`             // True if the vApp template is busy
+	IsGoldMaster         bool      `xml:"isGoldMaster,attr,omitempty"`       // True if the vApp template is a gold master
+	IsEnabled            bool      `xml:"isEnabled,attr,omitempty"`          // True if the vApp template is enabled
+	Status               string    `xml:"status,attr,omitempty"`             // Status
+	IsDeployed           bool      `xml:"isDeployed,attr,omitempty"`         // True if this entity is deployed
+	IsExpired            bool      `xml:"isExpired,attr,omitempty"`          // True if this entity is expired
+	StorageProfileName   string    `xml:"storageProfileName,attr,omitempty"` // Storage profile name
+	Version              string    `xml:"version,attr,omitempty"`            // Storage profile name
+	LastSuccessfulSync   string    `xml:"lastSuccessfulSync,attr,omitempty"` // Date of last successful sync
+	NumberOfVMs          int       `xml:"numberOfVMs,attr,omitempty"`
+	NumberOfCPUs         int       `xml:"numberOfCpus,attr,omitempty"`
+	CpuAllocationMhz     int       `xml:"cpuAllocationMhz,attr,omitempty"`
+	CpuAllocationInMhz   int       `xml:"cpuAllocationInMhz,attr,omitempty"`
+	StorageKB            int       `xml:"storageKB,attr,omitempty"`
+	MemoryAllocationMB   int       `xml:"memoryAllocationMB,attr,omitempty"`
+	AutoDeleteNotified   bool      `xml:"isAutoDeleteNotified,attr,omitempty"`
+	AutoUndeployNotified bool      `xml:"isAutoUndeployNotified,attr,omitempty"`
+	VdcEnabled           bool      `xml:"isVdcEnabled,attr,omitempty"`
+	HonorBootOrder       bool      `xml:"honorBookOrder,attr,omitempty"`
+	Link                 *Link     `xml:"Link,omitempty"`
+	Metadata             *Metadata `xml:"Metadata,omitempty"`
 }
 
 // QueryResultEdgeGatewayRecordType represents an edge gateway record as query result.
