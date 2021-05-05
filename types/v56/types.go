@@ -2279,8 +2279,9 @@ type QueryResultVMRecordType struct {
 // QueryResultVAppRecordType represents a VM record as query result.
 type QueryResultVAppRecordType struct {
 	// Attributes
-	HREF                    string    `xml:"href,attr,omitempty"`         // The URI of the entity.
-	Name                    string    `xml:"name,attr"`                   // The name of the entity.
+	HREF                    string    `xml:"href,attr,omitempty"` // The URI of the entity.
+	Name                    string    `xml:"name,attr"`           // The name of the entity.
+	Description             string    `xml:"description,attr,omitempty"`
 	CreationDate            string    `xml:"creationDate,attr,omitempty"` // Creation date/time of the vApp.
 	Busy                    bool      `xml:"isBusy,attr,omitempty"`
 	Deployed                bool      `xml:"isDeployed,attr,omitempty"` // True if the vApp is deployed.
