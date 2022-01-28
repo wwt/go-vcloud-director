@@ -221,8 +221,12 @@ type NetworkConfiguration struct {
 	DistributedInterface *bool `xml:"DistributedInterface,omitempty"`
 	GuestVlanAllowed     *bool `xml:"GuestVlanAllowed,omitempty"`
 	// TODO: Not Implemented
-	// RouterInfo                     RouterInfo           `xml:"RouterInfo,omitempty"`
+	RouterInfo RouterInfo `xml:"RouterInfo,omitempty"`
 	// SyslogServerSettings           SyslogServerSettings `xml:"SyslogServerSettings,omitempty"`
+}
+
+type RouterInfo struct {
+	ExternalIP string `xml:"ExternalIp,omitempty"`
 }
 
 // VAppNetworkConfiguration represents a vApp network configuration
