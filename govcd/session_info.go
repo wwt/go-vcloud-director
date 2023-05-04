@@ -5,6 +5,7 @@ package govcd
  */
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -24,7 +25,7 @@ type ExtendedSessionInfo struct {
 }
 
 // GetSessionInfo collects the basic session information for a VCD connection
-func (client *Client) GetSessionInfo() (*types.CurrentSessionInfo, error) {
+func (client *Client) GetSessionInfo(ctx context.Context) (*types.CurrentSessionInfo, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointSessionCurrent
 
 	// We get the maximum supported version, as early versions of the API return less data
@@ -40,7 +41,7 @@ func (client *Client) GetSessionInfo() (*types.CurrentSessionInfo, error) {
 
 	var info types.CurrentSessionInfo
 
-	err = client.OpenApiGetItem(apiVersion, urlRef, nil, &info, nil)
+	err = client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, &info, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -51,9 +52,9 @@ func (client *Client) GetSessionInfo() (*types.CurrentSessionInfo, error) {
 // GetExtendedSessionInfo collects extended session information for support and debugging
 // It will try to collect as much data as possible, failing only if the minimum data can't
 // be collected.
-func (vcdClient *VCDClient) GetExtendedSessionInfo() (*ExtendedSessionInfo, error) {
+func (vcdClient *VCDClient) GetExtendedSessionInfo(ctx context.Context) (*ExtendedSessionInfo, error) {
 	var extendedSessionInfo ExtendedSessionInfo
-	sessionInfo, err := vcdClient.Client.GetSessionInfo()
+	sessionInfo, err := vcdClient.Client.GetSessionInfo(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +66,7 @@ func (vcdClient *VCDClient) GetExtendedSessionInfo() (*ExtendedSessionInfo, erro
 	default:
 		extendedSessionInfo.ConnectionType = "Username + password"
 	}
-	version, err := vcdClient.Client.GetVcdFullVersion()
+	version, err := vcdClient.Client.GetVcdFullVersion(ctx)
 	if err == nil {
 		extendedSessionInfo.Version = version.Version.String()
 	}
@@ -83,16 +84,16 @@ func (vcdClient *VCDClient) GetExtendedSessionInfo() (*ExtendedSessionInfo, erro
 		return &extendedSessionInfo, nil
 	}
 	extendedSessionInfo.Roles = append(extendedSessionInfo.Roles, sessionInfo.Roles...)
-	org, err := vcdClient.GetAdminOrgById(sessionInfo.Org.ID)
+	org, err := vcdClient.GetAdminOrgById(ctx, sessionInfo.Org.ID)
 	if err != nil {
 		return &extendedSessionInfo, err
 	}
 	for _, roleRef := range sessionInfo.RoleRefs {
-		role, err := org.GetRoleById(roleRef.ID)
+		role, err := org.GetRoleById(ctx, roleRef.ID)
 		if err != nil {
 			continue
 		}
-		rights, err := role.GetRights(nil)
+		rights, err := role.GetRights(ctx, nil)
 		if err != nil {
 			continue
 		}
@@ -104,11 +105,11 @@ func (vcdClient *VCDClient) GetExtendedSessionInfo() (*ExtendedSessionInfo, erro
 }
 
 // LogSessionInfo prints session information into the default logs
-func (client *VCDClient) LogSessionInfo() {
+func (client *VCDClient) LogSessionInfo(ctx context.Context) {
 
 	// If logging is disabled, there is no point in collecting session info
 	if util.EnableLogging {
-		info, err := client.GetExtendedSessionInfo()
+		info, err := client.GetExtendedSessionInfo(ctx)
 		if err != nil {
 			util.Logger.Printf("no session info collected: %s\n", err)
 			return

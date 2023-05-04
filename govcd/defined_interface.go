@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 	"net/url"
@@ -20,10 +21,10 @@ type DefinedInterface struct {
 
 // CreateDefinedInterface creates a Defined Interface.
 // Only System administrator can create Defined Interfaces.
-func (vcdClient *VCDClient) CreateDefinedInterface(definedInterface *types.DefinedInterface) (*DefinedInterface, error) {
+func (vcdClient *VCDClient) CreateDefinedInterface(ctx context.Context, definedInterface *types.DefinedInterface) (*DefinedInterface, error) {
 	client := vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeInterfaces
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +39,7 @@ func (vcdClient *VCDClient) CreateDefinedInterface(definedInterface *types.Defin
 		client:           &vcdClient.Client,
 	}
 
-	err = client.OpenApiPostItem(apiVersion, urlRef, nil, definedInterface, result.DefinedInterface, nil)
+	err = client.OpenApiPostItem(ctx, apiVersion, urlRef, nil, definedInterface, result.DefinedInterface, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -47,10 +48,10 @@ func (vcdClient *VCDClient) CreateDefinedInterface(definedInterface *types.Defin
 }
 
 // GetAllDefinedInterfaces retrieves all Defined Interfaces. Query parameters can be supplied to perform additional filtering.
-func (vcdClient *VCDClient) GetAllDefinedInterfaces(queryParameters url.Values) ([]*DefinedInterface, error) {
+func (vcdClient *VCDClient) GetAllDefinedInterfaces(ctx context.Context, queryParameters url.Values) ([]*DefinedInterface, error) {
 	client := vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeInterfaces
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +62,7 @@ func (vcdClient *VCDClient) GetAllDefinedInterfaces(queryParameters url.Values) 
 	}
 
 	typeResponses := []*types.DefinedInterface{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParameters, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParameters, &typeResponses, nil)
 	if err != nil {
 		return nil, amendRdeApiError(&client, err)
 	}
@@ -79,10 +80,10 @@ func (vcdClient *VCDClient) GetAllDefinedInterfaces(queryParameters url.Values) 
 }
 
 // GetDefinedInterface retrieves a single Defined Interface defined by its unique combination of vendor, nss and version.
-func (vcdClient *VCDClient) GetDefinedInterface(vendor, nss, version string) (*DefinedInterface, error) {
+func (vcdClient *VCDClient) GetDefinedInterface(ctx context.Context, vendor, nss, version string) (*DefinedInterface, error) {
 	queryParameters := url.Values{}
 	queryParameters.Add("filter", fmt.Sprintf("vendor==%s;nss==%s;version==%s", vendor, nss, version))
-	interfaces, err := vcdClient.GetAllDefinedInterfaces(queryParameters)
+	interfaces, err := vcdClient.GetAllDefinedInterfaces(ctx, queryParameters)
 	if err != nil {
 		return nil, err
 	}
@@ -99,11 +100,11 @@ func (vcdClient *VCDClient) GetDefinedInterface(vendor, nss, version string) (*D
 }
 
 // GetDefinedInterfaceById gets a Defined Interface identified by its unique URN.
-func (vcdClient *VCDClient) GetDefinedInterfaceById(id string) (*DefinedInterface, error) {
+func (vcdClient *VCDClient) GetDefinedInterfaceById(ctx context.Context, id string) (*DefinedInterface, error) {
 	client := vcdClient.Client
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeInterfaces
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +119,7 @@ func (vcdClient *VCDClient) GetDefinedInterfaceById(id string) (*DefinedInterfac
 		client:           &vcdClient.Client,
 	}
 
-	err = client.OpenApiGetItem(apiVersion, urlRef, nil, result.DefinedInterface, nil)
+	err = client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, result.DefinedInterface, nil)
 	if err != nil {
 		return nil, amendRdeApiError(&client, err)
 	}
@@ -128,7 +129,7 @@ func (vcdClient *VCDClient) GetDefinedInterfaceById(id string) (*DefinedInterfac
 
 // Update updates the receiver Defined Interface with the values given by the input.
 // Only System administrator can update Defined Interfaces.
-func (di *DefinedInterface) Update(definedInterface types.DefinedInterface) error {
+func (di *DefinedInterface) Update(ctx context.Context, definedInterface types.DefinedInterface) error {
 	client := di.client
 
 	if di.DefinedInterface.ID == "" {
@@ -145,7 +146,7 @@ func (di *DefinedInterface) Update(definedInterface types.DefinedInterface) erro
 	definedInterface.Vendor = di.DefinedInterface.Vendor
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeInterfaces
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -155,7 +156,7 @@ func (di *DefinedInterface) Update(definedInterface types.DefinedInterface) erro
 		return err
 	}
 
-	err = client.OpenApiPutItem(apiVersion, urlRef, nil, definedInterface, di.DefinedInterface, nil)
+	err = client.OpenApiPutItem(ctx, apiVersion, urlRef, nil, definedInterface, di.DefinedInterface, nil)
 	if err != nil {
 		return amendRdeApiError(client, err)
 	}
@@ -165,7 +166,7 @@ func (di *DefinedInterface) Update(definedInterface types.DefinedInterface) erro
 
 // Delete deletes the receiver Defined Interface.
 // Only System administrator can delete Defined Interfaces.
-func (di *DefinedInterface) Delete() error {
+func (di *DefinedInterface) Delete(ctx context.Context) error {
 	client := di.client
 
 	if di.DefinedInterface.ID == "" {
@@ -173,7 +174,7 @@ func (di *DefinedInterface) Delete() error {
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeInterfaces
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -183,7 +184,7 @@ func (di *DefinedInterface) Delete() error {
 		return err
 	}
 
-	err = client.OpenApiDeleteItem(apiVersion, urlRef, nil, nil)
+	err = client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil, nil)
 	if err != nil {
 		return amendRdeApiError(client, err)
 	}

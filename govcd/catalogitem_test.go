@@ -11,8 +11,6 @@ import (
 	"fmt"
 	//"strings"
 
-	. "gopkg.in/check.v1"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 )
@@ -221,7 +219,7 @@ func (vcd *TestVCD) Test_DeleteNonEmptyCatalog(check *C) {
 	// add catalogItem
 	uploadTask, err := catalog.UploadOvf(vcd.config.OVA.OvaPath, catalogItemName, "upload from delete catalog item test", 1024)
 	check.Assert(err, IsNil)
-	err = uploadTask.WaitTaskCompletion()
+	err = uploadTask.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 	AddToCleanupList(catalogItemName, "catalogItem", vcd.org.Org.Name+"|"+catalogName, check.TestName())
 

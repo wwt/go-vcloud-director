@@ -6,6 +6,7 @@ package govcd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,12 +24,12 @@ import (
 
 // SetApiToken behaves similarly to SetToken, with the difference that it will
 // return full information about the bearer token, so that the caller can make decisions about token expiration
-func (vcdClient *VCDClient) SetApiToken(org, apiToken string) (*types.ApiTokenRefresh, error) {
-	tokenRefresh, err := vcdClient.GetBearerTokenFromApiToken(org, apiToken)
+func (vcdClient *VCDClient) SetApiToken(ctx context.Context, org, apiToken string) (*types.ApiTokenRefresh, error) {
+	tokenRefresh, err := vcdClient.GetBearerTokenFromApiToken(ctx, org, apiToken)
 	if err != nil {
 		return nil, err
 	}
-	err = vcdClient.SetToken(org, BearerTokenHeader, tokenRefresh.AccessToken)
+	err = vcdClient.SetToken(ctx, org, BearerTokenHeader, tokenRefresh.AccessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -38,9 +39,9 @@ func (vcdClient *VCDClient) SetApiToken(org, apiToken string) (*types.ApiTokenRe
 // SetServiceAccountApiToken reads the current Service Account API token,
 // sets the client's bearer token and fetches a new API token for next
 // authentication request using SetApiToken and overwrites the old file.
-func (vcdClient *VCDClient) SetServiceAccountApiToken(org, apiTokenFile string) error {
-	if vcdClient.Client.APIVCDMaxVersionIs("< 37.0") {
-		version, err := vcdClient.Client.GetVcdFullVersion()
+func (vcdClient *VCDClient) SetServiceAccountApiToken(ctx context.Context, org, apiTokenFile string) error {
+	if vcdClient.Client.APIVCDMaxVersionIs(ctx, "< 37.0") {
+		version, err := vcdClient.Client.GetVcdFullVersion(ctx)
 		if err == nil {
 			return fmt.Errorf("minimum version for Service Account authentication is 10.4 - Version detected: %s", version.Version)
 		}
@@ -56,7 +57,7 @@ func (vcdClient *VCDClient) SetServiceAccountApiToken(org, apiTokenFile string) 
 	}
 
 	// Get bearer token and update the refresh token for the next authentication request
-	saApiToken, err = vcdClient.SetApiToken(org, saApiToken.RefreshToken)
+	saApiToken, err = vcdClient.SetApiToken(ctx, org, saApiToken.RefreshToken)
 	if err != nil {
 		return err
 	}
@@ -78,9 +79,9 @@ func (vcdClient *VCDClient) SetServiceAccountApiToken(org, apiTokenFile string) 
 
 // GetBearerTokenFromApiToken uses an API token to retrieve a bearer token
 // using the refresh token operation.
-func (vcdClient *VCDClient) GetBearerTokenFromApiToken(org, token string) (*types.ApiTokenRefresh, error) {
-	if vcdClient.Client.APIVCDMaxVersionIs("< 36.1") {
-		version, err := vcdClient.Client.GetVcdFullVersion()
+func (vcdClient *VCDClient) GetBearerTokenFromApiToken(ctx context.Context, org, token string) (*types.ApiTokenRefresh, error) {
+	if vcdClient.Client.APIVCDMaxVersionIs(ctx, "< 36.1") {
+		version, err := vcdClient.Client.GetVcdFullVersion(ctx)
 		if err == nil {
 			return nil, fmt.Errorf("minimum version for API token is 10.3.1 - Version detected: %s", version.Version)
 		}
@@ -104,7 +105,7 @@ func (vcdClient *VCDClient) GetBearerTokenFromApiToken(org, token string) (*type
 	}
 
 	data := bytes.NewBufferString(fmt.Sprintf("grant_type=refresh_token&refresh_token=%s", token))
-	req := vcdClient.Client.NewRequest(nil, http.MethodPost, *reqHref, data)
+	req := vcdClient.Client.NewRequest(ctx, nil, http.MethodPost, *reqHref, data)
 	req.Header.Add("Accept", "application/*;version=36.1")
 
 	resp, err := vcdClient.Client.Http.Do(req)

@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -35,7 +36,7 @@ func NewNsxvDistributedFirewall(client *Client, vdcId string) *NsxvDistributedFi
 }
 
 // GetConfiguration retrieves the configuration of a distributed firewall
-func (dfw *NsxvDistributedFirewall) GetConfiguration() (*types.FirewallConfiguration, error) {
+func (dfw *NsxvDistributedFirewall) GetConfiguration(ctx context.Context) (*types.FirewallConfiguration, error) {
 	// Explicitly retrieving only the Layer 3 rules, as we don't need to deal with layer 2
 	initialUrl, err := dfw.client.buildUrl("network", "firewall", "globalroot-0", "config", "layer3sections", dfw.VdcId)
 	if err != nil {
@@ -47,7 +48,7 @@ func (dfw *NsxvDistributedFirewall) GetConfiguration() (*types.FirewallConfigura
 		return nil, err
 	}
 
-	req := dfw.client.NewRequest(nil, http.MethodGet, *requestUrl, nil)
+	req := dfw.client.NewRequest(ctx, nil, http.MethodGet, *requestUrl, nil)
 
 	resp, err := checkResp(dfw.client.Http.Do(req))
 	if err != nil {
@@ -76,12 +77,12 @@ func (dfw *NsxvDistributedFirewall) GetConfiguration() (*types.FirewallConfigura
 }
 
 // IsEnabled returns true when the distributed firewall is enabled
-func (dfw *NsxvDistributedFirewall) IsEnabled() (bool, error) {
+func (dfw *NsxvDistributedFirewall) IsEnabled(ctx context.Context) (bool, error) {
 	if dfw.VdcId == "" {
 		return false, fmt.Errorf("no VDC set for this NsxvDistributedFirewall")
 	}
 
-	conf, err := dfw.GetConfiguration()
+	conf, err := dfw.GetConfiguration(ctx)
 	if err != nil {
 		return false, nil
 	}
@@ -93,7 +94,7 @@ func (dfw *NsxvDistributedFirewall) IsEnabled() (bool, error) {
 
 // Enable makes the distributed firewall available
 // It fails with a non-NSX-V VDC
-func (dfw *NsxvDistributedFirewall) Enable() error {
+func (dfw *NsxvDistributedFirewall) Enable(ctx context.Context) error {
 	dfw.enabled = false
 	if dfw.VdcId == "" {
 		return fmt.Errorf("no AdminVdc set for this NsxvDistributedFirewall")
@@ -108,7 +109,7 @@ func (dfw *NsxvDistributedFirewall) Enable() error {
 		return err
 	}
 
-	req := dfw.client.NewRequest(nil, http.MethodPost, *requestUrl, nil)
+	req := dfw.client.NewRequest(ctx, nil, http.MethodPost, *requestUrl, nil)
 
 	resp, err := checkResp(dfw.client.Http.Do(req))
 	if err != nil {
@@ -123,7 +124,7 @@ func (dfw *NsxvDistributedFirewall) Enable() error {
 
 // Disable removes the availability of a distributed firewall
 // WARNING: it also removes all rules
-func (dfw *NsxvDistributedFirewall) Disable() error {
+func (dfw *NsxvDistributedFirewall) Disable(ctx context.Context) error {
 	if dfw.VdcId == "" {
 		return fmt.Errorf("no AdminVdc set for this NsxvDistributedFirewall")
 	}
@@ -137,13 +138,13 @@ func (dfw *NsxvDistributedFirewall) Disable() error {
 		return err
 	}
 
-	req := dfw.client.NewRequest(nil, http.MethodDelete, *requestUrl, nil)
+	req := dfw.client.NewRequest(ctx, nil, http.MethodDelete, *requestUrl, nil)
 
 	resp, err := checkResp(dfw.client.Http.Do(req))
 	if err != nil {
 		// VCD 10.3.x sometimes returns an error even though the removal succeeds
 		if dfw.client.APIVersion == "36.0" {
-			conf, _ := dfw.GetConfiguration()
+			conf, _ := dfw.GetConfiguration(ctx)
 			if conf == nil {
 				return nil
 			}
@@ -163,9 +164,9 @@ func (dfw *NsxvDistributedFirewall) Disable() error {
 
 // UpdateConfiguration will either create a new set of rules or update existing ones.
 // If the firewall already contains rules, they are overwritten by the ones passed as parameters
-func (dfw *NsxvDistributedFirewall) UpdateConfiguration(rules []types.NsxvDistributedFirewallRule) (*types.FirewallConfiguration, error) {
+func (dfw *NsxvDistributedFirewall) UpdateConfiguration(ctx context.Context, rules []types.NsxvDistributedFirewallRule) (*types.FirewallConfiguration, error) {
 
-	oldConf, err := dfw.GetConfiguration()
+	oldConf, err := dfw.GetConfiguration(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +216,7 @@ func (dfw *NsxvDistributedFirewall) UpdateConfiguration(rules []types.NsxvDistri
 
 	contentType := fmt.Sprintf("application/*+xml;version=%s", dfw.client.APIVersion)
 
-	resp, err := dfw.client.ExecuteRequest(requestUrl.String(), http.MethodPut, contentType,
+	resp, err := dfw.client.ExecuteRequest(ctx, requestUrl.String(), http.MethodPut, contentType,
 		"error updating NSX-V distributed firewall: %s", ruleSet, &newRuleset)
 
 	if err != nil {
@@ -224,13 +225,13 @@ func (dfw *NsxvDistributedFirewall) UpdateConfiguration(rules []types.NsxvDistri
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("[update DistributedFirewall] expected status code %d - received %d", http.StatusOK, resp.StatusCode)
 	}
-	return dfw.GetConfiguration()
+	return dfw.GetConfiguration(ctx)
 }
 
 // GetServices retrieves the list of services for the current VCD
 // If `refresh` = false and the services were already retrieved in a previous operation,
 // then it returns the internal values instead of fetching new ones
-func (dfw *NsxvDistributedFirewall) GetServices(refresh bool) ([]types.Application, error) {
+func (dfw *NsxvDistributedFirewall) GetServices(ctx context.Context, refresh bool) ([]types.Application, error) {
 	if dfw.Services != nil && !refresh {
 		return dfw.Services, nil
 	}
@@ -247,7 +248,7 @@ func (dfw *NsxvDistributedFirewall) GetServices(refresh bool) ([]types.Applicati
 		return nil, err
 	}
 
-	req := dfw.client.NewRequest(nil, http.MethodGet, *requestUrl, nil)
+	req := dfw.client.NewRequest(ctx, nil, http.MethodGet, *requestUrl, nil)
 
 	resp, err := checkResp(dfw.client.Http.Do(req))
 	if err != nil {
@@ -268,7 +269,7 @@ func (dfw *NsxvDistributedFirewall) GetServices(refresh bool) ([]types.Applicati
 // GetServiceGroups retrieves the list of services for the current VDC
 // If `refresh` = false and the services were already retrieved in a previous operation,
 // then it returns the internal values instead of fetching new ones
-func (dfw *NsxvDistributedFirewall) GetServiceGroups(refresh bool) ([]types.ApplicationGroup, error) {
+func (dfw *NsxvDistributedFirewall) GetServiceGroups(ctx context.Context, refresh bool) ([]types.ApplicationGroup, error) {
 	if dfw.ServiceGroups != nil && !refresh {
 		return dfw.ServiceGroups, nil
 	}
@@ -285,7 +286,7 @@ func (dfw *NsxvDistributedFirewall) GetServiceGroups(refresh bool) ([]types.Appl
 		return nil, err
 	}
 
-	req := dfw.client.NewRequest(nil, http.MethodGet, *requestUrl, nil)
+	req := dfw.client.NewRequest(ctx, nil, http.MethodGet, *requestUrl, nil)
 
 	resp, err := checkResp(dfw.client.Http.Do(req))
 	if err != nil {
@@ -304,30 +305,30 @@ func (dfw *NsxvDistributedFirewall) GetServiceGroups(refresh bool) ([]types.Appl
 }
 
 // Refresh retrieves fresh values for the distributed firewall rules, services, and service groups
-func (dfw *NsxvDistributedFirewall) Refresh() error {
+func (dfw *NsxvDistributedFirewall) Refresh(ctx context.Context) error {
 	if dfw.VdcId == "" {
 		return fmt.Errorf("no AdminVdc set for this NsxvDistributedFirewall")
 	}
 
-	_, err := dfw.GetServices(true)
+	_, err := dfw.GetServices(ctx, true)
 	if err != nil {
 		return err
 	}
 
-	_, err = dfw.GetServiceGroups(true)
+	_, err = dfw.GetServiceGroups(ctx, true)
 	if err != nil {
 		return err
 	}
 
-	_, err = dfw.GetConfiguration()
+	_, err = dfw.GetConfiguration(ctx)
 	return err
 }
 
 // GetServiceById retrieves a single service, identified by its ID, for the current VDC
 // If the list of services was already retrieved, it uses it, otherwise fetches new ones.
 // Returns ErrorEntityNotFound when the requested services was not found
-func (dfw *NsxvDistributedFirewall) GetServiceById(serviceId string) (*types.Application, error) {
-	services, err := dfw.GetServices(false)
+func (dfw *NsxvDistributedFirewall) GetServiceById(ctx context.Context, serviceId string) (*types.Application, error) {
+	services, err := dfw.GetServices(ctx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -342,8 +343,8 @@ func (dfw *NsxvDistributedFirewall) GetServiceById(serviceId string) (*types.App
 // GetServiceByName retrieves a single service, identified by its name, for the current VDC
 // If the list of services was already retrieved, it uses it, otherwise fetches new ones.
 // Returns ErrorEntityNotFound when the requested service was not found
-func (dfw *NsxvDistributedFirewall) GetServiceByName(serviceName string) (*types.Application, error) {
-	services, err := dfw.GetServices(false)
+func (dfw *NsxvDistributedFirewall) GetServiceByName(ctx context.Context, serviceName string) (*types.Application, error) {
+	services, err := dfw.GetServices(ctx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -364,8 +365,8 @@ func (dfw *NsxvDistributedFirewall) GetServiceByName(serviceName string) (*types
 
 // GetServicesByRegex returns a list of services with their names matching the given regular expression
 // It may return an empty list (without error)
-func (dfw *NsxvDistributedFirewall) GetServicesByRegex(expression string) ([]types.Application, error) {
-	services, err := dfw.GetServices(false)
+func (dfw *NsxvDistributedFirewall) GetServicesByRegex(ctx context.Context, expression string) ([]types.Application, error) {
+	services, err := dfw.GetServices(ctx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -385,8 +386,8 @@ func (dfw *NsxvDistributedFirewall) GetServicesByRegex(expression string) ([]typ
 // GetServiceGroupById retrieves a single service group, identified by its ID, for the current VDC
 // If the list of service groups was already retrieved, it uses it, otherwise fetches new ones.
 // Returns ErrorEntityNotFound when the requested service group was not found
-func (dfw *NsxvDistributedFirewall) GetServiceGroupById(serviceGroupId string) (*types.ApplicationGroup, error) {
-	serviceGroups, err := dfw.GetServiceGroups(false)
+func (dfw *NsxvDistributedFirewall) GetServiceGroupById(ctx context.Context, serviceGroupId string) (*types.ApplicationGroup, error) {
+	serviceGroups, err := dfw.GetServiceGroups(ctx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -401,8 +402,8 @@ func (dfw *NsxvDistributedFirewall) GetServiceGroupById(serviceGroupId string) (
 // GetServiceGroupByName retrieves a single service group, identified by its name, for the current VDC
 // If the list of service groups was already retrieved, it uses it, otherwise fetches new ones.
 // Returns ErrorEntityNotFound when the requested service group was not found
-func (dfw *NsxvDistributedFirewall) GetServiceGroupByName(serviceGroupName string) (*types.ApplicationGroup, error) {
-	serviceGroups, err := dfw.GetServiceGroups(false)
+func (dfw *NsxvDistributedFirewall) GetServiceGroupByName(ctx context.Context, serviceGroupName string) (*types.ApplicationGroup, error) {
+	serviceGroups, err := dfw.GetServiceGroups(ctx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -423,8 +424,8 @@ func (dfw *NsxvDistributedFirewall) GetServiceGroupByName(serviceGroupName strin
 
 // GetServiceGroupsByRegex returns a list of services with their names matching the given regular expression
 // It may return an empty list (without error)
-func (dfw *NsxvDistributedFirewall) GetServiceGroupsByRegex(expression string) ([]types.ApplicationGroup, error) {
-	serviceGroups, err := dfw.GetServiceGroups(false)
+func (dfw *NsxvDistributedFirewall) GetServiceGroupsByRegex(ctx context.Context, expression string) ([]types.ApplicationGroup, error) {
+	serviceGroups, err := dfw.GetServiceGroups(ctx, false)
 	if err != nil {
 		return nil, err
 	}

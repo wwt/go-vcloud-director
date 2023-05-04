@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -21,7 +22,7 @@ type NsxtAlbImportableCloud struct {
 
 // GetAllAlbImportableClouds returns importable NSX-T ALB Clouds.
 // parentAlbControllerUrn (ID in URN format of a parent ALB Controller) is mandatory
-func (vcdClient *VCDClient) GetAllAlbImportableClouds(parentAlbControllerUrn string, queryParameters url.Values) ([]*NsxtAlbImportableCloud, error) {
+func (vcdClient *VCDClient) GetAllAlbImportableClouds(ctx context.Context, parentAlbControllerUrn string, queryParameters url.Values) ([]*NsxtAlbImportableCloud, error) {
 	client := vcdClient.Client
 	if parentAlbControllerUrn == "" {
 		return nil, fmt.Errorf("parent ALB Controller ID is required")
@@ -31,7 +32,7 @@ func (vcdClient *VCDClient) GetAllAlbImportableClouds(parentAlbControllerUrn str
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbImportableClouds
-	apiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	apiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +45,7 @@ func (vcdClient *VCDClient) GetAllAlbImportableClouds(parentAlbControllerUrn str
 	queryParams := copyOrNewUrlValues(queryParameters)
 	queryParams = queryParameterFilterAnd(fmt.Sprintf("_context==%s", parentAlbControllerUrn), queryParams)
 	typeResponses := []*types.NsxtAlbImportableCloud{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParams, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParams, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -61,8 +62,8 @@ func (vcdClient *VCDClient) GetAllAlbImportableClouds(parentAlbControllerUrn str
 }
 
 // GetAlbImportableCloudByName returns importable NSX-T ALB Clouds.
-func (vcdClient *VCDClient) GetAlbImportableCloudByName(parentAlbControllerUrn, name string) (*NsxtAlbImportableCloud, error) {
-	albImportableClouds, err := vcdClient.GetAllAlbImportableClouds(parentAlbControllerUrn, nil)
+func (vcdClient *VCDClient) GetAlbImportableCloudByName(ctx context.Context, parentAlbControllerUrn, name string) (*NsxtAlbImportableCloud, error) {
+	albImportableClouds, err := vcdClient.GetAllAlbImportableClouds(ctx, parentAlbControllerUrn, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error finding NSX-T ALB Importable Cloud by Name '%s': %s", name, err)
 	}
@@ -87,8 +88,8 @@ func (vcdClient *VCDClient) GetAlbImportableCloudByName(parentAlbControllerUrn, 
 
 // GetAlbImportableCloudById returns importable NSX-T ALB Clouds.
 // Note. ID filtering is performed on client side
-func (vcdClient *VCDClient) GetAlbImportableCloudById(parentAlbControllerUrn, id string) (*NsxtAlbImportableCloud, error) {
-	albImportableClouds, err := vcdClient.GetAllAlbImportableClouds(parentAlbControllerUrn, nil)
+func (vcdClient *VCDClient) GetAlbImportableCloudById(ctx context.Context, parentAlbControllerUrn, id string) (*NsxtAlbImportableCloud, error) {
+	albImportableClouds, err := vcdClient.GetAllAlbImportableClouds(ctx, parentAlbControllerUrn, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error finding NSX-T ALB Importable Cloud by ID '%s': %s", id, err)
 	}
@@ -111,11 +112,11 @@ func (vcdClient *VCDClient) GetAlbImportableCloudById(parentAlbControllerUrn, id
 }
 
 // GetAllAlbImportableClouds is attached to NsxtAlbController type for a convenient parent/child relationship
-func (nsxtAlbController *NsxtAlbController) GetAllAlbImportableClouds(queryParameters url.Values) ([]*NsxtAlbImportableCloud, error) {
-	return nsxtAlbController.vcdClient.GetAllAlbImportableClouds(nsxtAlbController.NsxtAlbController.ID, queryParameters)
+func (nsxtAlbController *NsxtAlbController) GetAllAlbImportableClouds(ctx context.Context, queryParameters url.Values) ([]*NsxtAlbImportableCloud, error) {
+	return nsxtAlbController.vcdClient.GetAllAlbImportableClouds(ctx, nsxtAlbController.NsxtAlbController.ID, queryParameters)
 }
 
 // GetAlbImportableCloudByName is attached to NsxtAlbController type for a convenient parent/child relationship
-func (nsxtAlbController *NsxtAlbController) GetAlbImportableCloudByName(name string) (*NsxtAlbImportableCloud, error) {
-	return nsxtAlbController.vcdClient.GetAlbImportableCloudByName(nsxtAlbController.NsxtAlbController.ID, name)
+func (nsxtAlbController *NsxtAlbController) GetAlbImportableCloudByName(ctx context.Context, name string) (*NsxtAlbImportableCloud, error) {
+	return nsxtAlbController.vcdClient.GetAlbImportableCloudByName(ctx, nsxtAlbController.NsxtAlbController.ID, name)
 }

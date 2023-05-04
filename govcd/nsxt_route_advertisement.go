@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
@@ -12,7 +13,7 @@ import (
 
 // GetNsxtRouteAdvertisementWithContext retrieves the list of subnets that will be advertised so that the Edge Gateway can route
 // out to the connected external network.
-func (egw *NsxtEdgeGateway) GetNsxtRouteAdvertisementWithContext(useTenantContext bool) (*types.RouteAdvertisement, error) {
+func (egw *NsxtEdgeGateway) GetNsxtRouteAdvertisementWithContext(ctx context.Context, useTenantContext bool) (*types.RouteAdvertisement, error) {
 	err := checkSanityNsxtEdgeGatewayRouteAdvertisement(egw)
 	if err != nil {
 		return nil, err
@@ -20,7 +21,7 @@ func (egw *NsxtEdgeGateway) GetNsxtRouteAdvertisementWithContext(useTenantContex
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointNsxtRouteAdvertisement
 
-	highestApiVersion, err := egw.client.getOpenApiHighestElevatedVersion(endpoint)
+	highestApiVersion, err := egw.client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +42,7 @@ func (egw *NsxtEdgeGateway) GetNsxtRouteAdvertisementWithContext(useTenantContex
 	}
 
 	routeAdvertisement := &types.RouteAdvertisement{}
-	err = egw.client.OpenApiGetItem(highestApiVersion, urlRef, nil, routeAdvertisement, tenantContextHeaders)
+	err = egw.client.OpenApiGetItem(ctx, highestApiVersion, urlRef, nil, routeAdvertisement, tenantContextHeaders)
 	if err != nil {
 		return nil, err
 	}
@@ -50,13 +51,13 @@ func (egw *NsxtEdgeGateway) GetNsxtRouteAdvertisementWithContext(useTenantContex
 }
 
 // GetNsxtRouteAdvertisement method is the same as GetNsxtRouteAdvertisementWithContext but sending TenantContext by default
-func (egw *NsxtEdgeGateway) GetNsxtRouteAdvertisement() (*types.RouteAdvertisement, error) {
-	return egw.GetNsxtRouteAdvertisementWithContext(true)
+func (egw *NsxtEdgeGateway) GetNsxtRouteAdvertisement(ctx context.Context) (*types.RouteAdvertisement, error) {
+	return egw.GetNsxtRouteAdvertisementWithContext(ctx, true)
 }
 
 // UpdateNsxtRouteAdvertisementWithContext updates the list of subnets that will be advertised so that the Edge Gateway can route
 // out to the connected external network.
-func (egw *NsxtEdgeGateway) UpdateNsxtRouteAdvertisementWithContext(enable bool, subnets []string, useTenantContext bool) (*types.RouteAdvertisement, error) {
+func (egw *NsxtEdgeGateway) UpdateNsxtRouteAdvertisementWithContext(ctx context.Context, enable bool, subnets []string, useTenantContext bool) (*types.RouteAdvertisement, error) {
 	err := checkSanityNsxtEdgeGatewayRouteAdvertisement(egw)
 	if err != nil {
 		return nil, err
@@ -64,7 +65,7 @@ func (egw *NsxtEdgeGateway) UpdateNsxtRouteAdvertisementWithContext(enable bool,
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointNsxtRouteAdvertisement
 
-	highestApiVersion, err := egw.client.getOpenApiHighestElevatedVersion(endpoint)
+	highestApiVersion, err := egw.client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -89,28 +90,28 @@ func (egw *NsxtEdgeGateway) UpdateNsxtRouteAdvertisementWithContext(enable bool,
 		Subnets: subnets,
 	}
 
-	err = egw.client.OpenApiPutItem(highestApiVersion, urlRef, nil, routeAdvertisement, nil, tenantContextHeaders)
+	err = egw.client.OpenApiPutItem(ctx, highestApiVersion, urlRef, nil, routeAdvertisement, nil, tenantContextHeaders)
 	if err != nil {
 		return nil, err
 	}
 
-	return egw.GetNsxtRouteAdvertisementWithContext(useTenantContext)
+	return egw.GetNsxtRouteAdvertisementWithContext(ctx, useTenantContext)
 }
 
 // UpdateNsxtRouteAdvertisement method is the same as UpdateNsxtRouteAdvertisementWithContext but sending TenantContext by default
-func (egw *NsxtEdgeGateway) UpdateNsxtRouteAdvertisement(enable bool, subnets []string) (*types.RouteAdvertisement, error) {
-	return egw.UpdateNsxtRouteAdvertisementWithContext(enable, subnets, true)
+func (egw *NsxtEdgeGateway) UpdateNsxtRouteAdvertisement(ctx context.Context, enable bool, subnets []string) (*types.RouteAdvertisement, error) {
+	return egw.UpdateNsxtRouteAdvertisementWithContext(ctx, enable, subnets, true)
 }
 
 // DeleteNsxtRouteAdvertisementWithContext deletes the list of subnets that will be advertised.
-func (egw *NsxtEdgeGateway) DeleteNsxtRouteAdvertisementWithContext(useTenantContext bool) error {
-	_, err := egw.UpdateNsxtRouteAdvertisementWithContext(false, []string{}, useTenantContext)
+func (egw *NsxtEdgeGateway) DeleteNsxtRouteAdvertisementWithContext(ctx context.Context, useTenantContext bool) error {
+	_, err := egw.UpdateNsxtRouteAdvertisementWithContext(ctx, false, []string{}, useTenantContext)
 	return err
 }
 
 // DeleteNsxtRouteAdvertisement method is the same as DeleteNsxtRouteAdvertisementWithContext but sending TenantContext by default
-func (egw *NsxtEdgeGateway) DeleteNsxtRouteAdvertisement() error {
-	return egw.DeleteNsxtRouteAdvertisementWithContext(true)
+func (egw *NsxtEdgeGateway) DeleteNsxtRouteAdvertisement(ctx context.Context) error {
+	return egw.DeleteNsxtRouteAdvertisementWithContext(ctx, true)
 }
 
 // checkSanityNsxtEdgeGatewayRouteAdvertisement function performs some checks to *NsxtEdgeGateway parameter and returns error

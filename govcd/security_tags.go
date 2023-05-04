@@ -1,6 +1,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 	"net/url"
@@ -9,9 +10,9 @@ import (
 // GetAllSecurityTaggedEntities Retrieves the list of entities that have at least one tag assigned to it.
 // queryParameters allows users to pass filters: I.e: filter=(tag==Web;entityType==vm)
 // This function works from API v36.0 (VCD 10.3.0+)
-func (org *Org) GetAllSecurityTaggedEntities(queryParameters url.Values) ([]types.SecurityTaggedEntity, error) {
+func (org *Org) GetAllSecurityTaggedEntities(ctx context.Context, queryParameters url.Values) ([]types.SecurityTaggedEntity, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointSecurityTags
-	apiVersion, err := org.client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := org.client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -27,7 +28,7 @@ func (org *Org) GetAllSecurityTaggedEntities(queryParameters url.Values) ([]type
 	}
 
 	var securityTaggedEntities []types.SecurityTaggedEntity
-	err = org.client.OpenApiGetAllItems(apiVersion, urlRef, queryParameters, &securityTaggedEntities, getTenantContextHeader(tenantContext))
+	err = org.client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParameters, &securityTaggedEntities, getTenantContextHeader(tenantContext))
 	if err != nil {
 		return nil, err
 	}
@@ -37,11 +38,11 @@ func (org *Org) GetAllSecurityTaggedEntities(queryParameters url.Values) ([]type
 
 // GetAllSecurityTaggedEntitiesByName wraps GetAllSecurityTaggedEntities and returns ErrorEntityNotFound if nothing was found
 // This function works from API v36.0 (VCD 10.3.0+)
-func (org *Org) GetAllSecurityTaggedEntitiesByName(securityTagName string) ([]types.SecurityTaggedEntity, error) {
+func (org *Org) GetAllSecurityTaggedEntitiesByName(ctx context.Context, securityTagName string) ([]types.SecurityTaggedEntity, error) {
 	queryParameters := copyOrNewUrlValues(nil)
 	queryParameters.Add("filter", "tag=="+securityTagName)
 
-	securityTagEntities, err := org.GetAllSecurityTaggedEntities(queryParameters)
+	securityTagEntities, err := org.GetAllSecurityTaggedEntities(ctx, queryParameters)
 	if err != nil {
 		return nil, err
 	}
@@ -56,9 +57,9 @@ func (org *Org) GetAllSecurityTaggedEntitiesByName(securityTagName string) ([]ty
 // GetAllSecurityTagValues Retrieves the list of security tags that are in the organization and can be reused to tag an entity.
 // The list of tags include tags assigned to entities within the organization.
 // This function works from API v36.0 (VCD 10.3.0+)
-func (org *Org) GetAllSecurityTagValues(queryParameters url.Values) ([]types.SecurityTagValue, error) {
+func (org *Org) GetAllSecurityTagValues(ctx context.Context, queryParameters url.Values) ([]types.SecurityTagValue, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointSecurityTags
-	apiVersion, err := org.client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := org.client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +75,7 @@ func (org *Org) GetAllSecurityTagValues(queryParameters url.Values) ([]types.Sec
 	}
 
 	var securityTaggedValues []types.SecurityTagValue
-	err = org.client.OpenApiGetAllItems(apiVersion, urlRef, queryParameters, &securityTaggedValues, getTenantContextHeader(tenantContext))
+	err = org.client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParameters, &securityTaggedValues, getTenantContextHeader(tenantContext))
 	if err != nil {
 		return nil, err
 	}
@@ -84,9 +85,9 @@ func (org *Org) GetAllSecurityTagValues(queryParameters url.Values) ([]types.Sec
 
 // GetVMSecurityTags Retrieves the list of tags for a specific VM. If user has view right to the VM, user can view its tags.
 // This function works from API v36.0 (VCD 10.3.0+)
-func (vm *VM) GetVMSecurityTags() (*types.EntitySecurityTags, error) {
+func (vm *VM) GetVMSecurityTags(ctx context.Context) (*types.EntitySecurityTags, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointSecurityTags
-	apiVersion, err := vm.client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := vm.client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +98,7 @@ func (vm *VM) GetVMSecurityTags() (*types.EntitySecurityTags, error) {
 	}
 
 	var entitySecurityTags types.EntitySecurityTags
-	err = vm.client.OpenApiGetItem(apiVersion, urlRef, nil, &entitySecurityTags, nil)
+	err = vm.client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, &entitySecurityTags, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -109,9 +110,9 @@ func (vm *VM) GetVMSecurityTags() (*types.EntitySecurityTags, error) {
 // Only the list of tagged entities can be updated. The name cannot be updated.
 // Any other existing entities not in the list will be untagged.
 // This function works from API v36.0 (VCD 10.3.0+)
-func (org *Org) UpdateSecurityTag(securityTag *types.SecurityTag) (*types.SecurityTag, error) {
+func (org *Org) UpdateSecurityTag(ctx context.Context, securityTag *types.SecurityTag) (*types.SecurityTag, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointSecurityTags
-	apiVersion, err := org.client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := org.client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -126,14 +127,14 @@ func (org *Org) UpdateSecurityTag(securityTag *types.SecurityTag) (*types.Securi
 		return nil, err
 	}
 
-	err = org.client.OpenApiPutItem(apiVersion, urlRef, nil, securityTag, nil, getTenantContextHeader(tenantContext))
+	err = org.client.OpenApiPutItem(ctx, apiVersion, urlRef, nil, securityTag, nil, getTenantContextHeader(tenantContext))
 	if err != nil {
 		return nil, err
 	}
 
 	queryParameters := copyOrNewUrlValues(nil)
 	queryParameters.Add("filter", "tag=="+securityTag.Tag)
-	readEntities, err := org.GetAllSecurityTaggedEntities(queryParameters)
+	readEntities, err := org.GetAllSecurityTaggedEntities(ctx, queryParameters)
 	if err != nil {
 		return nil, err
 	}
@@ -153,9 +154,9 @@ func (org *Org) UpdateSecurityTag(securityTag *types.SecurityTag) (*types.Securi
 // UpdateVMSecurityTags updates the list of tags for a specific VM. An empty list of tags means to delete all tags
 // for the VM. If user has edit permission on the VM, user can edit its tags.
 // This function works from API v36.0 (VCD 10.3.0+)
-func (vm *VM) UpdateVMSecurityTags(entitySecurityTags *types.EntitySecurityTags) (*types.EntitySecurityTags, error) {
+func (vm *VM) UpdateVMSecurityTags(ctx context.Context, entitySecurityTags *types.EntitySecurityTags) (*types.EntitySecurityTags, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointSecurityTags
-	apiVersion, err := vm.client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := vm.client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +167,7 @@ func (vm *VM) UpdateVMSecurityTags(entitySecurityTags *types.EntitySecurityTags)
 	}
 
 	var serverEntitySecurityTags types.EntitySecurityTags
-	err = vm.client.OpenApiPutItem(apiVersion, urlRef, nil, entitySecurityTags, &serverEntitySecurityTags, nil)
+	err = vm.client.OpenApiPutItem(ctx, apiVersion, urlRef, nil, entitySecurityTags, &serverEntitySecurityTags, nil)
 	if err != nil {
 		return nil, err
 	}

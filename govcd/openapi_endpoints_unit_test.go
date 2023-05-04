@@ -118,7 +118,7 @@ func TestClient_getOpenApiHighestElevatedVersion(t *testing.T) {
 			client := &Client{
 				supportedVersions: tt.supportedVersions,
 			}
-			got, err := client.getOpenApiHighestElevatedVersion(tt.endpoint)
+			got, err := client.getOpenApiHighestElevatedVersion(ctx, tt.endpoint)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getOpenApiHighestElevatedVersion() error = %v, wantErr %v", err, tt.wantErr)
 				return

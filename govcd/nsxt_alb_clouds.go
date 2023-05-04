@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -20,14 +21,14 @@ type NsxtAlbCloud struct {
 }
 
 // GetAllAlbClouds returns all configured NSX-T ALB Clouds
-func (vcdClient *VCDClient) GetAllAlbClouds(queryParameters url.Values) ([]*NsxtAlbCloud, error) {
+func (vcdClient *VCDClient) GetAllAlbClouds(ctx context.Context, queryParameters url.Values) ([]*NsxtAlbCloud, error) {
 	client := vcdClient.Client
 	if !client.IsSysAdmin {
 		return nil, errors.New("handling NSX-T ALB Clouds require System user")
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbCloud
-	apiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	apiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +39,7 @@ func (vcdClient *VCDClient) GetAllAlbClouds(queryParameters url.Values) ([]*Nsxt
 	}
 
 	typeResponses := []*types.NsxtAlbCloud{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParameters, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParameters, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -56,11 +57,11 @@ func (vcdClient *VCDClient) GetAllAlbClouds(queryParameters url.Values) ([]*Nsxt
 }
 
 // GetAlbCloudByName returns NSX-T ALB Cloud by name
-func (vcdClient *VCDClient) GetAlbCloudByName(name string) (*NsxtAlbCloud, error) {
+func (vcdClient *VCDClient) GetAlbCloudByName(ctx context.Context, name string) (*NsxtAlbCloud, error) {
 	queryParameters := copyOrNewUrlValues(nil)
 	queryParameters.Add("filter", "name=="+name)
 
-	albClouds, err := vcdClient.GetAllAlbClouds(queryParameters)
+	albClouds, err := vcdClient.GetAllAlbClouds(ctx, queryParameters)
 	if err != nil {
 		return nil, fmt.Errorf("error reading NSX-T ALB Cloud with Name '%s': %s", name, err)
 	}
@@ -80,12 +81,12 @@ func (vcdClient *VCDClient) GetAlbCloudByName(name string) (*NsxtAlbCloud, error
 //
 // Note. This function uses server side filtering instead of directly querying endpoint with specified ID because such
 // endpoint does not exist
-func (vcdClient *VCDClient) GetAlbCloudById(id string) (*NsxtAlbCloud, error) {
+func (vcdClient *VCDClient) GetAlbCloudById(ctx context.Context, id string) (*NsxtAlbCloud, error) {
 
 	queryParameters := copyOrNewUrlValues(nil)
 	queryParameters.Add("filter", "id=="+id)
 
-	albCloud, err := vcdClient.GetAllAlbClouds(queryParameters)
+	albCloud, err := vcdClient.GetAllAlbClouds(ctx, queryParameters)
 	if err != nil {
 		return nil, fmt.Errorf("error reading NSX-T ALB Cloud with ID '%s': %s", id, err)
 	}
@@ -98,14 +99,14 @@ func (vcdClient *VCDClient) GetAlbCloudById(id string) (*NsxtAlbCloud, error) {
 }
 
 // CreateAlbCloud creates NSX-T ALB Cloud
-func (vcdClient *VCDClient) CreateAlbCloud(albCloudConfig *types.NsxtAlbCloud) (*NsxtAlbCloud, error) {
+func (vcdClient *VCDClient) CreateAlbCloud(ctx context.Context, albCloudConfig *types.NsxtAlbCloud) (*NsxtAlbCloud, error) {
 	client := vcdClient.Client
 	if !client.IsSysAdmin {
 		return nil, errors.New("handling NSX-T ALB Clouds require System user")
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbCloud
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +121,7 @@ func (vcdClient *VCDClient) CreateAlbCloud(albCloudConfig *types.NsxtAlbCloud) (
 		vcdClient:    vcdClient,
 	}
 
-	err = client.OpenApiPostItem(minimumApiVersion, urlRef, nil, albCloudConfig, returnObject.NsxtAlbCloud, nil)
+	err = client.OpenApiPostItem(ctx, minimumApiVersion, urlRef, nil, albCloudConfig, returnObject.NsxtAlbCloud, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating NSX-T ALB Cloud: %s", err)
 	}
@@ -134,7 +135,7 @@ func (vcdClient *VCDClient) CreateAlbCloud(albCloudConfig *types.NsxtAlbCloud) (
 //func (nsxtAlbCloud *NsxtAlbCloud) Update(albCloudConfig *types.NsxtAlbCloud) (*NsxtAlbCloud, error) {
 //	client := nsxtAlbCloud.vcdClient.Client
 //	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbCloud
-//	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+//	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 //	if err != nil {
 //		return nil, err
 //	}
@@ -153,7 +154,7 @@ func (vcdClient *VCDClient) CreateAlbCloud(albCloudConfig *types.NsxtAlbCloud) (
 //		vcdClient:    nsxtAlbCloud.vcdClient,
 //	}
 //
-//	err = client.OpenApiPutItem(minimumApiVersion, urlRef, nil, albCloudConfig, responseAlbCloud.NsxtAlbCloud, nil)
+//	err = client.OpenApiPutItem(ctx, minimumApiVersion, urlRef, nil, albCloudConfig, responseAlbCloud.NsxtAlbCloud, nil)
 //	if err != nil {
 //		return nil, fmt.Errorf("error updating NSX-T ALB Cloud: %s", err)
 //	}
@@ -162,10 +163,10 @@ func (vcdClient *VCDClient) CreateAlbCloud(albCloudConfig *types.NsxtAlbCloud) (
 //}
 
 // Delete removes NSX-T ALB Cloud configuration
-func (nsxtAlbCloud *NsxtAlbCloud) Delete() error {
+func (nsxtAlbCloud *NsxtAlbCloud) Delete(ctx context.Context) error {
 	client := nsxtAlbCloud.vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbCloud
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -179,7 +180,7 @@ func (nsxtAlbCloud *NsxtAlbCloud) Delete() error {
 		return err
 	}
 
-	err = client.OpenApiDeleteItem(minimumApiVersion, urlRef, nil, nil)
+	err = client.OpenApiDeleteItem(ctx, minimumApiVersion, urlRef, nil, nil)
 	if err != nil {
 		return fmt.Errorf("error deleting NSX-T ALB Cloud: %s", err)
 	}

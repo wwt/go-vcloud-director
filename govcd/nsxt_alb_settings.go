@@ -1,16 +1,17 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 )
 
 // GetAlbSettings retrieves NSX-T ALB settings for a particular Edge Gateway
-func (egw *NsxtEdgeGateway) GetAlbSettings() (*types.NsxtAlbConfig, error) {
+func (egw *NsxtEdgeGateway) GetAlbSettings(ctx context.Context) (*types.NsxtAlbConfig, error) {
 	client := egw.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbEdgeGateway
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -21,7 +22,7 @@ func (egw *NsxtEdgeGateway) GetAlbSettings() (*types.NsxtAlbConfig, error) {
 	}
 
 	typeResponse := &types.NsxtAlbConfig{}
-	err = client.OpenApiGetItem(apiVersion, urlRef, nil, &typeResponse, nil)
+	err = client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, &typeResponse, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -30,10 +31,10 @@ func (egw *NsxtEdgeGateway) GetAlbSettings() (*types.NsxtAlbConfig, error) {
 }
 
 // UpdateAlbSettings updates NSX-T ALB settings for a particular Edge Gateway
-func (egw *NsxtEdgeGateway) UpdateAlbSettings(config *types.NsxtAlbConfig) (*types.NsxtAlbConfig, error) {
+func (egw *NsxtEdgeGateway) UpdateAlbSettings(ctx context.Context, config *types.NsxtAlbConfig) (*types.NsxtAlbConfig, error) {
 	client := egw.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbEdgeGateway
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +45,7 @@ func (egw *NsxtEdgeGateway) UpdateAlbSettings(config *types.NsxtAlbConfig) (*typ
 	}
 
 	typeResponse := &types.NsxtAlbConfig{}
-	err = client.OpenApiPutItem(apiVersion, urlRef, nil, config, typeResponse, nil)
+	err = client.OpenApiPutItem(ctx, apiVersion, urlRef, nil, config, typeResponse, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -53,11 +54,11 @@ func (egw *NsxtEdgeGateway) UpdateAlbSettings(config *types.NsxtAlbConfig) (*typ
 }
 
 // DisableAlb is a shortcut wrapping UpdateAlbSettings which disables ALB configuration
-func (egw *NsxtEdgeGateway) DisableAlb() error {
+func (egw *NsxtEdgeGateway) DisableAlb(ctx context.Context) error {
 	config := &types.NsxtAlbConfig{
 		Enabled: false,
 	}
-	_, err := egw.UpdateAlbSettings(config)
+	_, err := egw.UpdateAlbSettings(ctx, config)
 	if err != nil {
 		return fmt.Errorf("error disabling NSX-T ALB: %s", err)
 	}

@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -18,11 +19,11 @@ type NsxtAlbServiceEngineGroupAssignment struct {
 	vcdClient                           *VCDClient
 }
 
-func (vcdClient *VCDClient) GetAllAlbServiceEngineGroupAssignments(queryParameters url.Values) ([]*NsxtAlbServiceEngineGroupAssignment, error) {
+func (vcdClient *VCDClient) GetAllAlbServiceEngineGroupAssignments(ctx context.Context, queryParameters url.Values) ([]*NsxtAlbServiceEngineGroupAssignment, error) {
 	client := vcdClient.Client
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbServiceEngineGroupAssignments
-	apiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	apiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +34,7 @@ func (vcdClient *VCDClient) GetAllAlbServiceEngineGroupAssignments(queryParamete
 	}
 
 	typeResponses := []*types.NsxtAlbServiceEngineGroupAssignment{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParameters, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParameters, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -49,11 +50,11 @@ func (vcdClient *VCDClient) GetAllAlbServiceEngineGroupAssignments(queryParamete
 	return wrappedResponses, nil
 }
 
-func (vcdClient *VCDClient) GetAlbServiceEngineGroupAssignmentById(id string) (*NsxtAlbServiceEngineGroupAssignment, error) {
+func (vcdClient *VCDClient) GetAlbServiceEngineGroupAssignmentById(ctx context.Context, id string) (*NsxtAlbServiceEngineGroupAssignment, error) {
 	client := vcdClient.Client
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbServiceEngineGroupAssignments
-	apiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	apiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +66,7 @@ func (vcdClient *VCDClient) GetAlbServiceEngineGroupAssignmentById(id string) (*
 
 	typeResponse := &types.NsxtAlbServiceEngineGroupAssignment{}
 
-	err = client.OpenApiGetItem(apiVersion, urlRef, nil, &typeResponse, nil)
+	err = client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, &typeResponse, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -78,9 +79,9 @@ func (vcdClient *VCDClient) GetAlbServiceEngineGroupAssignmentById(id string) (*
 	return wrappedResponse, nil
 }
 
-func (vcdClient *VCDClient) GetAlbServiceEngineGroupAssignmentByName(name string) (*NsxtAlbServiceEngineGroupAssignment, error) {
+func (vcdClient *VCDClient) GetAlbServiceEngineGroupAssignmentByName(ctx context.Context, name string) (*NsxtAlbServiceEngineGroupAssignment, error) {
 	// Filtering by Service Engine Group name is not supported on API therefore filtering is done locally
-	allServiceEngineGroupAssignments, err := vcdClient.GetAllAlbServiceEngineGroupAssignments(nil)
+	allServiceEngineGroupAssignments, err := vcdClient.GetAllAlbServiceEngineGroupAssignments(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -103,9 +104,9 @@ func (vcdClient *VCDClient) GetAlbServiceEngineGroupAssignmentByName(name string
 // GetFilteredAlbServiceEngineGroupAssignmentByName will get all ALB Service Engine Group assignments based on filters
 // provided in queryParameters additionally will filter by name locally because VCD does not support server side
 // filtering by name.
-func (vcdClient *VCDClient) GetFilteredAlbServiceEngineGroupAssignmentByName(name string, queryParameters url.Values) (*NsxtAlbServiceEngineGroupAssignment, error) {
+func (vcdClient *VCDClient) GetFilteredAlbServiceEngineGroupAssignmentByName(ctx context.Context, name string, queryParameters url.Values) (*NsxtAlbServiceEngineGroupAssignment, error) {
 	// Filtering by Service Engine Group name is not supported on API therefore filtering is done locally
-	allServiceEngineGroupAssignments, err := vcdClient.GetAllAlbServiceEngineGroupAssignments(queryParameters)
+	allServiceEngineGroupAssignments, err := vcdClient.GetAllAlbServiceEngineGroupAssignments(ctx, queryParameters)
 	if err != nil {
 		return nil, err
 	}
@@ -125,14 +126,14 @@ func (vcdClient *VCDClient) GetFilteredAlbServiceEngineGroupAssignmentByName(nam
 	return foundGroup, nil
 }
 
-func (vcdClient *VCDClient) CreateAlbServiceEngineGroupAssignment(assignmentConfig *types.NsxtAlbServiceEngineGroupAssignment) (*NsxtAlbServiceEngineGroupAssignment, error) {
+func (vcdClient *VCDClient) CreateAlbServiceEngineGroupAssignment(ctx context.Context, assignmentConfig *types.NsxtAlbServiceEngineGroupAssignment) (*NsxtAlbServiceEngineGroupAssignment, error) {
 	client := vcdClient.Client
 	if !client.IsSysAdmin {
 		return nil, errors.New("handling NSX-T ALB Service Engine Group Assignment require System user")
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbServiceEngineGroupAssignments
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +148,7 @@ func (vcdClient *VCDClient) CreateAlbServiceEngineGroupAssignment(assignmentConf
 		vcdClient:                           vcdClient,
 	}
 
-	err = client.OpenApiPostItem(minimumApiVersion, urlRef, nil, assignmentConfig, returnObject.NsxtAlbServiceEngineGroupAssignment, nil)
+	err = client.OpenApiPostItem(ctx, minimumApiVersion, urlRef, nil, assignmentConfig, returnObject.NsxtAlbServiceEngineGroupAssignment, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating NSX-T ALB Service Engine Group Assignment: %s", err)
 	}
@@ -156,10 +157,10 @@ func (vcdClient *VCDClient) CreateAlbServiceEngineGroupAssignment(assignmentConf
 }
 
 // Update updates existing ALB Service Engine Group Assignment with new supplied assignmentConfig configuration
-func (nsxtEdgeAlbServiceEngineGroup *NsxtAlbServiceEngineGroupAssignment) Update(assignmentConfig *types.NsxtAlbServiceEngineGroupAssignment) (*NsxtAlbServiceEngineGroupAssignment, error) {
+func (nsxtEdgeAlbServiceEngineGroup *NsxtAlbServiceEngineGroupAssignment) Update(ctx context.Context, assignmentConfig *types.NsxtAlbServiceEngineGroupAssignment) (*NsxtAlbServiceEngineGroupAssignment, error) {
 	client := nsxtEdgeAlbServiceEngineGroup.vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbServiceEngineGroupAssignments
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +179,7 @@ func (nsxtEdgeAlbServiceEngineGroup *NsxtAlbServiceEngineGroupAssignment) Update
 		vcdClient:                           nsxtEdgeAlbServiceEngineGroup.vcdClient,
 	}
 
-	err = client.OpenApiPutItem(minimumApiVersion, urlRef, nil, assignmentConfig, responseAlbController.NsxtAlbServiceEngineGroupAssignment, nil)
+	err = client.OpenApiPutItem(ctx, minimumApiVersion, urlRef, nil, assignmentConfig, responseAlbController.NsxtAlbServiceEngineGroupAssignment, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error updating NSX-T ALB Service Engine Group Assignment: %s", err)
 	}
@@ -187,10 +188,10 @@ func (nsxtEdgeAlbServiceEngineGroup *NsxtAlbServiceEngineGroupAssignment) Update
 }
 
 // Delete deletes NSX-T ALB Service Engine Group Assignment
-func (nsxtEdgeAlbServiceEngineGroup *NsxtAlbServiceEngineGroupAssignment) Delete() error {
+func (nsxtEdgeAlbServiceEngineGroup *NsxtAlbServiceEngineGroupAssignment) Delete(ctx context.Context) error {
 	client := nsxtEdgeAlbServiceEngineGroup.vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbServiceEngineGroupAssignments
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -204,7 +205,7 @@ func (nsxtEdgeAlbServiceEngineGroup *NsxtAlbServiceEngineGroupAssignment) Delete
 		return err
 	}
 
-	err = client.OpenApiDeleteItem(minimumApiVersion, urlRef, nil, nil)
+	err = client.OpenApiDeleteItem(ctx, minimumApiVersion, urlRef, nil, nil)
 	if err != nil {
 		return fmt.Errorf("error deleting NSX-T ALB Service Engine Group Assignment: %s", err)
 	}

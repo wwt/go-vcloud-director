@@ -1,6 +1,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 	"net/url"
@@ -26,16 +27,16 @@ const vmGroupUrnPrefix = "urn:vcloud:namedVmGroup"
 // GetVmGroupById finds a VM Group by its ID.
 // On success, returns a pointer to the VmGroup structure and a nil error
 // On failure, returns a nil pointer and an error
-func (vcdClient *VCDClient) GetVmGroupById(id string) (*VmGroup, error) {
-	return getVmGroupWithFilter(vcdClient, "vmGroupId=="+url.QueryEscape(extractUuid(id)))
+func (vcdClient *VCDClient) GetVmGroupById(ctx context.Context, id string) (*VmGroup, error) {
+	return getVmGroupWithFilter(ctx, vcdClient, "vmGroupId=="+url.QueryEscape(extractUuid(id)))
 }
 
 // GetVmGroupByNamedVmGroupIdAndProviderVdcUrn finds a VM Group by its Named VM Group ID and Provider VDC URN.
 // On success, returns a pointer to the VmGroup structure and a nil error
 // On failure, returns a nil pointer and an error
-func (vcdClient *VCDClient) GetVmGroupByNamedVmGroupIdAndProviderVdcUrn(namedVmGroupId, pvdcUrn string) (*VmGroup, error) {
+func (vcdClient *VCDClient) GetVmGroupByNamedVmGroupIdAndProviderVdcUrn(ctx context.Context, namedVmGroupId, pvdcUrn string) (*VmGroup, error) {
 	id := extractUuid(namedVmGroupId)
-	resourcePools, err := getResourcePools(vcdClient, pvdcUrn)
+	resourcePools, err := getResourcePools(ctx, vcdClient, pvdcUrn)
 	if err != nil {
 		return nil, fmt.Errorf("could not get VM Group with namedVmGroupId=%s: %s", id, err)
 	}
@@ -43,14 +44,14 @@ func (vcdClient *VCDClient) GetVmGroupByNamedVmGroupIdAndProviderVdcUrn(namedVmG
 	if err != nil {
 		return nil, fmt.Errorf("could not get VM Group with namedVmGroupId=%s: %s", id, err)
 	}
-	return getVmGroupWithFilter(vcdClient, filter)
+	return getVmGroupWithFilter(ctx, vcdClient, filter)
 }
 
 // GetVmGroupByNameAndProviderVdcUrn finds a VM Group by its name and associated Provider VDC URN.
 // On success, returns a pointer to the VmGroup structure and a nil error
 // On failure, returns a nil pointer and an error
-func (vcdClient *VCDClient) GetVmGroupByNameAndProviderVdcUrn(name, pvdcUrn string) (*VmGroup, error) {
-	resourcePools, err := getResourcePools(vcdClient, pvdcUrn)
+func (vcdClient *VCDClient) GetVmGroupByNameAndProviderVdcUrn(ctx context.Context, name, pvdcUrn string) (*VmGroup, error) {
+	resourcePools, err := getResourcePools(ctx, vcdClient, pvdcUrn)
 	if err != nil {
 		return nil, fmt.Errorf("could not get VM Group with vmGroupName=%s: %s", name, err)
 	}
@@ -58,7 +59,7 @@ func (vcdClient *VCDClient) GetVmGroupByNameAndProviderVdcUrn(name, pvdcUrn stri
 	if err != nil {
 		return nil, fmt.Errorf("could not get VM Group with vmGroupName=%s: %s", name, err)
 	}
-	return getVmGroupWithFilter(vcdClient, filter)
+	return getVmGroupWithFilter(ctx, vcdClient, filter)
 }
 
 // buildFilterForVmGroups builds a filter to search for VM Groups based on the given resource pools and the desired
@@ -91,10 +92,10 @@ func buildFilterForVmGroups(resourcePools []*types.QueryResultResourcePoolRecord
 // GetLogicalVmGroupById finds a Logical VM Group by its URN.
 // On success, returns a pointer to the LogicalVmGroup structure and a nil error
 // On failure, returns a nil pointer and an error
-func (vcdClient *VCDClient) GetLogicalVmGroupById(logicalVmGroupId string) (*LogicalVmGroup, error) {
+func (vcdClient *VCDClient) GetLogicalVmGroupById(ctx context.Context, logicalVmGroupId string) (*LogicalVmGroup, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointLogicalVmGroups
 
-	apiVersion, err := vcdClient.Client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := vcdClient.Client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +114,7 @@ func (vcdClient *VCDClient) GetLogicalVmGroupById(logicalVmGroupId string) (*Log
 		client:         &vcdClient.Client,
 	}
 
-	err = vcdClient.Client.OpenApiGetItem(apiVersion, urlRef, nil, result.LogicalVmGroup, nil)
+	err = vcdClient.Client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, result.LogicalVmGroup, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error getting Logical VM Group: %s", err)
 	}
@@ -122,10 +123,10 @@ func (vcdClient *VCDClient) GetLogicalVmGroupById(logicalVmGroupId string) (*Log
 }
 
 // CreateLogicalVmGroup creates a new Logical VM Group in VCD
-func (vcdClient *VCDClient) CreateLogicalVmGroup(logicalVmGroup types.LogicalVmGroup) (*LogicalVmGroup, error) {
+func (vcdClient *VCDClient) CreateLogicalVmGroup(ctx context.Context, logicalVmGroup types.LogicalVmGroup) (*LogicalVmGroup, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointLogicalVmGroups
 
-	apiVersion, err := vcdClient.Client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := vcdClient.Client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +141,7 @@ func (vcdClient *VCDClient) CreateLogicalVmGroup(logicalVmGroup types.LogicalVmG
 		client:         &vcdClient.Client,
 	}
 
-	err = vcdClient.Client.OpenApiPostItem(apiVersion, urlRef, nil, logicalVmGroup, result.LogicalVmGroup, nil)
+	err = vcdClient.Client.OpenApiPostItem(ctx, apiVersion, urlRef, nil, logicalVmGroup, result.LogicalVmGroup, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating the Logical VM Group: %s", err)
 	}
@@ -149,14 +150,14 @@ func (vcdClient *VCDClient) CreateLogicalVmGroup(logicalVmGroup types.LogicalVmG
 }
 
 // Delete deletes the receiver Logical VM Group
-func (logicalVmGroup *LogicalVmGroup) Delete() error {
+func (logicalVmGroup *LogicalVmGroup) Delete(ctx context.Context) error {
 	if logicalVmGroup.LogicalVmGroup.ID == "" {
 		return fmt.Errorf("cannot delete Logical VM Group without id")
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointLogicalVmGroups
 
-	apiVersion, err := logicalVmGroup.client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := logicalVmGroup.client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -166,7 +167,7 @@ func (logicalVmGroup *LogicalVmGroup) Delete() error {
 		return err
 	}
 
-	err = logicalVmGroup.client.OpenApiDeleteItem(apiVersion, urlRef, nil, nil)
+	err = logicalVmGroup.client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil, nil)
 	if err != nil {
 		return fmt.Errorf("error deleting the Logical VM Group: %s", err)
 	}
@@ -176,8 +177,8 @@ func (logicalVmGroup *LogicalVmGroup) Delete() error {
 // getVmGroupWithFilter finds a VM Group by specifying a filter=(filterKey==filterValue).
 // On success, returns a pointer to the VmGroup structure and a nil error
 // On failure, returns a nil pointer and an error
-func getVmGroupWithFilter(vcdClient *VCDClient, filter string) (*VmGroup, error) {
-	foundVmGroups, err := vcdClient.QueryWithNotEncodedParams(nil, map[string]string{
+func getVmGroupWithFilter(ctx context.Context, vcdClient *VCDClient, filter string) (*VmGroup, error) {
+	foundVmGroups, err := vcdClient.QueryWithNotEncodedParams(ctx, nil, map[string]string{
 		"type":          "vmGroups",
 		"filter":        filter,
 		"filterEncoded": "true",
@@ -199,8 +200,8 @@ func getVmGroupWithFilter(vcdClient *VCDClient, filter string) (*VmGroup, error)
 }
 
 // getResourcePools returns the Resource Pool that can unequivocally identify a VM Group
-func getResourcePools(vcdClient *VCDClient, pvdcUrn string) ([]*types.QueryResultResourcePoolRecordType, error) {
-	foundResourcePools, err := vcdClient.QueryWithNotEncodedParams(nil, map[string]string{
+func getResourcePools(ctx context.Context, vcdClient *VCDClient, pvdcUrn string) ([]*types.QueryResultResourcePoolRecordType, error) {
+	foundResourcePools, err := vcdClient.QueryWithNotEncodedParams(ctx, nil, map[string]string{
 		"type":          "resourcePool",
 		"filter":        fmt.Sprintf("providerVdc==%s", url.QueryEscape(pvdcUrn)),
 		"filterEncoded": "true",

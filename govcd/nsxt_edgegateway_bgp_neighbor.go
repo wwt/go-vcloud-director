@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
@@ -20,10 +21,10 @@ type EdgeBgpNeighbor struct {
 }
 
 // CreateBgpNeighbor creates BGP Neighbor with the given configuration
-func (egw *NsxtEdgeGateway) CreateBgpNeighbor(bgpNeighborConfig *types.EdgeBgpNeighbor) (*EdgeBgpNeighbor, error) {
+func (egw *NsxtEdgeGateway) CreateBgpNeighbor(ctx context.Context, bgpNeighborConfig *types.EdgeBgpNeighbor) (*EdgeBgpNeighbor, error) {
 	client := egw.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeBgpNeighbor
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -40,12 +41,12 @@ func (egw *NsxtEdgeGateway) CreateBgpNeighbor(bgpNeighborConfig *types.EdgeBgpNe
 		EdgeBgpNeighbor: &types.EdgeBgpNeighbor{},
 	}
 
-	task, err := client.OpenApiPostItemAsync(apiVersion, urlRef, nil, bgpNeighborConfig)
+	task, err := client.OpenApiPostItemAsync(ctx, apiVersion, urlRef, nil, bgpNeighborConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error creating NSX-T Edge Gateway BGP Neighbor: %s", err)
 	}
 
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error creating NSX-T Edge Gateway BGP Neighbor: %s", err)
 	}
@@ -65,14 +66,14 @@ func (egw *NsxtEdgeGateway) CreateBgpNeighbor(bgpNeighborConfig *types.EdgeBgpNe
 		if err != nil {
 			return nil, err
 		}
-		err = client.OpenApiGetItem(apiVersion, getUrlRef, nil, returnObject.EdgeBgpNeighbor, nil)
+		err = client.OpenApiGetItem(ctx, apiVersion, getUrlRef, nil, returnObject.EdgeBgpNeighbor, nil)
 		if err != nil {
 			return nil, fmt.Errorf("error retrieving NSX-T Edge Gateway BGP Neighbor after creation: %s", err)
 		}
 	} else {
 		// ID after object creation was not returned therefore retrieving the entity by Name to lookup ID
 		// This has a risk of duplicate items, but is the only way to find the object when ID is not returned
-		bgpNeighbor, err := egw.GetBgpNeighborByIp(bgpNeighborConfig.NeighborAddress)
+		bgpNeighbor, err := egw.GetBgpNeighborByIp(ctx, bgpNeighborConfig.NeighborAddress)
 		if err != nil {
 			return nil, fmt.Errorf("error retrieving NSX-T Edge Gateway BGP Neighbor after creation: %s", err)
 		}
@@ -83,12 +84,12 @@ func (egw *NsxtEdgeGateway) CreateBgpNeighbor(bgpNeighborConfig *types.EdgeBgpNe
 }
 
 // GetAllBgpNeighbors retrieves all BGP Neighbors with an optional filter
-func (egw *NsxtEdgeGateway) GetAllBgpNeighbors(queryParameters url.Values) ([]*EdgeBgpNeighbor, error) {
+func (egw *NsxtEdgeGateway) GetAllBgpNeighbors(ctx context.Context, queryParameters url.Values) ([]*EdgeBgpNeighbor, error) {
 	queryParams := copyOrNewUrlValues(queryParameters)
 
 	client := egw.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeBgpNeighbor
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +101,7 @@ func (egw *NsxtEdgeGateway) GetAllBgpNeighbors(queryParameters url.Values) ([]*E
 	}
 
 	typeResponses := []*types.EdgeBgpNeighbor{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParams, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParams, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -125,12 +126,12 @@ func (egw *NsxtEdgeGateway) GetAllBgpNeighbors(queryParameters url.Values) ([]*E
 //
 // Note. API does not support filtering by 'neighborIpAddress' field therefore filtering is performed on client
 // side
-func (egw *NsxtEdgeGateway) GetBgpNeighborByIp(neighborIpAddress string) (*EdgeBgpNeighbor, error) {
+func (egw *NsxtEdgeGateway) GetBgpNeighborByIp(ctx context.Context, neighborIpAddress string) (*EdgeBgpNeighbor, error) {
 	if neighborIpAddress == "" {
 		return nil, fmt.Errorf("neighborIpAddress cannot be empty")
 	}
 
-	allBgpNeighbors, err := egw.GetAllBgpNeighbors(nil)
+	allBgpNeighbors, err := egw.GetAllBgpNeighbors(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving NSX-T Edge Gateway BGP Neighbor: %s", err)
 	}
@@ -154,14 +155,14 @@ func (egw *NsxtEdgeGateway) GetBgpNeighborByIp(neighborIpAddress string) (*EdgeB
 }
 
 // GetBgpNeighborById retrieves BGP Neighbor By ID
-func (egw *NsxtEdgeGateway) GetBgpNeighborById(id string) (*EdgeBgpNeighbor, error) {
+func (egw *NsxtEdgeGateway) GetBgpNeighborById(ctx context.Context, id string) (*EdgeBgpNeighbor, error) {
 	if id == "" {
 		return nil, fmt.Errorf("id is required")
 	}
 
 	client := egw.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeBgpNeighbor
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +179,7 @@ func (egw *NsxtEdgeGateway) GetBgpNeighborById(id string) (*EdgeBgpNeighbor, err
 		EdgeBgpNeighbor: &types.EdgeBgpNeighbor{},
 	}
 
-	err = client.OpenApiGetItem(apiVersion, urlRef, nil, returnObject.EdgeBgpNeighbor, nil)
+	err = client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, returnObject.EdgeBgpNeighbor, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving NSX-T Edge Gateway BGP Neighbor: %s", err)
 	}
@@ -187,10 +188,10 @@ func (egw *NsxtEdgeGateway) GetBgpNeighborById(id string) (*EdgeBgpNeighbor, err
 }
 
 // Update updates existing BGP Neighbor with new configuration and returns it
-func (bgpNeighbor *EdgeBgpNeighbor) Update(bgpNeighborConfig *types.EdgeBgpNeighbor) (*EdgeBgpNeighbor, error) {
+func (bgpNeighbor *EdgeBgpNeighbor) Update(ctx context.Context, bgpNeighborConfig *types.EdgeBgpNeighbor) (*EdgeBgpNeighbor, error) {
 	client := bgpNeighbor.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeBgpNeighbor
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +208,7 @@ func (bgpNeighbor *EdgeBgpNeighbor) Update(bgpNeighborConfig *types.EdgeBgpNeigh
 		EdgeBgpNeighbor: &types.EdgeBgpNeighbor{},
 	}
 
-	err = client.OpenApiPutItem(apiVersion, urlRef, nil, bgpNeighborConfig, returnObject.EdgeBgpNeighbor, nil)
+	err = client.OpenApiPutItem(ctx, apiVersion, urlRef, nil, bgpNeighborConfig, returnObject.EdgeBgpNeighbor, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error setting NSX-T Edge Gateway BGP Neighbor: %s", err)
 	}
@@ -216,10 +217,10 @@ func (bgpNeighbor *EdgeBgpNeighbor) Update(bgpNeighborConfig *types.EdgeBgpNeigh
 }
 
 // Delete deletes existing BGP Neighbor
-func (bgpNeighbor *EdgeBgpNeighbor) Delete() error {
+func (bgpNeighbor *EdgeBgpNeighbor) Delete(ctx context.Context) error {
 	client := bgpNeighbor.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeBgpNeighbor
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -230,7 +231,7 @@ func (bgpNeighbor *EdgeBgpNeighbor) Delete() error {
 		return err
 	}
 
-	err = client.OpenApiDeleteItem(apiVersion, urlRef, nil, nil)
+	err = client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil, nil)
 	if err != nil {
 		return fmt.Errorf("error deleting NSX-T Edge Gateway BGP Neighbor: %s", err)
 	}

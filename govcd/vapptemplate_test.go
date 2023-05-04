@@ -9,8 +9,6 @@ package govcd
 import (
 	"context"
 	"fmt"
-
-	. "gopkg.in/check.v1"
 )
 
 // TODO: Write test for InstantiateVAppTemplate
@@ -99,12 +97,12 @@ func testUploadAndDeleteVAppTemplate(vcd *TestVCD, check *C, isOvfLink bool) {
 	if isOvfLink {
 		uploadTask, err := catalog.UploadOvfByLink(vcd.config.OVA.OvfUrl, itemName, description)
 		check.Assert(err, IsNil)
-		err = uploadTask.WaitTaskCompletion()
+		err = uploadTask.WaitTaskCompletion(ctx)
 		check.Assert(err, IsNil)
 	} else {
 		task, err := catalog.UploadOvf(vcd.config.OVA.OvaPath, itemName, description, 1024)
 		check.Assert(err, IsNil)
-		err = task.WaitTaskCompletion()
+		err = task.WaitTaskCompletion(ctx)
 		check.Assert(err, IsNil)
 	}
 

@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
@@ -24,10 +25,10 @@ type EdgeBgpIpPrefixList struct {
 // Note. VCD 10.2 versions do not automatically return ID for created BGP IP Prefix List. To work around it this code
 // automatically retrieves the entity by Name after the task is finished. This function may fail on VCD 10.2 if
 // duplicate BGP IP Prefix Lists exist.
-func (egw *NsxtEdgeGateway) CreateBgpIpPrefixList(bgpIpPrefixList *types.EdgeBgpIpPrefixList) (*EdgeBgpIpPrefixList, error) {
+func (egw *NsxtEdgeGateway) CreateBgpIpPrefixList(ctx context.Context, bgpIpPrefixList *types.EdgeBgpIpPrefixList) (*EdgeBgpIpPrefixList, error) {
 	client := egw.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeBgpConfigPrefixLists
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -44,12 +45,12 @@ func (egw *NsxtEdgeGateway) CreateBgpIpPrefixList(bgpIpPrefixList *types.EdgeBgp
 		EdgeBgpIpPrefixList: &types.EdgeBgpIpPrefixList{},
 	}
 
-	task, err := client.OpenApiPostItemAsync(apiVersion, urlRef, nil, bgpIpPrefixList)
+	task, err := client.OpenApiPostItemAsync(ctx, apiVersion, urlRef, nil, bgpIpPrefixList)
 	if err != nil {
 		return nil, fmt.Errorf("error creating NSX-T Edge Gateway BGP IP Prefix List: %s", err)
 	}
 
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error creating NSX-T Edge Gateway BGP IP Prefix List: %s", err)
 	}
@@ -72,14 +73,14 @@ func (egw *NsxtEdgeGateway) CreateBgpIpPrefixList(bgpIpPrefixList *types.EdgeBgp
 		if err != nil {
 			return nil, err
 		}
-		err = client.OpenApiGetItem(apiVersion, getUrlRef, nil, returnObject.EdgeBgpIpPrefixList, nil)
+		err = client.OpenApiGetItem(ctx, apiVersion, getUrlRef, nil, returnObject.EdgeBgpIpPrefixList, nil)
 		if err != nil {
 			return nil, fmt.Errorf("error retrieving NSX-T Edge Gateway BGP IP Prefix List after creation: %s", err)
 		}
 	} else {
 		// ID after object creation was not returned therefore retrieving the entity by Name to lookup ID
 		// This has a risk of duplicate items, but is the only way to find the object when ID is not returned
-		bgpIpPrefixList, err := egw.GetBgpIpPrefixListByName(bgpIpPrefixList.Name)
+		bgpIpPrefixList, err := egw.GetBgpIpPrefixListByName(ctx, bgpIpPrefixList.Name)
 		if err != nil {
 			return nil, fmt.Errorf("error retrieving NSX-T Edge Gateway BGP IP Prefix List after creation: %s", err)
 		}
@@ -90,12 +91,12 @@ func (egw *NsxtEdgeGateway) CreateBgpIpPrefixList(bgpIpPrefixList *types.EdgeBgp
 }
 
 // GetAllBgpIpPrefixLists retrieves all BGP IP Prefix Lists in a given NSX-T Edge Gateway with optional queryParameters
-func (egw *NsxtEdgeGateway) GetAllBgpIpPrefixLists(queryParameters url.Values) ([]*EdgeBgpIpPrefixList, error) {
+func (egw *NsxtEdgeGateway) GetAllBgpIpPrefixLists(ctx context.Context, queryParameters url.Values) ([]*EdgeBgpIpPrefixList, error) {
 	queryParams := copyOrNewUrlValues(queryParameters)
 
 	client := egw.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeBgpConfigPrefixLists
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +108,7 @@ func (egw *NsxtEdgeGateway) GetAllBgpIpPrefixLists(queryParameters url.Values) (
 	}
 
 	typeResponses := []*types.EdgeBgpIpPrefixList{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParams, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParams, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -132,12 +133,12 @@ func (egw *NsxtEdgeGateway) GetAllBgpIpPrefixLists(queryParameters url.Values) (
 //
 // Note. API does not support filtering by 'name' field therefore filtering is performed on client
 // side
-func (egw *NsxtEdgeGateway) GetBgpIpPrefixListByName(name string) (*EdgeBgpIpPrefixList, error) {
+func (egw *NsxtEdgeGateway) GetBgpIpPrefixListByName(ctx context.Context, name string) (*EdgeBgpIpPrefixList, error) {
 	if name == "" {
 		return nil, fmt.Errorf("name cannot be empty")
 	}
 
-	allBgpIpPrefixLists, err := egw.GetAllBgpIpPrefixLists(nil)
+	allBgpIpPrefixLists, err := egw.GetAllBgpIpPrefixLists(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving NSX-T Edge Gateway BGP IP Prefix List: %s", err)
 	}
@@ -161,14 +162,14 @@ func (egw *NsxtEdgeGateway) GetBgpIpPrefixListByName(name string) (*EdgeBgpIpPre
 }
 
 // GetBgpIpPrefixListById retrieves BGP IP Prefix List By ID
-func (egw *NsxtEdgeGateway) GetBgpIpPrefixListById(id string) (*EdgeBgpIpPrefixList, error) {
+func (egw *NsxtEdgeGateway) GetBgpIpPrefixListById(ctx context.Context, id string) (*EdgeBgpIpPrefixList, error) {
 	if id == "" {
 		return nil, fmt.Errorf("id is required")
 	}
 
 	client := egw.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeBgpConfigPrefixLists
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +186,7 @@ func (egw *NsxtEdgeGateway) GetBgpIpPrefixListById(id string) (*EdgeBgpIpPrefixL
 		EdgeBgpIpPrefixList: &types.EdgeBgpIpPrefixList{},
 	}
 
-	err = client.OpenApiGetItem(apiVersion, urlRef, nil, returnObject.EdgeBgpIpPrefixList, nil)
+	err = client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, returnObject.EdgeBgpIpPrefixList, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving NSX-T Edge Gateway BGP IP Prefix List: %s", err)
 	}
@@ -194,10 +195,10 @@ func (egw *NsxtEdgeGateway) GetBgpIpPrefixListById(id string) (*EdgeBgpIpPrefixL
 }
 
 // Update updates existing BGP IP Prefix List with new configuration and returns it
-func (bgpIpPrefixListCfg *EdgeBgpIpPrefixList) Update(bgpIpPrefixList *types.EdgeBgpIpPrefixList) (*EdgeBgpIpPrefixList, error) {
+func (bgpIpPrefixListCfg *EdgeBgpIpPrefixList) Update(ctx context.Context, bgpIpPrefixList *types.EdgeBgpIpPrefixList) (*EdgeBgpIpPrefixList, error) {
 	client := bgpIpPrefixListCfg.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeBgpConfigPrefixLists
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +215,7 @@ func (bgpIpPrefixListCfg *EdgeBgpIpPrefixList) Update(bgpIpPrefixList *types.Edg
 		EdgeBgpIpPrefixList: &types.EdgeBgpIpPrefixList{},
 	}
 
-	err = client.OpenApiPutItem(apiVersion, urlRef, nil, bgpIpPrefixList, returnObject.EdgeBgpIpPrefixList, nil)
+	err = client.OpenApiPutItem(ctx, apiVersion, urlRef, nil, bgpIpPrefixList, returnObject.EdgeBgpIpPrefixList, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error setting NSX-T Edge Gateway BGP IP Prefix List: %s", err)
 	}
@@ -223,10 +224,10 @@ func (bgpIpPrefixListCfg *EdgeBgpIpPrefixList) Update(bgpIpPrefixList *types.Edg
 }
 
 // Delete deletes existing BGP IP Prefix List
-func (bgpIpPrefixListCfg *EdgeBgpIpPrefixList) Delete() error {
+func (bgpIpPrefixListCfg *EdgeBgpIpPrefixList) Delete(ctx context.Context) error {
 	client := bgpIpPrefixListCfg.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeBgpConfigPrefixLists
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -237,7 +238,7 @@ func (bgpIpPrefixListCfg *EdgeBgpIpPrefixList) Delete() error {
 		return err
 	}
 
-	err = client.OpenApiDeleteItem(apiVersion, urlRef, nil, nil)
+	err = client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil, nil)
 	if err != nil {
 		return fmt.Errorf("error deleting NSX-T Edge Gateway BGP IP Prefix List: %s", err)
 	}

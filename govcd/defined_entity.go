@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 	"net/url"
@@ -27,11 +28,11 @@ type DefinedEntity struct {
 
 // CreateRdeType creates a Runtime Defined Entity Type.
 // Only a System administrator can create RDE Types.
-func (vcdClient *VCDClient) CreateRdeType(rde *types.DefinedEntityType) (*DefinedEntityType, error) {
+func (vcdClient *VCDClient) CreateRdeType(ctx context.Context, rde *types.DefinedEntityType) (*DefinedEntityType, error) {
 	client := vcdClient.Client
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntityTypes
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +47,7 @@ func (vcdClient *VCDClient) CreateRdeType(rde *types.DefinedEntityType) (*Define
 		client:            &vcdClient.Client,
 	}
 
-	err = client.OpenApiPostItem(apiVersion, urlRef, nil, rde, result.DefinedEntityType, nil)
+	err = client.OpenApiPostItem(ctx, apiVersion, urlRef, nil, rde, result.DefinedEntityType, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -55,10 +56,10 @@ func (vcdClient *VCDClient) CreateRdeType(rde *types.DefinedEntityType) (*Define
 }
 
 // GetAllRdeTypes retrieves all Runtime Defined Entity Types. Query parameters can be supplied to perform additional filtering.
-func (vcdClient *VCDClient) GetAllRdeTypes(queryParameters url.Values) ([]*DefinedEntityType, error) {
+func (vcdClient *VCDClient) GetAllRdeTypes(ctx context.Context, queryParameters url.Values) ([]*DefinedEntityType, error) {
 	client := vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntityTypes
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +70,7 @@ func (vcdClient *VCDClient) GetAllRdeTypes(queryParameters url.Values) ([]*Defin
 	}
 
 	typeResponses := []*types.DefinedEntityType{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParameters, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParameters, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -87,10 +88,10 @@ func (vcdClient *VCDClient) GetAllRdeTypes(queryParameters url.Values) ([]*Defin
 }
 
 // GetRdeType gets a Runtime Defined Entity Type by its unique combination of vendor, nss and version.
-func (vcdClient *VCDClient) GetRdeType(vendor, nss, version string) (*DefinedEntityType, error) {
+func (vcdClient *VCDClient) GetRdeType(ctx context.Context, vendor, nss, version string) (*DefinedEntityType, error) {
 	queryParameters := url.Values{}
 	queryParameters.Add("filter", fmt.Sprintf("vendor==%s;nss==%s;version==%s", vendor, nss, version))
-	rdeTypes, err := vcdClient.GetAllRdeTypes(queryParameters)
+	rdeTypes, err := vcdClient.GetAllRdeTypes(ctx, queryParameters)
 	if err != nil {
 		return nil, err
 	}
@@ -107,10 +108,10 @@ func (vcdClient *VCDClient) GetRdeType(vendor, nss, version string) (*DefinedEnt
 }
 
 // GetRdeTypeById gets a Runtime Defined Entity Type by its ID.
-func (vcdClient *VCDClient) GetRdeTypeById(id string) (*DefinedEntityType, error) {
+func (vcdClient *VCDClient) GetRdeTypeById(ctx context.Context, id string) (*DefinedEntityType, error) {
 	client := vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntityTypes
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +126,7 @@ func (vcdClient *VCDClient) GetRdeTypeById(id string) (*DefinedEntityType, error
 		client:            &vcdClient.Client,
 	}
 
-	err = client.OpenApiGetItem(apiVersion, urlRef, nil, result.DefinedEntityType, nil)
+	err = client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, result.DefinedEntityType, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +136,7 @@ func (vcdClient *VCDClient) GetRdeTypeById(id string) (*DefinedEntityType, error
 
 // Update updates the receiver Runtime Defined Entity Type with the values given by the input.
 // Only a System administrator can create RDE Types.
-func (rdeType *DefinedEntityType) Update(rdeTypeToUpdate types.DefinedEntityType) error {
+func (rdeType *DefinedEntityType) Update(ctx context.Context, rdeTypeToUpdate types.DefinedEntityType) error {
 	client := rdeType.client
 	if rdeType.DefinedEntityType.ID == "" {
 		return fmt.Errorf("ID of the receiver Runtime Defined Entity Type is empty")
@@ -158,7 +159,7 @@ func (rdeType *DefinedEntityType) Update(rdeTypeToUpdate types.DefinedEntityType
 	rdeTypeToUpdate.Vendor = rdeType.DefinedEntityType.Vendor
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntityTypes
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -168,7 +169,7 @@ func (rdeType *DefinedEntityType) Update(rdeTypeToUpdate types.DefinedEntityType
 		return err
 	}
 
-	err = client.OpenApiPutItem(apiVersion, urlRef, nil, rdeTypeToUpdate, rdeType.DefinedEntityType, nil)
+	err = client.OpenApiPutItem(ctx, apiVersion, urlRef, nil, rdeTypeToUpdate, rdeType.DefinedEntityType, nil)
 	if err != nil {
 		return err
 	}
@@ -178,14 +179,14 @@ func (rdeType *DefinedEntityType) Update(rdeTypeToUpdate types.DefinedEntityType
 
 // Delete deletes the receiver Runtime Defined Entity Type.
 // Only a System administrator can delete RDE Types.
-func (rdeType *DefinedEntityType) Delete() error {
+func (rdeType *DefinedEntityType) Delete(ctx context.Context) error {
 	client := rdeType.client
 	if rdeType.DefinedEntityType.ID == "" {
 		return fmt.Errorf("ID of the receiver Runtime Defined Entity Type is empty")
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntityTypes
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -195,7 +196,7 @@ func (rdeType *DefinedEntityType) Delete() error {
 		return err
 	}
 
-	err = client.OpenApiDeleteItem(apiVersion, urlRef, nil, nil)
+	err = client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -205,20 +206,20 @@ func (rdeType *DefinedEntityType) Delete() error {
 }
 
 // GetAllRdes gets all the RDE instances of the given vendor, nss and version.
-func (vcdClient *VCDClient) GetAllRdes(vendor, nss, version string, queryParameters url.Values) ([]*DefinedEntity, error) {
-	return getAllRdes(&vcdClient.Client, vendor, nss, version, queryParameters)
+func (vcdClient *VCDClient) GetAllRdes(ctx context.Context, vendor, nss, version string, queryParameters url.Values) ([]*DefinedEntity, error) {
+	return getAllRdes(ctx, &vcdClient.Client, vendor, nss, version, queryParameters)
 }
 
 // GetAllRdes gets all the RDE instances of the receiver type.
-func (rdeType *DefinedEntityType) GetAllRdes(queryParameters url.Values) ([]*DefinedEntity, error) {
-	return getAllRdes(rdeType.client, rdeType.DefinedEntityType.Vendor, rdeType.DefinedEntityType.Nss, rdeType.DefinedEntityType.Version, queryParameters)
+func (rdeType *DefinedEntityType) GetAllRdes(ctx context.Context, queryParameters url.Values) ([]*DefinedEntity, error) {
+	return getAllRdes(ctx, rdeType.client, rdeType.DefinedEntityType.Vendor, rdeType.DefinedEntityType.Nss, rdeType.DefinedEntityType.Version, queryParameters)
 }
 
 // getAllRdes gets all the RDE instances of the given vendor, nss and version.
 // Supports filtering with the given queryParameters.
-func getAllRdes(client *Client, vendor, nss, version string, queryParameters url.Values) ([]*DefinedEntity, error) {
+func getAllRdes(ctx context.Context, client *Client, vendor, nss, version string, queryParameters url.Values) ([]*DefinedEntity, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntitiesTypes
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -229,7 +230,7 @@ func getAllRdes(client *Client, vendor, nss, version string, queryParameters url
 	}
 
 	typeResponses := []*types.DefinedEntity{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParameters, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParameters, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -248,22 +249,22 @@ func getAllRdes(client *Client, vendor, nss, version string, queryParameters url
 
 // GetRdesByName gets RDE instances with the given name that belongs to the receiver type.
 // VCD allows to have many RDEs with the same name, hence this function returns a slice.
-func (rdeType *DefinedEntityType) GetRdesByName(name string) ([]*DefinedEntity, error) {
-	return getRdesByName(rdeType.client, rdeType.DefinedEntityType.Vendor, rdeType.DefinedEntityType.Nss, rdeType.DefinedEntityType.Version, name)
+func (rdeType *DefinedEntityType) GetRdesByName(ctx context.Context, name string) ([]*DefinedEntity, error) {
+	return getRdesByName(ctx, rdeType.client, rdeType.DefinedEntityType.Vendor, rdeType.DefinedEntityType.Nss, rdeType.DefinedEntityType.Version, name)
 }
 
 // GetRdesByName gets RDE instances with the given name and the given vendor, nss and version.
 // VCD allows to have many RDEs with the same name, hence this function returns a slice.
-func (vcdClient *VCDClient) GetRdesByName(vendor, nss, version, name string) ([]*DefinedEntity, error) {
-	return getRdesByName(&vcdClient.Client, vendor, nss, version, name)
+func (vcdClient *VCDClient) GetRdesByName(ctx context.Context, vendor, nss, version, name string) ([]*DefinedEntity, error) {
+	return getRdesByName(ctx, &vcdClient.Client, vendor, nss, version, name)
 }
 
 // getRdesByName gets RDE instances with the given name and the given vendor, nss and version.
 // VCD allows to have many RDEs with the same name, hence this function returns a slice.
-func getRdesByName(client *Client, vendor, nss, version, name string) ([]*DefinedEntity, error) {
+func getRdesByName(ctx context.Context, client *Client, vendor, nss, version, name string) ([]*DefinedEntity, error) {
 	queryParameters := url.Values{}
 	queryParameters.Add("filter", fmt.Sprintf("name==%s", name))
-	rdeTypes, err := getAllRdes(client, vendor, nss, version, queryParameters)
+	rdeTypes, err := getAllRdes(ctx, client, vendor, nss, version, queryParameters)
 	if err != nil {
 		return nil, err
 	}
@@ -277,21 +278,21 @@ func getRdesByName(client *Client, vendor, nss, version, name string) ([]*Define
 
 // GetRdeById gets a Runtime Defined Entity by its ID.
 // Getting a RDE by ID populates the ETag field in the returned object.
-func (rdeType *DefinedEntityType) GetRdeById(id string) (*DefinedEntity, error) {
-	return getRdeById(rdeType.client, id)
+func (rdeType *DefinedEntityType) GetRdeById(ctx context.Context, id string) (*DefinedEntity, error) {
+	return getRdeById(ctx, rdeType.client, id)
 }
 
 // GetRdeById gets a Runtime Defined Entity by its ID.
 // Getting a RDE by ID populates the ETag field in the returned object.
-func (vcdClient *VCDClient) GetRdeById(id string) (*DefinedEntity, error) {
-	return getRdeById(&vcdClient.Client, id)
+func (vcdClient *VCDClient) GetRdeById(ctx context.Context, id string) (*DefinedEntity, error) {
+	return getRdeById(ctx, &vcdClient.Client, id)
 }
 
 // getRdeById gets a Runtime Defined Entity by its ID.
 // Getting a RDE by ID populates the ETag field in the returned object.
-func getRdeById(client *Client, id string) (*DefinedEntity, error) {
+func getRdeById(ctx context.Context, client *Client, id string) (*DefinedEntity, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntities
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +307,7 @@ func getRdeById(client *Client, id string) (*DefinedEntity, error) {
 		client:        client,
 	}
 
-	headers, err := client.OpenApiGetItemAndHeaders(apiVersion, urlRef, nil, result.DefinedEntity, nil)
+	headers, err := client.OpenApiGetItemAndHeaders(ctx, apiVersion, urlRef, nil, result.DefinedEntity, nil)
 	if err != nil {
 		return nil, amendRdeApiError(client, err)
 	}
@@ -320,25 +321,25 @@ func getRdeById(client *Client, id string) (*DefinedEntity, error) {
 // The input tenant context allows to create the RDE in a given org if the creator is a System admin.
 // NOTE: After RDE creation, some actor should Resolve it, otherwise the RDE state will be "PRE_CREATED"
 // and the generated VCD task will remain at 1% until resolved.
-func (rdeType *DefinedEntityType) CreateRde(entity types.DefinedEntity, tenantContext *TenantContext) (*DefinedEntity, error) {
+func (rdeType *DefinedEntityType) CreateRde(ctx context.Context, entity types.DefinedEntity, tenantContext *TenantContext) (*DefinedEntity, error) {
 	entity.EntityType = rdeType.DefinedEntityType.ID
-	err := createRde(rdeType.client, entity, tenantContext)
+	err := createRde(ctx, rdeType.client, entity, tenantContext)
 	if err != nil {
 		return nil, err
 	}
-	return pollPreCreatedRde(rdeType.client, rdeType.DefinedEntityType.Vendor, rdeType.DefinedEntityType.Nss, rdeType.DefinedEntityType.Version, entity.Name, 5)
+	return pollPreCreatedRde(ctx, rdeType.client, rdeType.DefinedEntityType.Vendor, rdeType.DefinedEntityType.Nss, rdeType.DefinedEntityType.Version, entity.Name, 5)
 }
 
 // CreateRde creates an entity of the type of the given vendor, nss and version.
 // NOTE: After RDE creation, some actor should Resolve it, otherwise the RDE state will be "PRE_CREATED"
 // and the generated VCD task will remain at 1% until resolved.
-func (vcdClient *VCDClient) CreateRde(vendor, nss, version string, entity types.DefinedEntity, tenantContext *TenantContext) (*DefinedEntity, error) {
+func (vcdClient *VCDClient) CreateRde(ctx context.Context, vendor, nss, version string, entity types.DefinedEntity, tenantContext *TenantContext) (*DefinedEntity, error) {
 	entity.EntityType = fmt.Sprintf("urn:vcloud:type:%s:%s:%s", vendor, nss, version)
-	err := createRde(&vcdClient.Client, entity, tenantContext)
+	err := createRde(ctx, &vcdClient.Client, entity, tenantContext)
 	if err != nil {
 		return nil, err
 	}
-	return pollPreCreatedRde(&vcdClient.Client, vendor, nss, version, entity.Name, 5)
+	return pollPreCreatedRde(ctx, &vcdClient.Client, vendor, nss, version, entity.Name, 5)
 }
 
 // CreateRde creates an entity of the type of the receiver Runtime Defined Entity (RDE) type.
@@ -346,7 +347,7 @@ func (vcdClient *VCDClient) CreateRde(vendor, nss, version string, entity types.
 // it must match the type ID of the receiver RDE type.
 // NOTE: After RDE creation, some actor should Resolve it, otherwise the RDE state will be "PRE_CREATED"
 // and the generated VCD task will remain at 1% until resolved.
-func createRde(client *Client, entity types.DefinedEntity, tenantContext *TenantContext) error {
+func createRde(ctx context.Context, client *Client, entity types.DefinedEntity, tenantContext *TenantContext) error {
 	if entity.EntityType == "" {
 		return fmt.Errorf("ID of the Runtime Defined Entity type is empty")
 	}
@@ -356,7 +357,7 @@ func createRde(client *Client, entity types.DefinedEntity, tenantContext *Tenant
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntityTypes
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -366,7 +367,7 @@ func createRde(client *Client, entity types.DefinedEntity, tenantContext *Tenant
 		return err
 	}
 
-	_, err = client.OpenApiPostItemAsyncWithHeaders(apiVersion, urlRef, nil, entity, getTenantContextHeader(tenantContext))
+	_, err = client.OpenApiPostItemAsyncWithHeaders(ctx, apiVersion, urlRef, nil, entity, getTenantContextHeader(tenantContext))
 	if err != nil {
 		return err
 	}
@@ -377,11 +378,11 @@ func createRde(client *Client, entity types.DefinedEntity, tenantContext *Tenant
 // that corresponds to the given vendor, nss, version and name.
 // This function can be useful on RDE creation, as VCD just returns a task that remains at 1% until the RDE is resolved,
 // hence one needs to re-fetch the recently created RDE manually.
-func pollPreCreatedRde(client *Client, vendor, nss, version, name string, tries int) (*DefinedEntity, error) {
+func pollPreCreatedRde(ctx context.Context, client *Client, vendor, nss, version, name string, tries int) (*DefinedEntity, error) {
 	var rdes []*DefinedEntity
 	var err error
 	for i := 0; i < tries; i++ {
-		rdes, err = getRdesByName(client, vendor, nss, version, name)
+		rdes, err = getRdesByName(ctx, client, vendor, nss, version, name)
 		if err == nil {
 			for _, rde := range rdes {
 				// This doesn't really guarantee that the chosen RDE is the one we want, but there's no other way of
@@ -400,10 +401,10 @@ func pollPreCreatedRde(client *Client, vendor, nss, version, name string, tries 
 // is valid, reaching a state of RESOLVED. If it fails, the state will be RESOLUTION_ERROR,
 // and it will need to Update the JSON entity.
 // Resolving a RDE populates the ETag field in the receiver object.
-func (rde *DefinedEntity) Resolve() error {
+func (rde *DefinedEntity) Resolve(ctx context.Context) error {
 	client := rde.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntitiesResolve
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -413,7 +414,7 @@ func (rde *DefinedEntity) Resolve() error {
 		return err
 	}
 
-	headers, err := client.OpenApiPostItemAndGetHeaders(apiVersion, urlRef, nil, nil, rde.DefinedEntity, nil)
+	headers, err := client.OpenApiPostItemAndGetHeaders(ctx, apiVersion, urlRef, nil, nil, rde.DefinedEntity, nil)
 	if err != nil {
 		return amendRdeApiError(client, err)
 	}
@@ -425,7 +426,7 @@ func (rde *DefinedEntity) Resolve() error {
 // Update updates the receiver Runtime Defined Entity with the values given by the input. This method is useful
 // if rde.Resolve() failed and a JSON entity change is needed.
 // Updating a RDE populates the ETag field in the receiver object.
-func (rde *DefinedEntity) Update(rdeToUpdate types.DefinedEntity) error {
+func (rde *DefinedEntity) Update(ctx context.Context, rdeToUpdate types.DefinedEntity) error {
 	client := rde.client
 
 	if rde.DefinedEntity.ID == "" {
@@ -440,7 +441,7 @@ func (rde *DefinedEntity) Update(rdeToUpdate types.DefinedEntity) error {
 
 	if rde.Etag == "" {
 		// We need to get an Etag to perform the update
-		retrievedRde, err := getRdeById(rde.client, rde.DefinedEntity.ID)
+		retrievedRde, err := getRdeById(ctx, rde.client, rde.DefinedEntity.ID)
 		if err != nil {
 			return err
 		}
@@ -451,7 +452,7 @@ func (rde *DefinedEntity) Update(rdeToUpdate types.DefinedEntity) error {
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntities
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -461,7 +462,7 @@ func (rde *DefinedEntity) Update(rdeToUpdate types.DefinedEntity) error {
 		return amendRdeApiError(client, err)
 	}
 
-	headers, err := client.OpenApiPutItemAndGetHeaders(apiVersion, urlRef, nil, rdeToUpdate, rde.DefinedEntity, map[string]string{"If-Match": rde.Etag})
+	headers, err := client.OpenApiPutItemAndGetHeaders(ctx, apiVersion, urlRef, nil, rdeToUpdate, rde.DefinedEntity, map[string]string{"If-Match": rde.Etag})
 	if err != nil {
 		return err
 	}
@@ -471,7 +472,7 @@ func (rde *DefinedEntity) Update(rdeToUpdate types.DefinedEntity) error {
 }
 
 // Delete deletes the receiver Runtime Defined Entity.
-func (rde *DefinedEntity) Delete() error {
+func (rde *DefinedEntity) Delete(ctx context.Context) error {
 	client := rde.client
 
 	if rde.DefinedEntity.ID == "" {
@@ -479,7 +480,7 @@ func (rde *DefinedEntity) Delete() error {
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntities
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -489,7 +490,7 @@ func (rde *DefinedEntity) Delete() error {
 		return err
 	}
 
-	err = client.OpenApiDeleteItem(apiVersion, urlRef, nil, nil)
+	err = client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil, nil)
 	if err != nil {
 		return amendRdeApiError(client, err)
 	}

@@ -10,7 +10,6 @@ import (
 	"fmt"
 
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
-	. "gopkg.in/check.v1"
 )
 
 func init() {
@@ -122,7 +121,7 @@ func (vcd *TestVCD) TestMediaRecordMetadata(check *C) {
 	uploadTask, err := catalog.UploadMediaImage(check.TestName(), check.TestName(), vcd.config.Media.MediaPath, 1024)
 	check.Assert(err, IsNil)
 	check.Assert(uploadTask, NotNil)
-	err = uploadTask.WaitTaskCompletion()
+	err = uploadTask.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
 	AddToCleanupList(check.TestName(), "mediaCatalogImage", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.Name, "Test_AddMetadataOnMediaRecord")
@@ -145,7 +144,7 @@ func (vcd *TestVCD) TestMediaRecordMetadata(check *C) {
 	deleteTask, err := media.Delete()
 	check.Assert(err, IsNil)
 	check.Assert(deleteTask, NotNil)
-	err = deleteTask.WaitTaskCompletion()
+	err = deleteTask.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -240,7 +239,7 @@ func (vcd *TestVCD) TestDiskMetadata(check *C) {
 	diskHREF := task.Task.Owner.HREF
 	PrependToCleanupList(diskHREF, "disk", "", check.TestName())
 
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
 	disk, err := vcd.vdc.GetDiskByHref(diskHREF)

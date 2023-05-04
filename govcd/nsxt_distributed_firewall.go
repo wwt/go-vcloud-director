@@ -1,6 +1,7 @@
 package govcd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -19,10 +20,10 @@ type DistributedFirewall struct {
 //
 // Note. This function works only with `default` policy as this was the only supported when this
 // functions was created
-func (vdcGroup *VdcGroup) GetDistributedFirewall() (*DistributedFirewall, error) {
+func (vdcGroup *VdcGroup) GetDistributedFirewall(ctx context.Context) (*DistributedFirewall, error) {
 	client := vdcGroup.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVdcGroupsDfwRules
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +40,7 @@ func (vdcGroup *VdcGroup) GetDistributedFirewall() (*DistributedFirewall, error)
 		VdcGroup:                         vdcGroup,
 	}
 
-	err = client.OpenApiGetItem(apiVersion, urlRef, nil, returnObject.DistributedFirewallRuleContainer, nil)
+	err = client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, returnObject.DistributedFirewallRuleContainer, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving Distributed Firewall rules: %s", err)
 	}
@@ -51,10 +52,10 @@ func (vdcGroup *VdcGroup) GetDistributedFirewall() (*DistributedFirewall, error)
 //
 // Note. This function works only with `default` policy as this was the only supported when this
 // functions was created
-func (vdcGroup *VdcGroup) UpdateDistributedFirewall(dfwRules *types.DistributedFirewallRules) (*DistributedFirewall, error) {
+func (vdcGroup *VdcGroup) UpdateDistributedFirewall(ctx context.Context, dfwRules *types.DistributedFirewallRules) (*DistributedFirewall, error) {
 	client := vdcGroup.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVdcGroupsDfwRules
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +72,7 @@ func (vdcGroup *VdcGroup) UpdateDistributedFirewall(dfwRules *types.DistributedF
 		VdcGroup:                         vdcGroup,
 	}
 
-	err = client.OpenApiPutItem(apiVersion, urlRef, nil, dfwRules, returnObject.DistributedFirewallRuleContainer, nil)
+	err = client.OpenApiPutItem(ctx, apiVersion, urlRef, nil, dfwRules, returnObject.DistributedFirewallRuleContainer, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error updating Distributed Firewall rules: %s", err)
 	}
@@ -83,8 +84,8 @@ func (vdcGroup *VdcGroup) UpdateDistributedFirewall(dfwRules *types.DistributedF
 //
 // Note. This function works only with `default` policy as this was the only supported when this
 // functions was created
-func (vdcGroup *VdcGroup) DeleteAllDistributedFirewallRules() error {
-	_, err := vdcGroup.UpdateDistributedFirewall(&types.DistributedFirewallRules{})
+func (vdcGroup *VdcGroup) DeleteAllDistributedFirewallRules(ctx context.Context) error {
+	_, err := vdcGroup.UpdateDistributedFirewall(ctx, &types.DistributedFirewallRules{})
 	return err
 }
 
@@ -92,10 +93,10 @@ func (vdcGroup *VdcGroup) DeleteAllDistributedFirewallRules() error {
 //
 // Note. This function works only with `default` policy as this was the only supported when this
 // functions was created
-func (firewall *DistributedFirewall) DeleteAllRules() error {
+func (firewall *DistributedFirewall) DeleteAllRules(ctx context.Context) error {
 	if firewall.VdcGroup != nil && firewall.VdcGroup.VdcGroup != nil && firewall.VdcGroup.VdcGroup.Id == "" {
 		return errors.New("empty VDC Group ID for parent VDC Group")
 	}
 
-	return firewall.VdcGroup.DeleteAllDistributedFirewallRules()
+	return firewall.VdcGroup.DeleteAllDistributedFirewallRules(ctx)
 }

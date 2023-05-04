@@ -9,8 +9,6 @@ package govcd
 import (
 	"fmt"
 
-	. "gopkg.in/check.v1"
-
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 )
 
@@ -247,7 +245,7 @@ func (vcd *TestVCD) Test_GetNetworkListLarge(check *C) {
 		check.Assert(err, IsNil)
 
 		AddToCleanupList(networkName, "network", vcd.org.Org.Name+"|"+vcd.vdc.Vdc.Name, "Test_GetNetworkListLarge")
-		err = task.WaitTaskCompletion()
+		err = task.WaitTaskCompletion(ctx)
 		check.Assert(err, IsNil)
 	}
 
@@ -450,7 +448,7 @@ func (vcd *TestVCD) Test_CreateUpdateOrgVdcNetworkDirect(check *C) {
 
 	AddToCleanupList(networkName, "network", vcd.org.Org.Name+"|"+vcd.vdc.Vdc.Name, "Test_CreateOrgVdcNetworkDirect")
 
-	// err = task.WaitTaskCompletion()
+	// err = task.WaitTaskCompletion(ctx)
 	err = task.WaitInspectTaskCompletion(ctx, LogTask, 10)
 	if err != nil {
 		fmt.Printf("error performing task: %s", err)

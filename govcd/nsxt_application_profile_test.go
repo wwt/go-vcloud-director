@@ -194,7 +194,7 @@ func getResultCountByScope(scope string, check *C, vcd *TestVCD) int {
 		Resulttotal int `json:"resultTotal"`
 	}{}
 
-	err = vcd.vdc.client.OpenApiGetItem(apiVersion, urlRef, queryParams, &result, nil)
+	err = vcd.vdc.client.OpenApiGetItem(ctx, apiVersion, urlRef, queryParams, &result, nil)
 	check.Assert(err, IsNil)
 	return result.Resulttotal
 }

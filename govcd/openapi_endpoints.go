@@ -178,11 +178,11 @@ func (client *Client) checkOpenApiEndpointCompatibility(ctx context.Context, end
 // The advantage of this function is that it provides a controlled API elevation instead of just picking the highest
 // which could be risky and untested (especially if new API version is released after release of package consuming this
 // SDK)
-func (client *Client) getOpenApiHighestElevatedVersion(endpoint string) (string, error) {
+func (client *Client) getOpenApiHighestElevatedVersion(ctx context.Context, endpoint string) (string, error) {
 	util.Logger.Printf("[DEBUG] Checking if elevated API versions are defined for endpoint '%s'", endpoint)
 
-	// At first get minimum API version and check if it can be supported
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	// At first, get the minimum API version and check if it can be supported
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return "", fmt.Errorf("error getting minimum required API version: %s", err)
 	}
@@ -217,7 +217,7 @@ func (client *Client) getOpenApiHighestElevatedVersion(endpoint string) (string,
 		util.Logger.Printf("[DEBUG] Checking if elevated version '%s' is supported by VCD instance for endpoint '%s'",
 			elevatedVersion.Original(), endpoint)
 		// Check if maximum VCD API version supported is greater or equal to elevated version
-		if client.APIVCDMaxVersionIs(fmt.Sprintf(">= %s", elevatedVersion.Original())) {
+		if client.APIVCDMaxVersionIs(ctx, fmt.Sprintf(">= %s", elevatedVersion.Original())) {
 			util.Logger.Printf("[DEBUG] Elevated version '%s' is supported by VCD instance for endpoint '%s'",
 				elevatedVersion.Original(), endpoint)
 			// highest version found - store it and abort the loop

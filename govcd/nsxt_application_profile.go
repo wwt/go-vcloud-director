@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
@@ -29,9 +30,9 @@ type NsxtAppPortProfile struct {
 // * PROVIDER (Created by Provider globally)
 // * TENANT (Create by tenant at Org level)
 // More details about scope in documentation for types.NsxtAppPortProfile
-func (org *Org) CreateNsxtAppPortProfile(appPortProfileConfig *types.NsxtAppPortProfile) (*NsxtAppPortProfile, error) {
+func (org *Org) CreateNsxtAppPortProfile(ctx context.Context, appPortProfileConfig *types.NsxtAppPortProfile) (*NsxtAppPortProfile, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAppPortProfiles
-	minimumApiVersion, err := org.client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := org.client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +47,7 @@ func (org *Org) CreateNsxtAppPortProfile(appPortProfileConfig *types.NsxtAppPort
 		client:             org.client,
 	}
 
-	err = org.client.OpenApiPostItem(minimumApiVersion, urlRef, nil, appPortProfileConfig, returnObject.NsxtAppPortProfile, nil)
+	err = org.client.OpenApiPostItem(ctx, minimumApiVersion, urlRef, nil, appPortProfileConfig, returnObject.NsxtAppPortProfile, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating NSX-T Application Port Profile: %s", err)
 	}
@@ -56,47 +57,47 @@ func (org *Org) CreateNsxtAppPortProfile(appPortProfileConfig *types.NsxtAppPort
 
 // GetAllNsxtAppPortProfiles returns all NSX-T Application Port Profiles for specific scope
 // More details about scope in documentation for types.NsxtAppPortProfile
-func (org *Org) GetAllNsxtAppPortProfiles(queryParameters url.Values, scope string) ([]*NsxtAppPortProfile, error) {
+func (org *Org) GetAllNsxtAppPortProfiles(ctx context.Context, queryParameters url.Values, scope string) ([]*NsxtAppPortProfile, error) {
 	queryParams := copyOrNewUrlValues(queryParameters)
 	if scope != "" {
 		queryParams = queryParameterFilterAnd("scope=="+scope, queryParams)
 	}
 
-	return getAllNsxtAppPortProfiles(org.client, queryParams)
+	return getAllNsxtAppPortProfiles(ctx, org.client, queryParams)
 }
 
 // GetNsxtAppPortProfileByName allows users to retrieve Application Port Profiles for specific scope.
 // More details in documentation for types.NsxtAppPortProfile
 //
 // Note. Names are enforced to be unique per scope
-func (org *Org) GetNsxtAppPortProfileByName(name, scope string) (*NsxtAppPortProfile, error) {
+func (org *Org) GetNsxtAppPortProfileByName(ctx context.Context, name, scope string) (*NsxtAppPortProfile, error) {
 	queryParameters := url.Values{}
 	if scope != "" {
 		queryParameters = queryParameterFilterAnd("scope=="+scope, queryParameters)
 	}
 
-	return getNsxtAppPortProfileByName(org.client, name, queryParameters)
+	return getNsxtAppPortProfileByName(ctx, org.client, name, queryParameters)
 }
 
 // GetNsxtAppPortProfileByName allows users to retrieve Application Port Profiles for specific scope.
 // More details in documentation for types.NsxtAppPortProfile
 //
 // Note. Names are enforced to be unique per scope
-func (vdc *Vdc) GetNsxtAppPortProfileByName(name, scope string) (*NsxtAppPortProfile, error) {
+func (vdc *Vdc) GetNsxtAppPortProfileByName(ctx context.Context, name, scope string) (*NsxtAppPortProfile, error) {
 	queryParameters := copyOrNewUrlValues(nil)
 	queryParameters = queryParameterFilterAnd("_context=="+vdc.Vdc.ID, queryParameters)
 	if scope != "" {
 		queryParameters = queryParameterFilterAnd("scope=="+scope, queryParameters)
 	}
 
-	return getNsxtAppPortProfileByName(vdc.client, name, queryParameters)
+	return getNsxtAppPortProfileByName(ctx, vdc.client, name, queryParameters)
 }
 
 // GetNsxtAppPortProfileByName allows users to retrieve Application Port Profiles for specific scope.
 // More details in documentation for types.NsxtAppPortProfile
 //
 // Note. Names are enforced to be unique per scope
-func (vdcGroup *VdcGroup) GetNsxtAppPortProfileByName(name, scope string) (*NsxtAppPortProfile, error) {
+func (vdcGroup *VdcGroup) GetNsxtAppPortProfileByName(ctx context.Context, name, scope string) (*NsxtAppPortProfile, error) {
 	queryParameters := copyOrNewUrlValues(nil)
 	queryParameters = queryParameterFilterAnd("_context=="+vdcGroup.VdcGroup.Id, queryParameters)
 
@@ -104,18 +105,18 @@ func (vdcGroup *VdcGroup) GetNsxtAppPortProfileByName(name, scope string) (*Nsxt
 		queryParameters = queryParameterFilterAnd("scope=="+scope, queryParameters)
 	}
 
-	return getNsxtAppPortProfileByName(vdcGroup.client, name, queryParameters)
+	return getNsxtAppPortProfileByName(ctx, vdcGroup.client, name, queryParameters)
 }
 
 // GetNsxtAppPortProfileById retrieves NSX-T Application Port Profile by ID
-func (org *Org) GetNsxtAppPortProfileById(id string) (*NsxtAppPortProfile, error) {
-	return getNsxtAppPortProfileById(org.client, id)
+func (org *Org) GetNsxtAppPortProfileById(ctx context.Context, id string) (*NsxtAppPortProfile, error) {
+	return getNsxtAppPortProfileById(ctx, org.client, id)
 }
 
 // Update allows users to update NSX-T Application Port Profile
-func (appPortProfile *NsxtAppPortProfile) Update(appPortProfileConfig *types.NsxtAppPortProfile) (*NsxtAppPortProfile, error) {
+func (appPortProfile *NsxtAppPortProfile) Update(ctx context.Context, appPortProfileConfig *types.NsxtAppPortProfile) (*NsxtAppPortProfile, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAppPortProfiles
-	minimumApiVersion, err := appPortProfile.client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := appPortProfile.client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +135,7 @@ func (appPortProfile *NsxtAppPortProfile) Update(appPortProfileConfig *types.Nsx
 		client:             appPortProfile.client,
 	}
 
-	err = appPortProfile.client.OpenApiPutItem(minimumApiVersion, urlRef, nil, appPortProfileConfig, returnObject.NsxtAppPortProfile, nil)
+	err = appPortProfile.client.OpenApiPutItem(ctx, minimumApiVersion, urlRef, nil, appPortProfileConfig, returnObject.NsxtAppPortProfile, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error updating NSX-T Application Port Profile : %s", err)
 	}
@@ -143,9 +144,9 @@ func (appPortProfile *NsxtAppPortProfile) Update(appPortProfileConfig *types.Nsx
 }
 
 // Delete allows users to delete NSX-T Application Port Profile
-func (appPortProfile *NsxtAppPortProfile) Delete() error {
+func (appPortProfile *NsxtAppPortProfile) Delete(ctx context.Context) error {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAppPortProfiles
-	minimumApiVersion, err := appPortProfile.client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := appPortProfile.client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -159,7 +160,7 @@ func (appPortProfile *NsxtAppPortProfile) Delete() error {
 		return err
 	}
 
-	err = appPortProfile.client.OpenApiDeleteItem(minimumApiVersion, urlRef, nil, nil)
+	err = appPortProfile.client.OpenApiDeleteItem(ctx, minimumApiVersion, urlRef, nil, nil)
 
 	if err != nil {
 		return fmt.Errorf("error deleting NSX-T Application Port Profile: %s", err)
@@ -168,11 +169,11 @@ func (appPortProfile *NsxtAppPortProfile) Delete() error {
 	return nil
 }
 
-func getNsxtAppPortProfileByName(client *Client, name string, queryParameters url.Values) (*NsxtAppPortProfile, error) {
+func getNsxtAppPortProfileByName(ctx context.Context, client *Client, name string, queryParameters url.Values) (*NsxtAppPortProfile, error) {
 	queryParams := copyOrNewUrlValues(queryParameters)
 	queryParams = queryParameterFilterAnd("name=="+name, queryParams)
 
-	allAppPortProfiles, err := getAllNsxtAppPortProfiles(client, queryParams)
+	allAppPortProfiles, err := getAllNsxtAppPortProfiles(ctx, client, queryParams)
 	if err != nil {
 		return nil, fmt.Errorf("could not find NSX-T Application Port Profile with name '%s': %s", name, err)
 	}
@@ -185,12 +186,12 @@ func getNsxtAppPortProfileByName(client *Client, name string, queryParameters ur
 		return nil, fmt.Errorf("expected exactly one NSX-T Application Port Profile with name '%s'. Got %d", name, len(allAppPortProfiles))
 	}
 
-	return getNsxtAppPortProfileById(client, allAppPortProfiles[0].NsxtAppPortProfile.ID)
+	return getNsxtAppPortProfileById(ctx, client, allAppPortProfiles[0].NsxtAppPortProfile.ID)
 }
 
-func getNsxtAppPortProfileById(client *Client, id string) (*NsxtAppPortProfile, error) {
+func getNsxtAppPortProfileById(ctx context.Context, client *Client, id string) (*NsxtAppPortProfile, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAppPortProfiles
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +210,7 @@ func getNsxtAppPortProfileById(client *Client, id string) (*NsxtAppPortProfile, 
 		client:             client,
 	}
 
-	err = client.OpenApiGetItem(minimumApiVersion, urlRef, nil, appPortProfile.NsxtAppPortProfile, nil)
+	err = client.OpenApiGetItem(ctx, minimumApiVersion, urlRef, nil, appPortProfile.NsxtAppPortProfile, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -217,9 +218,9 @@ func getNsxtAppPortProfileById(client *Client, id string) (*NsxtAppPortProfile, 
 	return appPortProfile, nil
 }
 
-func getAllNsxtAppPortProfiles(client *Client, queryParameters url.Values) ([]*NsxtAppPortProfile, error) {
+func getAllNsxtAppPortProfiles(ctx context.Context, client *Client, queryParameters url.Values) ([]*NsxtAppPortProfile, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAppPortProfiles
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +231,7 @@ func getAllNsxtAppPortProfiles(client *Client, queryParameters url.Values) ([]*N
 	}
 
 	typeResponses := []*types.NsxtAppPortProfile{{}}
-	err = client.OpenApiGetAllItems(minimumApiVersion, urlRef, queryParameters, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, minimumApiVersion, urlRef, queryParameters, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}

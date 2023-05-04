@@ -432,9 +432,9 @@ func HelperCreateMultipleCatalogItems(ctx context.Context, catalog *Catalog, req
 	return data, nil
 }
 
-func HelperMakeFiltersFromOrgVdc(org *Org) ([]FilterMatch, error) {
+func HelperMakeFiltersFromOrgVdc(ctx context.Context, org *Org) ([]FilterMatch, error) {
 	var filters []FilterMatch
-	items, err := org.QueryOrgVdcList()
+	items, err := org.QueryOrgVdcList(ctx)
 	if err != nil {
 		return filters, err
 	}
@@ -447,7 +447,7 @@ func HelperMakeFiltersFromOrgVdc(org *Org) ([]FilterMatch, error) {
 			return nil, err
 		}
 
-		filter, err = org.client.metadataToFilter(item.HREF, filter)
+		filter, err = org.client.metadataToFilter(ctx, item.HREF, filter)
 		if err != nil {
 			return nil, err
 		}

@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -22,14 +23,14 @@ type NsxtAlbController struct {
 }
 
 // GetAllAlbControllers returns all configured NSX-T ALB Controllers
-func (vcdClient *VCDClient) GetAllAlbControllers(queryParameters url.Values) ([]*NsxtAlbController, error) {
+func (vcdClient *VCDClient) GetAllAlbControllers(ctx context.Context, queryParameters url.Values) ([]*NsxtAlbController, error) {
 	client := vcdClient.Client
 	if !client.IsSysAdmin {
 		return nil, errors.New("reading NSX-T ALB Controllers require System user")
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbController
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +41,7 @@ func (vcdClient *VCDClient) GetAllAlbControllers(queryParameters url.Values) ([]
 	}
 
 	typeResponses := []*types.NsxtAlbController{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParameters, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParameters, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -58,11 +59,11 @@ func (vcdClient *VCDClient) GetAllAlbControllers(queryParameters url.Values) ([]
 }
 
 // GetAlbControllerByName returns NSX-T ALB Controller by Name
-func (vcdClient *VCDClient) GetAlbControllerByName(name string) (*NsxtAlbController, error) {
+func (vcdClient *VCDClient) GetAlbControllerByName(ctx context.Context, name string) (*NsxtAlbController, error) {
 	queryParameters := copyOrNewUrlValues(nil)
 	queryParameters.Add("filter", "name=="+name)
 
-	controllers, err := vcdClient.GetAllAlbControllers(queryParameters)
+	controllers, err := vcdClient.GetAllAlbControllers(ctx, queryParameters)
 	if err != nil {
 		return nil, fmt.Errorf("error reading ALB Controller with Name '%s': %s", name, err)
 	}
@@ -79,7 +80,7 @@ func (vcdClient *VCDClient) GetAlbControllerByName(name string) (*NsxtAlbControl
 }
 
 // GetAlbControllerById returns NSX-T ALB Controller by ID
-func (vcdClient *VCDClient) GetAlbControllerById(id string) (*NsxtAlbController, error) {
+func (vcdClient *VCDClient) GetAlbControllerById(ctx context.Context, id string) (*NsxtAlbController, error) {
 	client := vcdClient.Client
 	if !client.IsSysAdmin {
 		return nil, errors.New("reading NSX-T ALB Controllers require System user")
@@ -90,7 +91,7 @@ func (vcdClient *VCDClient) GetAlbControllerById(id string) (*NsxtAlbController,
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbController
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +102,7 @@ func (vcdClient *VCDClient) GetAlbControllerById(id string) (*NsxtAlbController,
 	}
 
 	typeResponse := &types.NsxtAlbController{}
-	err = client.OpenApiGetItem(apiVersion, urlRef, nil, &typeResponse, nil)
+	err = client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, &typeResponse, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -117,9 +118,9 @@ func (vcdClient *VCDClient) GetAlbControllerById(id string) (*NsxtAlbController,
 // GetAlbControllerByUrl returns configured ALB Controller by URL
 //
 // Note. Filtering is performed on client side.
-func (vcdClient *VCDClient) GetAlbControllerByUrl(url string) (*NsxtAlbController, error) {
+func (vcdClient *VCDClient) GetAlbControllerByUrl(ctx context.Context, url string) (*NsxtAlbController, error) {
 	// Ideally this function could filter on VCD side, but API does not support filtering on URL
-	controllers, err := vcdClient.GetAllAlbControllers(nil)
+	controllers, err := vcdClient.GetAllAlbControllers(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error reading ALB Controller with Url '%s': %s", url, err)
 	}
@@ -144,14 +145,14 @@ func (vcdClient *VCDClient) GetAlbControllerByUrl(url string) (*NsxtAlbControlle
 }
 
 // CreateNsxtAlbController creates controller with supplied albControllerConfig configuration
-func (vcdClient *VCDClient) CreateNsxtAlbController(albControllerConfig *types.NsxtAlbController) (*NsxtAlbController, error) {
+func (vcdClient *VCDClient) CreateNsxtAlbController(ctx context.Context, albControllerConfig *types.NsxtAlbController) (*NsxtAlbController, error) {
 	client := vcdClient.Client
 	if !client.IsSysAdmin {
 		return nil, errors.New("handling NSX-T ALB Controllers require System user")
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbController
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +167,7 @@ func (vcdClient *VCDClient) CreateNsxtAlbController(albControllerConfig *types.N
 		vcdClient:         vcdClient,
 	}
 
-	err = client.OpenApiPostItem(apiVersion, urlRef, nil, albControllerConfig, returnObject.NsxtAlbController, nil)
+	err = client.OpenApiPostItem(ctx, apiVersion, urlRef, nil, albControllerConfig, returnObject.NsxtAlbController, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating NSX-T ALB Controller: %s", err)
 	}
@@ -175,10 +176,10 @@ func (vcdClient *VCDClient) CreateNsxtAlbController(albControllerConfig *types.N
 }
 
 // Update updates existing NSX-T ALB Controller with new supplied albControllerConfig configuration
-func (nsxtAlbController *NsxtAlbController) Update(albControllerConfig *types.NsxtAlbController) (*NsxtAlbController, error) {
+func (nsxtAlbController *NsxtAlbController) Update(ctx context.Context, albControllerConfig *types.NsxtAlbController) (*NsxtAlbController, error) {
 	client := nsxtAlbController.vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbController
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +198,7 @@ func (nsxtAlbController *NsxtAlbController) Update(albControllerConfig *types.Ns
 		vcdClient:         nsxtAlbController.vcdClient,
 	}
 
-	err = client.OpenApiPutItem(apiVersion, urlRef, nil, albControllerConfig, responseAlbController.NsxtAlbController, nil)
+	err = client.OpenApiPutItem(ctx, apiVersion, urlRef, nil, albControllerConfig, responseAlbController.NsxtAlbController, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error updating NSX-T ALB Controller: %s", err)
 	}
@@ -206,10 +207,10 @@ func (nsxtAlbController *NsxtAlbController) Update(albControllerConfig *types.Ns
 }
 
 // Delete deletes existing NSX-T ALB Controller
-func (nsxtAlbController *NsxtAlbController) Delete() error {
+func (nsxtAlbController *NsxtAlbController) Delete(ctx context.Context) error {
 	client := nsxtAlbController.vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbController
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -223,7 +224,7 @@ func (nsxtAlbController *NsxtAlbController) Delete() error {
 		return err
 	}
 
-	err = client.OpenApiDeleteItem(apiVersion, urlRef, nil, nil)
+	err = client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil, nil)
 	if err != nil {
 		return fmt.Errorf("error deleting NSX-T ALB Controller: %s", err)
 	}

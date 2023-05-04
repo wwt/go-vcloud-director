@@ -4,7 +4,6 @@ package govcd
 
 import (
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
-	. "gopkg.in/check.v1"
 )
 
 // Test_NsxtSecurityGroup tests out CRUD of Static NSX-T Security Group
@@ -300,7 +299,7 @@ func createVappVmAndAttachNetwork(check *C, vcd *TestVCD, vdc *Vdc, net *OpenApi
 	task, err := updateNetworkConfigurations(vapp, networkConfigurations)
 	check.Assert(err, IsNil)
 
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 	// EOF Attach network to vApp
 

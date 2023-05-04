@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
@@ -21,25 +22,25 @@ type AnyTypeEdgeGateway struct {
 }
 
 // GetNsxtEdgeGatewayById allows retrieving NSX-T or NSX-V Edge Gateway by ID for Org admins
-func (adminOrg *AdminOrg) GetAnyTypeEdgeGatewayById(id string) (*AnyTypeEdgeGateway, error) {
-	return getAnyTypeApiEdgeGatewayById(adminOrg.client, id, nil)
+func (adminOrg *AdminOrg) GetAnyTypeEdgeGatewayById(ctx context.Context, id string) (*AnyTypeEdgeGateway, error) {
+	return getAnyTypeApiEdgeGatewayById(ctx, adminOrg.client, id, nil)
 }
 
 // GetNsxtEdgeGatewayById allows retrieving NSX-T or NSX-V Edge Gateway by ID for Org users
-func (org *Org) GetAnyTypeEdgeGatewayById(id string) (*AnyTypeEdgeGateway, error) {
-	return getAnyTypeApiEdgeGatewayById(org.client, id, nil)
+func (org *Org) GetAnyTypeEdgeGatewayById(ctx context.Context, id string) (*AnyTypeEdgeGateway, error) {
+	return getAnyTypeApiEdgeGatewayById(ctx, org.client, id, nil)
 }
 
 // getNsxtEdgeGatewayById is a private parent for wrapped functions:
 // func (adminOrg *AdminOrg) GetAnyTypeEdgeGatewayById(id string) (*AnyTypeEdgeGateway, error)
 // func (org *Org) GetAnyTypeEdgeGatewayById(id string) (*AnyTypeEdgeGateway, error)
-func getAnyTypeApiEdgeGatewayById(client *Client, id string, queryParameters url.Values) (*AnyTypeEdgeGateway, error) {
+func getAnyTypeApiEdgeGatewayById(ctx context.Context, client *Client, id string, queryParameters url.Values) (*AnyTypeEdgeGateway, error) {
 	if id == "" {
 		return nil, fmt.Errorf("empty Edge Gateway ID")
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeGateways
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +55,7 @@ func getAnyTypeApiEdgeGatewayById(client *Client, id string, queryParameters url
 		client:      client,
 	}
 
-	err = client.OpenApiGetItem(apiVersion, urlRef, queryParameters, egw.EdgeGateway, nil)
+	err = client.OpenApiGetItem(ctx, apiVersion, urlRef, queryParameters, egw.EdgeGateway, nil)
 	if err != nil {
 		return nil, err
 	}

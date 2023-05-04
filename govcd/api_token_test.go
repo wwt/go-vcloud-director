@@ -41,7 +41,7 @@ func (vcd *TestVCD) TestVCDClient_GetBearerTokenFromApiToken(check *C) {
 		check.Skip("This test requires VCD 10.3.1 or greater")
 	}
 
-	tokenInfo, err := vcd.client.GetBearerTokenFromApiToken(orgName, apiToken)
+	tokenInfo, err := vcd.client.GetBearerTokenFromApiToken(ctx, orgName, apiToken)
 	check.Assert(err, IsNil)
 	check.Assert(tokenInfo, NotNil)
 	check.Assert(tokenInfo.AccessToken, Not(Equals), "")

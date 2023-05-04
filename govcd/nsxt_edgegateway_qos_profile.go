@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
@@ -19,7 +20,7 @@ type NsxtEdgeGatewayQosProfile struct {
 }
 
 // GetAllNsxtEdgeGatewayQosProfiles retrieves all NSX-T Edge Gateway QoS Profiles defined in NSX-T Manager
-func (vcdClient *VCDClient) GetAllNsxtEdgeGatewayQosProfiles(nsxtManagerId string, queryParameters url.Values) ([]*NsxtEdgeGatewayQosProfile, error) {
+func (vcdClient *VCDClient) GetAllNsxtEdgeGatewayQosProfiles(ctx context.Context, nsxtManagerId string, queryParameters url.Values) ([]*NsxtEdgeGatewayQosProfile, error) {
 	if nsxtManagerId == "" {
 		return nil, fmt.Errorf("empty NSX-T manager ID")
 	}
@@ -30,7 +31,7 @@ func (vcdClient *VCDClient) GetAllNsxtEdgeGatewayQosProfiles(nsxtManagerId strin
 
 	client := vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointQosProfiles
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +45,7 @@ func (vcdClient *VCDClient) GetAllNsxtEdgeGatewayQosProfiles(nsxtManagerId strin
 	queryParams = queryParameterFilterAnd("nsxTManagerRef.id=="+nsxtManagerId, queryParams)
 
 	typeResponses := []*types.NsxtEdgeGatewayQosProfile{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParams, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParams, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +62,7 @@ func (vcdClient *VCDClient) GetAllNsxtEdgeGatewayQosProfiles(nsxtManagerId strin
 }
 
 // GetNsxtEdgeGatewayQosProfileById retrieves NSX-T Edge Gateway QoS Profile by Display Name
-func (vcdClient *VCDClient) GetNsxtEdgeGatewayQosProfileByDisplayName(nsxtManagerId, displayName string) (*NsxtEdgeGatewayQosProfile, error) {
+func (vcdClient *VCDClient) GetNsxtEdgeGatewayQosProfileByDisplayName(ctx context.Context, nsxtManagerId, displayName string) (*NsxtEdgeGatewayQosProfile, error) {
 	if displayName == "" {
 		return nil, fmt.Errorf("empty QoS profile Display Name")
 	}
@@ -72,7 +73,7 @@ func (vcdClient *VCDClient) GetNsxtEdgeGatewayQosProfileByDisplayName(nsxtManage
 		queryParameters := copyOrNewUrlValues(nil)
 		queryParameters.Add("filter", "displayName=="+displayName)
 	*/
-	nsxtEdgeClusters, err := vcdClient.GetAllNsxtEdgeGatewayQosProfiles(nsxtManagerId, nil)
+	nsxtEdgeClusters, err := vcdClient.GetAllNsxtEdgeGatewayQosProfiles(ctx, nsxtManagerId, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not find QoS profile with DisplayName '%s' for NSX-T Manager with ID '%s': %s",
 			displayName, nsxtManagerId, err)

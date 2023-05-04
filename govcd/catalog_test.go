@@ -236,12 +236,12 @@ func (vcd *TestVCD) Test_RenameCatalog(check *C) {
 
 	uploadTask, err := adminCatalog.UploadOvf(vcd.config.OVA.OvaPath, testUploadOvf, testUploadOvf, 1024)
 	check.Assert(err, IsNil)
-	err = uploadtask.WaitTaskCompletion(ctx)
+	err = uploadTask.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
 	uploadTask, err = catalog.UploadMediaImage(testUploadMedia, testUploadMedia, vcd.config.Media.MediaPath, 1024)
 	check.Assert(err, IsNil)
-	err = uploadtask.WaitTaskCompletion(ctx)
+	err = uploadTask.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
 	vAppTemplate1, err := catalog.GetVAppTemplateByName(testUploadOvf)
@@ -1073,7 +1073,7 @@ func (vcd *TestVCD) Test_UploadOvfByLink_progress_works(check *C) {
 			check.Assert(value, Not(Equals), "")
 		}
 	}
-	err = uploadtask.WaitTaskCompletion(ctx)
+	err = uploadTask.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
 	AddToCleanupList(itemName, "catalogItem", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.Name, "Test_UploadOvfByLink_progress_works")
@@ -1130,7 +1130,7 @@ func (vcd *TestVCD) Test_CatalogUploadMediaImageWihUdfTypeIso(check *C) {
 
 	uploadTask, err := catalog.UploadMediaImage(mediaName, "upload from test", vcd.config.Media.MediaUdfTypePath, 1024)
 	check.Assert(err, IsNil)
-	err = uploadtask.WaitTaskCompletion(ctx)
+	err = uploadTask.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
 	AddToCleanupList(mediaName, "mediaCatalogImage", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.Name, mediaName)
@@ -1246,7 +1246,7 @@ func (vcd *TestVCD) Test_CatalogAccessAsOrgUsers(check *C) {
 	fmt.Printf("uploading media image into catalog %s\n", catalogName)
 	uploadTask, err := catalog1AsSystem.UploadMediaImage(mediaName, "upload from test", vcd.config.Media.MediaPath, 1024)
 	check.Assert(err, IsNil)
-	err = uploadtask.WaitTaskCompletion(ctx)
+	err = uploadTask.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
 	vAppTemplateAsSystem, err := catalog1AsSystem.GetVAppTemplateByName(vappTemplateName)

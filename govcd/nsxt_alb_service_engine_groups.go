@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -31,7 +32,7 @@ type NsxtAlbServiceEngineGroup struct {
 // * Assignable Gateway ID (_context=gatewayId;_context==assignable) returns all Load Balancer Service Engine Groups
 // that are assignable to the gateway. This filters out any Load Balancer Service Engine groups that are already
 // assigned to the gateway or assigned to another gateway if the reservation type is 'DEDICATED’.
-func (vcdClient *VCDClient) GetAllAlbServiceEngineGroups(context string, queryParameters url.Values) ([]*NsxtAlbServiceEngineGroup, error) {
+func (vcdClient *VCDClient) GetAllAlbServiceEngineGroups(ctx context.Context, context string, queryParameters url.Values) ([]*NsxtAlbServiceEngineGroup, error) {
 	client := vcdClient.Client
 
 	if !client.IsSysAdmin {
@@ -39,7 +40,7 @@ func (vcdClient *VCDClient) GetAllAlbServiceEngineGroups(context string, queryPa
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbServiceEngineGroups
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +56,7 @@ func (vcdClient *VCDClient) GetAllAlbServiceEngineGroups(context string, queryPa
 	}
 	typeResponses := []*types.NsxtAlbServiceEngineGroup{{}}
 
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParams, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParams, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -78,14 +79,14 @@ func (vcdClient *VCDClient) GetAllAlbServiceEngineGroups(context string, queryPa
 // * Assignable Gateway ID (_context=gatewayId;_context==assignable) returns all Load Balancer Service Engine Groups
 // that are assignable to the gateway. This filters out any Load Balancer Service Engine groups that are already
 // assigned to the gateway or assigned to another gateway if the reservation type is 'DEDICATED’.
-func (vcdClient *VCDClient) GetAlbServiceEngineGroupByName(optionalContext, name string) (*NsxtAlbServiceEngineGroup, error) {
+func (vcdClient *VCDClient) GetAlbServiceEngineGroupByName(ctx context.Context, optionalContext, name string) (*NsxtAlbServiceEngineGroup, error) {
 	queryParams := copyOrNewUrlValues(nil)
 	if optionalContext != "" {
 		queryParams = queryParameterFilterAnd(fmt.Sprintf("_context==%s", optionalContext), queryParams)
 	}
 	queryParams.Add("filter", fmt.Sprintf("name==%s", name))
 
-	albSeGroups, err := vcdClient.GetAllAlbServiceEngineGroups("", queryParams)
+	albSeGroups, err := vcdClient.GetAllAlbServiceEngineGroups(ctx, "", queryParams)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving NSX-T ALB Service Engine Group By Name '%s': %s", name, err)
 	}
@@ -102,7 +103,7 @@ func (vcdClient *VCDClient) GetAlbServiceEngineGroupByName(optionalContext, name
 }
 
 // GetAlbServiceEngineGroupById returns importable NSX-T ALB Cloud by ID
-func (vcdClient *VCDClient) GetAlbServiceEngineGroupById(id string) (*NsxtAlbServiceEngineGroup, error) {
+func (vcdClient *VCDClient) GetAlbServiceEngineGroupById(ctx context.Context, id string) (*NsxtAlbServiceEngineGroup, error) {
 	client := vcdClient.Client
 
 	if !client.IsSysAdmin {
@@ -110,7 +111,7 @@ func (vcdClient *VCDClient) GetAlbServiceEngineGroupById(id string) (*NsxtAlbSer
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbServiceEngineGroups
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +123,7 @@ func (vcdClient *VCDClient) GetAlbServiceEngineGroupById(id string) (*NsxtAlbSer
 
 	typeResponse := &types.NsxtAlbServiceEngineGroup{}
 
-	err = client.OpenApiGetItem(apiVersion, urlRef, nil, &typeResponse, nil)
+	err = client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, &typeResponse, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -135,14 +136,14 @@ func (vcdClient *VCDClient) GetAlbServiceEngineGroupById(id string) (*NsxtAlbSer
 	return wrappedResponse, nil
 }
 
-func (vcdClient *VCDClient) CreateNsxtAlbServiceEngineGroup(albServiceEngineGroup *types.NsxtAlbServiceEngineGroup) (*NsxtAlbServiceEngineGroup, error) {
+func (vcdClient *VCDClient) CreateNsxtAlbServiceEngineGroup(ctx context.Context, albServiceEngineGroup *types.NsxtAlbServiceEngineGroup) (*NsxtAlbServiceEngineGroup, error) {
 	client := vcdClient.Client
 	if !client.IsSysAdmin {
 		return nil, errors.New("handling NSX-T ALB Service Engine Groups require System user")
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbServiceEngineGroups
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +158,7 @@ func (vcdClient *VCDClient) CreateNsxtAlbServiceEngineGroup(albServiceEngineGrou
 		vcdClient:                 vcdClient,
 	}
 
-	err = client.OpenApiPostItem(apiVersion, urlRef, nil, albServiceEngineGroup, returnObject.NsxtAlbServiceEngineGroup, nil)
+	err = client.OpenApiPostItem(ctx, apiVersion, urlRef, nil, albServiceEngineGroup, returnObject.NsxtAlbServiceEngineGroup, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating NSX-T ALB Service Engine Group: %s", err)
 	}
@@ -166,10 +167,10 @@ func (vcdClient *VCDClient) CreateNsxtAlbServiceEngineGroup(albServiceEngineGrou
 }
 
 // Update updates existing ALB Controller with new supplied albControllerConfig configuration
-func (nsxtAlbServiceEngineGroup *NsxtAlbServiceEngineGroup) Update(albSEGroupConfig *types.NsxtAlbServiceEngineGroup) (*NsxtAlbServiceEngineGroup, error) {
+func (nsxtAlbServiceEngineGroup *NsxtAlbServiceEngineGroup) Update(ctx context.Context, albSEGroupConfig *types.NsxtAlbServiceEngineGroup) (*NsxtAlbServiceEngineGroup, error) {
 	client := nsxtAlbServiceEngineGroup.vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbServiceEngineGroups
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +189,7 @@ func (nsxtAlbServiceEngineGroup *NsxtAlbServiceEngineGroup) Update(albSEGroupCon
 		vcdClient:                 nsxtAlbServiceEngineGroup.vcdClient,
 	}
 
-	err = client.OpenApiPutItem(apiVersion, urlRef, nil, albSEGroupConfig, responseAlbController.NsxtAlbServiceEngineGroup, nil)
+	err = client.OpenApiPutItem(ctx, apiVersion, urlRef, nil, albSEGroupConfig, responseAlbController.NsxtAlbServiceEngineGroup, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error updating NSX-T ALB Service Engine Group: %s", err)
 	}
@@ -197,10 +198,10 @@ func (nsxtAlbServiceEngineGroup *NsxtAlbServiceEngineGroup) Update(albSEGroupCon
 }
 
 // Delete deletes NSX-T ALB Service Engine Group configuration
-func (nsxtAlbServiceEngineGroup *NsxtAlbServiceEngineGroup) Delete() error {
+func (nsxtAlbServiceEngineGroup *NsxtAlbServiceEngineGroup) Delete(ctx context.Context) error {
 	client := nsxtAlbServiceEngineGroup.vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbServiceEngineGroups
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -214,7 +215,7 @@ func (nsxtAlbServiceEngineGroup *NsxtAlbServiceEngineGroup) Delete() error {
 		return err
 	}
 
-	err = client.OpenApiDeleteItem(apiVersion, urlRef, nil, nil)
+	err = client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil, nil)
 	if err != nil {
 		return fmt.Errorf("error deleting NSX-T ALB Service Engine Group: %s", err)
 	}
@@ -225,10 +226,10 @@ func (nsxtAlbServiceEngineGroup *NsxtAlbServiceEngineGroup) Delete() error {
 // Sync syncs a specified Load Balancer Service Engine Group. It requests the HA mode and the maximum number of
 // supported Virtual Services for this Service Engine Group from the Load Balancer, and updates vCD's local record of
 // these properties.
-func (nsxtAlbServiceEngineGroup *NsxtAlbServiceEngineGroup) Sync() error {
+func (nsxtAlbServiceEngineGroup *NsxtAlbServiceEngineGroup) Sync(ctx context.Context) error {
 	client := nsxtAlbServiceEngineGroup.vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbServiceEngineGroups
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -242,12 +243,12 @@ func (nsxtAlbServiceEngineGroup *NsxtAlbServiceEngineGroup) Sync() error {
 		return err
 	}
 
-	task, err := client.OpenApiPostItemAsync(apiVersion, urlRef, nil, nil)
+	task, err := client.OpenApiPostItemAsync(ctx, apiVersion, urlRef, nil, nil)
 	if err != nil {
 		return fmt.Errorf("error syncing NSX-T ALB Service Engine Group: %s", err)
 	}
 
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(ctx)
 	if err != nil {
 		return fmt.Errorf("sync task for NSX-T ALB Service Engine Group failed: %s", err)
 	}

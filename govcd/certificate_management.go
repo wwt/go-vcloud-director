@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 	"net/url"
@@ -19,12 +20,12 @@ type Certificate struct {
 }
 
 // GetCertificateFromLibraryById Returns certificate from library of certificates
-func getCertificateFromLibraryById(client *Client, id string, additionalHeader map[string]string) (*Certificate, error) {
-	endpoint, err := getEndpointByVersion(client)
+func getCertificateFromLibraryById(ctx context.Context, client *Client, id string, additionalHeader map[string]string) (*Certificate, error) {
+	endpoint, err := getEndpointByVersion(ctx, client)
 	if err != nil {
 		return nil, err
 	}
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +45,7 @@ func getCertificateFromLibraryById(client *Client, id string, additionalHeader m
 		Href:               urlRef.String(),
 	}
 
-	err = client.OpenApiGetItem(minimumApiVersion, urlRef, nil, certificate.CertificateLibrary, additionalHeader)
+	err = client.OpenApiGetItem(ctx, minimumApiVersion, urlRef, nil, certificate.CertificateLibrary, additionalHeader)
 	if err != nil {
 		return nil, err
 	}
@@ -52,9 +53,9 @@ func getCertificateFromLibraryById(client *Client, id string, additionalHeader m
 	return certificate, nil
 }
 
-func getEndpointByVersion(client *Client) (string, error) {
+func getEndpointByVersion(ctx context.Context, client *Client) (string, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointSSLCertificateLibrary
-	newerApiVersion, err := client.VersionEqualOrGreater("10.3", 3)
+	newerApiVersion, err := client.VersionEqualOrGreater(ctx, "10.3", 3)
 	if err != nil {
 		return "", err
 	}
@@ -66,24 +67,24 @@ func getEndpointByVersion(client *Client) (string, error) {
 }
 
 // GetCertificateFromLibraryById Returns certificate from library of certificates from System Context
-func (client *Client) GetCertificateFromLibraryById(id string) (*Certificate, error) {
-	return getCertificateFromLibraryById(client, id, nil)
+func (client *Client) GetCertificateFromLibraryById(ctx context.Context, id string) (*Certificate, error) {
+	return getCertificateFromLibraryById(ctx, client, id, nil)
 }
 
 // GetCertificateFromLibraryById Returns certificate from library of certificates from Org context
-func (adminOrg *AdminOrg) GetCertificateFromLibraryById(id string) (*Certificate, error) {
+func (adminOrg *AdminOrg) GetCertificateFromLibraryById(ctx context.Context, id string) (*Certificate, error) {
 	tenantContext, err := adminOrg.getTenantContext()
 	if err != nil {
 		return nil, err
 	}
-	return getCertificateFromLibraryById(adminOrg.client, id, getTenantContextHeader(tenantContext))
+	return getCertificateFromLibraryById(ctx, adminOrg.client, id, getTenantContextHeader(tenantContext))
 }
 
 // addCertificateToLibrary uploads certificates with configuration details
-func addCertificateToLibrary(client *Client, certificateConfig *types.CertificateLibraryItem,
+func addCertificateToLibrary(ctx context.Context, client *Client, certificateConfig *types.CertificateLibraryItem,
 	additionalHeader map[string]string) (*Certificate, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointSSLCertificateLibrary
-	apiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	apiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +100,7 @@ func addCertificateToLibrary(client *Client, certificateConfig *types.Certificat
 		Href:               urlRef.String(),
 	}
 
-	err = client.OpenApiPostItem(apiVersion, urlRef, nil,
+	err = client.OpenApiPostItem(ctx, apiVersion, urlRef, nil,
 		certificateConfig, typeResponse.CertificateLibrary, additionalHeader)
 	if err != nil {
 		return nil, err
@@ -109,24 +110,24 @@ func addCertificateToLibrary(client *Client, certificateConfig *types.Certificat
 }
 
 // AddCertificateToLibrary uploads certificates with configuration details
-func (adminOrg *AdminOrg) AddCertificateToLibrary(certificateConfig *types.CertificateLibraryItem) (*Certificate, error) {
+func (adminOrg *AdminOrg) AddCertificateToLibrary(ctx context.Context, certificateConfig *types.CertificateLibraryItem) (*Certificate, error) {
 	tenantContext, err := adminOrg.getTenantContext()
 	if err != nil {
 		return nil, err
 	}
-	return addCertificateToLibrary(adminOrg.client, certificateConfig, getTenantContextHeader(tenantContext))
+	return addCertificateToLibrary(ctx, adminOrg.client, certificateConfig, getTenantContextHeader(tenantContext))
 }
 
 // AddCertificateToLibrary uploads certificates with configuration details
-func (client *Client) AddCertificateToLibrary(certificateConfig *types.CertificateLibraryItem) (*Certificate, error) {
-	return addCertificateToLibrary(client, certificateConfig, nil)
+func (client *Client) AddCertificateToLibrary(ctx context.Context, certificateConfig *types.CertificateLibraryItem) (*Certificate, error) {
+	return addCertificateToLibrary(ctx, client, certificateConfig, nil)
 }
 
 // getAllCertificateFromLibrary retrieves all certificates. Query parameters can be supplied to perform additional
 // filtering
-func getAllCertificateFromLibrary(client *Client, queryParameters url.Values, additionalHeader map[string]string) ([]*Certificate, error) {
+func getAllCertificateFromLibrary(ctx context.Context, client *Client, queryParameters url.Values, additionalHeader map[string]string) ([]*Certificate, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointSSLCertificateLibrary
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +138,7 @@ func getAllCertificateFromLibrary(client *Client, queryParameters url.Values, ad
 	}
 
 	responses := []*types.CertificateLibraryItem{{}}
-	err = client.OpenApiGetAllItems(minimumApiVersion, urlRef, queryParameters, &responses, additionalHeader)
+	err = client.OpenApiGetAllItems(ctx, minimumApiVersion, urlRef, queryParameters, &responses, additionalHeader)
 	if err != nil {
 		return nil, err
 	}
@@ -161,18 +162,18 @@ func getAllCertificateFromLibrary(client *Client, queryParameters url.Values, ad
 
 // GetAllCertificatesFromLibrary retrieves all available certificates from certificate library.
 // Query parameters can be supplied to perform additional filtering
-func (client *Client) GetAllCertificatesFromLibrary(queryParameters url.Values) ([]*Certificate, error) {
-	return getAllCertificateFromLibrary(client, queryParameters, nil)
+func (client *Client) GetAllCertificatesFromLibrary(ctx context.Context, queryParameters url.Values) ([]*Certificate, error) {
+	return getAllCertificateFromLibrary(ctx, client, queryParameters, nil)
 }
 
 // GetAllCertificatesFromLibrary r retrieves all available certificates from certificate library.
 // Query parameters can be supplied to perform additional filtering
-func (adminOrg *AdminOrg) GetAllCertificatesFromLibrary(queryParameters url.Values) ([]*Certificate, error) {
+func (adminOrg *AdminOrg) GetAllCertificatesFromLibrary(ctx context.Context, queryParameters url.Values) ([]*Certificate, error) {
 	tenantContext, err := adminOrg.getTenantContext()
 	if err != nil {
 		return nil, err
 	}
-	return getAllCertificateFromLibrary(adminOrg.client, queryParameters, getTenantContextHeader(tenantContext))
+	return getAllCertificateFromLibrary(ctx, adminOrg.client, queryParameters, getTenantContextHeader(tenantContext))
 }
 
 // getCertificateFromLibraryByName retrieves certificate from certificate library by given name
@@ -183,14 +184,14 @@ func (adminOrg *AdminOrg) GetAllCertificatesFromLibrary(queryParameters url.Valu
 // search brute force too. Reference to issue:
 // https://github.com/golang/go/issues/4013
 // https://github.com/czos/goamz/pull/11/files
-func getCertificateFromLibraryByName(client *Client, name string, additionalHeader map[string]string) (*Certificate, error) {
-	slowSearch, params, err := shouldDoSlowSearch("alias", name, client)
+func getCertificateFromLibraryByName(ctx context.Context, client *Client, name string, additionalHeader map[string]string) (*Certificate, error) {
+	slowSearch, params, err := shouldDoSlowSearch(ctx, "alias", name, client)
 	if err != nil {
 		return nil, err
 	}
 
 	var foundCertificates []*Certificate
-	certificates, err := getAllCertificateFromLibrary(client, params, additionalHeader)
+	certificates, err := getAllCertificateFromLibrary(ctx, client, params, additionalHeader)
 	if err != nil {
 		return nil, err
 	}
@@ -223,26 +224,26 @@ func getCertificateFromLibraryByName(client *Client, name string, additionalHead
 }
 
 // GetCertificateFromLibraryByName retrieves certificate from certificate library by given name
-func (client *Client) GetCertificateFromLibraryByName(name string) (*Certificate, error) {
-	return getCertificateFromLibraryByName(client, name, nil)
+func (client *Client) GetCertificateFromLibraryByName(ctx context.Context, name string) (*Certificate, error) {
+	return getCertificateFromLibraryByName(ctx, client, name, nil)
 }
 
 // GetCertificateFromLibraryByName retrieves certificate from certificate library by given name
-func (adminOrg *AdminOrg) GetCertificateFromLibraryByName(name string) (*Certificate, error) {
+func (adminOrg *AdminOrg) GetCertificateFromLibraryByName(ctx context.Context, name string) (*Certificate, error) {
 	tenantContext, err := adminOrg.getTenantContext()
 	if err != nil {
 		return nil, err
 	}
-	return getCertificateFromLibraryByName(adminOrg.client, name, getTenantContextHeader(tenantContext))
+	return getCertificateFromLibraryByName(ctx, adminOrg.client, name, getTenantContextHeader(tenantContext))
 }
 
 // Update updates existing Certificate. Allows changing only alias and description
-func (certificate *Certificate) Update() (*Certificate, error) {
-	endpoint, err := getEndpointByVersion(certificate.client)
+func (certificate *Certificate) Update(ctx context.Context) (*Certificate, error) {
+	endpoint, err := getEndpointByVersion(ctx, certificate.client)
 	if err != nil {
 		return nil, err
 	}
-	minimumApiVersion, err := certificate.client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := certificate.client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +262,7 @@ func (certificate *Certificate) Update() (*Certificate, error) {
 		client:             certificate.client,
 	}
 
-	err = certificate.client.OpenApiPutItem(minimumApiVersion, urlRef, nil, certificate.CertificateLibrary,
+	err = certificate.client.OpenApiPutItem(ctx, minimumApiVersion, urlRef, nil, certificate.CertificateLibrary,
 		returnCertificate.CertificateLibrary, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error updating certificate: %s", err)
@@ -271,12 +272,12 @@ func (certificate *Certificate) Update() (*Certificate, error) {
 }
 
 // Delete deletes certificate from Certificate library
-func (certificate *Certificate) Delete() error {
-	endpoint, err := getEndpointByVersion(certificate.client)
+func (certificate *Certificate) Delete(ctx context.Context) error {
+	endpoint, err := getEndpointByVersion(ctx, certificate.client)
 	if err != nil {
 		return err
 	}
-	minimumApiVersion, err := certificate.client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := certificate.client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -290,7 +291,7 @@ func (certificate *Certificate) Delete() error {
 		return err
 	}
 
-	err = certificate.client.OpenApiDeleteItem(minimumApiVersion, urlRef, nil, nil)
+	err = certificate.client.OpenApiDeleteItem(ctx, minimumApiVersion, urlRef, nil, nil)
 
 	if err != nil {
 		return fmt.Errorf("error deleting certificate: %s", err)

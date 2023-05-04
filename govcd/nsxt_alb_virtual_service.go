@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
@@ -21,11 +22,11 @@ type NsxtAlbVirtualService struct {
 // GetAllAlbVirtualServiceSummaries returns a limited subset of NsxtAlbVirtualService values, but does it in single
 // query. To fetch complete information for ALB Virtual Services one can use GetAllAlbVirtualServices(), but it is slower
 // as it has to retrieve Virtual Services one by one.
-func (vcdClient *VCDClient) GetAllAlbVirtualServiceSummaries(edgeGatewayId string, queryParameters url.Values) ([]*NsxtAlbVirtualService, error) {
+func (vcdClient *VCDClient) GetAllAlbVirtualServiceSummaries(ctx context.Context, edgeGatewayId string, queryParameters url.Values) ([]*NsxtAlbVirtualService, error) {
 	client := vcdClient.Client
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbVirtualServiceSummaries
-	apiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	apiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +37,7 @@ func (vcdClient *VCDClient) GetAllAlbVirtualServiceSummaries(edgeGatewayId strin
 	}
 
 	typeResponses := []*types.NsxtAlbVirtualService{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParameters, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParameters, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -55,8 +56,8 @@ func (vcdClient *VCDClient) GetAllAlbVirtualServiceSummaries(edgeGatewayId strin
 
 // GetAllAlbVirtualServices fetches ALB Virtual Services by at first listing all Virtual Services summaries and then
 // fetching complete structure one by one
-func (vcdClient *VCDClient) GetAllAlbVirtualServices(edgeGatewayId string, queryParameters url.Values) ([]*NsxtAlbVirtualService, error) {
-	allAlbVirtualServiceSummaries, err := vcdClient.GetAllAlbVirtualServiceSummaries(edgeGatewayId, queryParameters)
+func (vcdClient *VCDClient) GetAllAlbVirtualServices(ctx context.Context, edgeGatewayId string, queryParameters url.Values) ([]*NsxtAlbVirtualService, error) {
+	allAlbVirtualServiceSummaries, err := vcdClient.GetAllAlbVirtualServiceSummaries(ctx, edgeGatewayId, queryParameters)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving all ALB Virtual Service summaries: %s", err)
 	}
@@ -64,7 +65,7 @@ func (vcdClient *VCDClient) GetAllAlbVirtualServices(edgeGatewayId string, query
 	// Loop over all Summaries and retrieve complete information
 	allAlbVirtualServices := make([]*NsxtAlbVirtualService, len(allAlbVirtualServiceSummaries))
 	for index := range allAlbVirtualServiceSummaries {
-		allAlbVirtualServices[index], err = vcdClient.GetAlbVirtualServiceById(allAlbVirtualServiceSummaries[index].NsxtAlbVirtualService.ID)
+		allAlbVirtualServices[index], err = vcdClient.GetAlbVirtualServiceById(ctx, allAlbVirtualServiceSummaries[index].NsxtAlbVirtualService.ID)
 		if err != nil {
 			return nil, fmt.Errorf("error retrieving complete ALB Virtual Service: %s", err)
 		}
@@ -75,11 +76,11 @@ func (vcdClient *VCDClient) GetAllAlbVirtualServices(edgeGatewayId string, query
 }
 
 // GetAlbVirtualServiceByName fetches ALB Virtual Service By Name
-func (vcdClient *VCDClient) GetAlbVirtualServiceByName(edgeGatewayId string, name string) (*NsxtAlbVirtualService, error) {
+func (vcdClient *VCDClient) GetAlbVirtualServiceByName(ctx context.Context, edgeGatewayId string, name string) (*NsxtAlbVirtualService, error) {
 	queryParameters := copyOrNewUrlValues(nil)
 	queryParameters.Add("filter", "name=="+name)
 
-	allAlbVirtualServices, err := vcdClient.GetAllAlbVirtualServices(edgeGatewayId, queryParameters)
+	allAlbVirtualServices, err := vcdClient.GetAllAlbVirtualServices(ctx, edgeGatewayId, queryParameters)
 	if err != nil {
 		return nil, fmt.Errorf("error reading ALB Virtual Service with Name '%s': %s", name, err)
 	}
@@ -96,7 +97,7 @@ func (vcdClient *VCDClient) GetAlbVirtualServiceByName(edgeGatewayId string, nam
 }
 
 // GetAlbVirtualServiceById fetches ALB Virtual Service By ID
-func (vcdClient *VCDClient) GetAlbVirtualServiceById(id string) (*NsxtAlbVirtualService, error) {
+func (vcdClient *VCDClient) GetAlbVirtualServiceById(ctx context.Context, id string) (*NsxtAlbVirtualService, error) {
 	client := vcdClient.Client
 
 	if id == "" {
@@ -104,7 +105,7 @@ func (vcdClient *VCDClient) GetAlbVirtualServiceById(id string) (*NsxtAlbVirtual
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbVirtualServices
-	apiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	apiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +116,7 @@ func (vcdClient *VCDClient) GetAlbVirtualServiceById(id string) (*NsxtAlbVirtual
 	}
 
 	typeResponse := &types.NsxtAlbVirtualService{}
-	err = client.OpenApiGetItem(apiVersion, urlRef, nil, &typeResponse, nil)
+	err = client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, &typeResponse, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -129,11 +130,11 @@ func (vcdClient *VCDClient) GetAlbVirtualServiceById(id string) (*NsxtAlbVirtual
 }
 
 // CreateNsxtAlbVirtualService creates NSX-T ALB Virtual Service based on supplied configuration
-func (vcdClient *VCDClient) CreateNsxtAlbVirtualService(albVirtualServiceConfig *types.NsxtAlbVirtualService) (*NsxtAlbVirtualService, error) {
+func (vcdClient *VCDClient) CreateNsxtAlbVirtualService(ctx context.Context, albVirtualServiceConfig *types.NsxtAlbVirtualService) (*NsxtAlbVirtualService, error) {
 	client := vcdClient.Client
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbVirtualServices
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +149,7 @@ func (vcdClient *VCDClient) CreateNsxtAlbVirtualService(albVirtualServiceConfig 
 		vcdClient:             vcdClient,
 	}
 
-	err = client.OpenApiPostItem(minimumApiVersion, urlRef, nil, albVirtualServiceConfig, returnObject.NsxtAlbVirtualService, nil)
+	err = client.OpenApiPostItem(ctx, minimumApiVersion, urlRef, nil, albVirtualServiceConfig, returnObject.NsxtAlbVirtualService, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating NSX-T ALB Virtual Service: %s", err)
 	}
@@ -157,10 +158,10 @@ func (vcdClient *VCDClient) CreateNsxtAlbVirtualService(albVirtualServiceConfig 
 }
 
 // Update updates NSX-T ALB Virtual Service based on supplied configuration
-func (nsxtAlbVirtualService *NsxtAlbVirtualService) Update(albVirtualServiceConfig *types.NsxtAlbVirtualService) (*NsxtAlbVirtualService, error) {
+func (nsxtAlbVirtualService *NsxtAlbVirtualService) Update(ctx context.Context, albVirtualServiceConfig *types.NsxtAlbVirtualService) (*NsxtAlbVirtualService, error) {
 	client := nsxtAlbVirtualService.vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbVirtualServices
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +180,7 @@ func (nsxtAlbVirtualService *NsxtAlbVirtualService) Update(albVirtualServiceConf
 		vcdClient:             nsxtAlbVirtualService.vcdClient,
 	}
 
-	err = client.OpenApiPutItem(minimumApiVersion, urlRef, nil, albVirtualServiceConfig, responseAlbController.NsxtAlbVirtualService, nil)
+	err = client.OpenApiPutItem(ctx, minimumApiVersion, urlRef, nil, albVirtualServiceConfig, responseAlbController.NsxtAlbVirtualService, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error updating NSX-T ALB Virtual Service: %s", err)
 	}
@@ -188,10 +189,10 @@ func (nsxtAlbVirtualService *NsxtAlbVirtualService) Update(albVirtualServiceConf
 }
 
 // Delete deletes NSX-T ALB Virtual Service
-func (nsxtAlbVirtualService *NsxtAlbVirtualService) Delete() error {
+func (nsxtAlbVirtualService *NsxtAlbVirtualService) Delete(ctx context.Context) error {
 	client := nsxtAlbVirtualService.vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbVirtualServices
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -205,7 +206,7 @@ func (nsxtAlbVirtualService *NsxtAlbVirtualService) Delete() error {
 		return err
 	}
 
-	err = client.OpenApiDeleteItem(minimumApiVersion, urlRef, nil, nil)
+	err = client.OpenApiDeleteItem(ctx, minimumApiVersion, urlRef, nil, nil)
 	if err != nil {
 		return fmt.Errorf("error deleting NSX-T ALB Virtual Service: %s", err)
 	}

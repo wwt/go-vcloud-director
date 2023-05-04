@@ -1,6 +1,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 	"net/http"
@@ -36,10 +37,10 @@ func newProviderVdcExtended(cli *Client) *ProviderVdcExtended {
 // GetProviderVdcByHref finds a Provider VDC by its HREF.
 // On success, returns a pointer to the ProviderVdc structure and a nil error
 // On failure, returns a nil pointer and an error
-func (vcdClient *VCDClient) GetProviderVdcByHref(providerVdcHref string) (*ProviderVdc, error) {
+func (vcdClient *VCDClient) GetProviderVdcByHref(ctx context.Context, providerVdcHref string) (*ProviderVdc, error) {
 	providerVdc := newProviderVdc(&vcdClient.Client)
 
-	_, err := vcdClient.Client.ExecuteRequest(providerVdcHref, http.MethodGet,
+	_, err := vcdClient.Client.ExecuteRequest(ctx, providerVdcHref, http.MethodGet,
 		"", "error retrieving Provider VDC: %s", nil, providerVdc.ProviderVdc)
 	if err != nil {
 		return nil, err
@@ -51,10 +52,10 @@ func (vcdClient *VCDClient) GetProviderVdcByHref(providerVdcHref string) (*Provi
 // GetProviderVdcExtendedByHref finds a Provider VDC with extended attributes by its HREF.
 // On success, returns a pointer to the ProviderVdcExtended structure and a nil error
 // On failure, returns a nil pointer and an error
-func (vcdClient *VCDClient) GetProviderVdcExtendedByHref(providerVdcHref string) (*ProviderVdcExtended, error) {
+func (vcdClient *VCDClient) GetProviderVdcExtendedByHref(ctx context.Context, providerVdcHref string) (*ProviderVdcExtended, error) {
 	providerVdc := newProviderVdcExtended(&vcdClient.Client)
 
-	_, err := vcdClient.Client.ExecuteRequest(getAdminExtensionURL(providerVdcHref), http.MethodGet,
+	_, err := vcdClient.Client.ExecuteRequest(ctx, getAdminExtensionURL(providerVdcHref), http.MethodGet,
 		"", "error retrieving extended Provider VDC: %s", nil, providerVdc.VMWProviderVdc)
 	if err != nil {
 		return nil, err
@@ -66,28 +67,28 @@ func (vcdClient *VCDClient) GetProviderVdcExtendedByHref(providerVdcHref string)
 // GetProviderVdcById finds a Provider VDC by URN.
 // On success, returns a pointer to the ProviderVdc structure and a nil error
 // On failure, returns a nil pointer and an error
-func (vcdClient *VCDClient) GetProviderVdcById(providerVdcId string) (*ProviderVdc, error) {
+func (vcdClient *VCDClient) GetProviderVdcById(ctx context.Context, providerVdcId string) (*ProviderVdc, error) {
 	providerVdcHref := vcdClient.Client.VCDHREF
 	providerVdcHref.Path += "/admin/providervdc/" + extractUuid(providerVdcId)
 
-	return vcdClient.GetProviderVdcByHref(providerVdcHref.String())
+	return vcdClient.GetProviderVdcByHref(ctx, providerVdcHref.String())
 }
 
 // GetProviderVdcExtendedById finds a Provider VDC with extended attributes by URN.
 // On success, returns a pointer to the ProviderVdcExtended structure and a nil error
 // On failure, returns a nil pointer and an error
-func (vcdClient *VCDClient) GetProviderVdcExtendedById(providerVdcId string) (*ProviderVdcExtended, error) {
+func (vcdClient *VCDClient) GetProviderVdcExtendedById(ctx context.Context, providerVdcId string) (*ProviderVdcExtended, error) {
 	providerVdcHref := vcdClient.Client.VCDHREF
 	providerVdcHref.Path += "/admin/extension/providervdc/" + extractUuid(providerVdcId)
 
-	return vcdClient.GetProviderVdcExtendedByHref(providerVdcHref.String())
+	return vcdClient.GetProviderVdcExtendedByHref(ctx, providerVdcHref.String())
 }
 
 // GetProviderVdcByName finds a Provider VDC by name.
 // On success, returns a pointer to the ProviderVdc structure and a nil error
 // On failure, returns a nil pointer and an error
-func (vcdClient *VCDClient) GetProviderVdcByName(providerVdcName string) (*ProviderVdc, error) {
-	providerVdc, err := getProviderVdcByName(vcdClient, providerVdcName, false)
+func (vcdClient *VCDClient) GetProviderVdcByName(ctx context.Context, providerVdcName string) (*ProviderVdc, error) {
+	providerVdc, err := getProviderVdcByName(ctx, vcdClient, providerVdcName, false)
 	if err != nil {
 		return nil, err
 	}
@@ -97,8 +98,8 @@ func (vcdClient *VCDClient) GetProviderVdcByName(providerVdcName string) (*Provi
 // GetProviderVdcExtendedByName finds a Provider VDC with extended attributes by name.
 // On success, returns a pointer to the ProviderVdcExtended structure and a nil error
 // On failure, returns a nil pointer and an error
-func (vcdClient *VCDClient) GetProviderVdcExtendedByName(providerVdcName string) (*ProviderVdcExtended, error) {
-	providerVdcExtended, err := getProviderVdcByName(vcdClient, providerVdcName, true)
+func (vcdClient *VCDClient) GetProviderVdcExtendedByName(ctx context.Context, providerVdcName string) (*ProviderVdcExtended, error) {
+	providerVdcExtended, err := getProviderVdcByName(ctx, vcdClient, providerVdcName, true)
 	if err != nil {
 		return nil, err
 	}
@@ -106,14 +107,14 @@ func (vcdClient *VCDClient) GetProviderVdcExtendedByName(providerVdcName string)
 }
 
 // Refresh updates the contents of the Provider VDC associated to the receiver object.
-func (providerVdc *ProviderVdc) Refresh() error {
+func (providerVdc *ProviderVdc) Refresh(ctx context.Context) error {
 	if providerVdc.ProviderVdc.HREF == "" {
 		return fmt.Errorf("cannot refresh, receiver Provider VDC is empty")
 	}
 
 	unmarshalledVdc := &types.ProviderVdc{}
 
-	_, err := providerVdc.client.ExecuteRequest(providerVdc.ProviderVdc.HREF, http.MethodGet,
+	_, err := providerVdc.client.ExecuteRequest(ctx, providerVdc.ProviderVdc.HREF, http.MethodGet,
 		"", "error refreshing Provider VDC: %s", nil, unmarshalledVdc)
 	if err != nil {
 		return err
@@ -125,14 +126,14 @@ func (providerVdc *ProviderVdc) Refresh() error {
 }
 
 // Refresh updates the contents of the extended Provider VDC associated to the receiver object.
-func (providerVdcExtended *ProviderVdcExtended) Refresh() error {
+func (providerVdcExtended *ProviderVdcExtended) Refresh(ctx context.Context) error {
 	if providerVdcExtended.VMWProviderVdc.HREF == "" {
 		return fmt.Errorf("cannot refresh, receiver extended Provider VDC is empty")
 	}
 
 	unmarshalledVdc := &types.VMWProviderVdc{}
 
-	_, err := providerVdcExtended.client.ExecuteRequest(providerVdcExtended.VMWProviderVdc.HREF, http.MethodGet,
+	_, err := providerVdcExtended.client.ExecuteRequest(ctx, providerVdcExtended.VMWProviderVdc.HREF, http.MethodGet,
 		"", "error refreshing extended Provider VDC: %s", nil, unmarshalledVdc)
 	if err != nil {
 		return err
@@ -144,13 +145,13 @@ func (providerVdcExtended *ProviderVdcExtended) Refresh() error {
 }
 
 // ToProviderVdc converts the receiver ProviderVdcExtended into the subset ProviderVdc
-func (providerVdcExtended *ProviderVdcExtended) ToProviderVdc() (*ProviderVdc, error) {
+func (providerVdcExtended *ProviderVdcExtended) ToProviderVdc(ctx context.Context) (*ProviderVdc, error) {
 	providerVdcHref := providerVdcExtended.client.VCDHREF
 	providerVdcHref.Path += "/admin/providervdc/" + extractUuid(providerVdcExtended.VMWProviderVdc.ID)
 
 	providerVdc := newProviderVdc(providerVdcExtended.client)
 
-	_, err := providerVdcExtended.client.ExecuteRequest(providerVdcHref.String(), http.MethodGet,
+	_, err := providerVdcExtended.client.ExecuteRequest(ctx, providerVdcHref.String(), http.MethodGet,
 		"", "error retrieving Provider VDC: %s", nil, providerVdc.ProviderVdc)
 	if err != nil {
 		return nil, err
@@ -162,12 +163,13 @@ func (providerVdcExtended *ProviderVdcExtended) ToProviderVdc() (*ProviderVdc, e
 // getProviderVdcByName finds a Provider VDC with extension (extended=true) or without extension (extended=false) by name
 // On success, returns a pointer to the ProviderVdc (extended=false) or ProviderVdcExtended (extended=true) structure and a nil error
 // On failure, returns a nil pointer and an error
-func getProviderVdcByName(vcdClient *VCDClient, providerVdcName string, extended bool) (interface{}, error) {
-	foundProviderVdcs, err := vcdClient.QueryWithNotEncodedParams(nil, map[string]string{
-		"type":          "providerVdc",
-		"filter":        fmt.Sprintf("name==%s", url.QueryEscape(providerVdcName)),
-		"filterEncoded": "true",
-	})
+func getProviderVdcByName(ctx context.Context, vcdClient *VCDClient, providerVdcName string, extended bool) (interface{}, error) {
+	foundProviderVdcs, err := vcdClient.QueryWithNotEncodedParams(ctx, nil,
+		map[string]string{
+			"type":          "providerVdc",
+			"filter":        fmt.Sprintf("name==%s", url.QueryEscape(providerVdcName)),
+			"filterEncoded": "true",
+		})
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +180,7 @@ func getProviderVdcByName(vcdClient *VCDClient, providerVdcName string, extended
 		return nil, fmt.Errorf("more than one Provider VDC found with name '%s'", providerVdcName)
 	}
 	if extended {
-		return vcdClient.GetProviderVdcExtendedByHref(foundProviderVdcs.Results.VMWProviderVdcRecord[0].HREF)
+		return vcdClient.GetProviderVdcExtendedByHref(ctx, foundProviderVdcs.Results.VMWProviderVdcRecord[0].HREF)
 	}
-	return vcdClient.GetProviderVdcByHref(foundProviderVdcs.Results.VMWProviderVdcRecord[0].HREF)
+	return vcdClient.GetProviderVdcByHref(ctx, foundProviderVdcs.Results.VMWProviderVdcRecord[0].HREF)
 }

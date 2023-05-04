@@ -10,7 +10,6 @@ import (
 	"net/url"
 
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
-	. "gopkg.in/check.v1"
 )
 
 type rightsProviderCollection interface {
@@ -149,7 +148,7 @@ func testRightsContainerTenants(vcd *TestVCD, check *C, rpc rightsProviderCollec
 	newOrgName := check.TestName() + "-org"
 	task, err := CreateOrg(vcd.client, newOrgName, newOrgName, newOrgName, &types.OrgSettings{}, true)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
 	newOrg, err := vcd.client.GetAdminOrgByName(newOrgName)

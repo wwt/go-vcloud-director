@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
@@ -21,11 +22,11 @@ type NsxtAlbPool struct {
 
 // GetAllAlbPoolSummaries retrieves partial information for type `NsxtAlbPool`, but it is the only way to retrieve all ALB
 // pools for Edge Gateway
-func (vcdClient *VCDClient) GetAllAlbPoolSummaries(edgeGatewayId string, queryParameters url.Values) ([]*NsxtAlbPool, error) {
+func (vcdClient *VCDClient) GetAllAlbPoolSummaries(ctx context.Context, edgeGatewayId string, queryParameters url.Values) ([]*NsxtAlbPool, error) {
 	client := vcdClient.Client
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbPoolSummaries
-	apiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	apiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +37,7 @@ func (vcdClient *VCDClient) GetAllAlbPoolSummaries(edgeGatewayId string, queryPa
 	}
 
 	typeResponses := []*types.NsxtAlbPool{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParameters, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParameters, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -55,8 +56,8 @@ func (vcdClient *VCDClient) GetAllAlbPoolSummaries(edgeGatewayId string, queryPa
 
 // GetAllAlbPools uses GetAllAlbPoolSummaries behind the scenes and the fetches complete data for all ALB Pools. This
 // has performance penalty because each ALB Pool is fetched individually.
-func (vcdClient *VCDClient) GetAllAlbPools(edgeGatewayId string, queryParameters url.Values) ([]*NsxtAlbPool, error) {
-	allAlbPoolSummaries, err := vcdClient.GetAllAlbPoolSummaries(edgeGatewayId, queryParameters)
+func (vcdClient *VCDClient) GetAllAlbPools(ctx context.Context, edgeGatewayId string, queryParameters url.Values) ([]*NsxtAlbPool, error) {
+	allAlbPoolSummaries, err := vcdClient.GetAllAlbPoolSummaries(ctx, edgeGatewayId, queryParameters)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving all ALB Pool summaries: %s", err)
 	}
@@ -65,7 +66,7 @@ func (vcdClient *VCDClient) GetAllAlbPools(edgeGatewayId string, queryParameters
 	allAlbPools := make([]*NsxtAlbPool, len(allAlbPoolSummaries))
 	for index := range allAlbPoolSummaries {
 
-		allAlbPools[index], err = vcdClient.GetAlbPoolById(allAlbPoolSummaries[index].NsxtAlbPool.ID)
+		allAlbPools[index], err = vcdClient.GetAlbPoolById(ctx, allAlbPoolSummaries[index].NsxtAlbPool.ID)
 		if err != nil {
 			return nil, fmt.Errorf("error retrieving complete ALB Pool: %s", err)
 		}
@@ -76,11 +77,11 @@ func (vcdClient *VCDClient) GetAllAlbPools(edgeGatewayId string, queryParameters
 }
 
 // GetAlbPoolByName fetches ALB Pool By Name
-func (vcdClient *VCDClient) GetAlbPoolByName(edgeGatewayId string, name string) (*NsxtAlbPool, error) {
+func (vcdClient *VCDClient) GetAlbPoolByName(ctx context.Context, edgeGatewayId string, name string) (*NsxtAlbPool, error) {
 	queryParameters := copyOrNewUrlValues(nil)
 	queryParameters.Add("filter", "name=="+name)
 
-	allAlbPools, err := vcdClient.GetAllAlbPools(edgeGatewayId, queryParameters)
+	allAlbPools, err := vcdClient.GetAllAlbPools(ctx, edgeGatewayId, queryParameters)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving ALB Pool with Name '%s': %s", name, err)
 	}
@@ -97,7 +98,7 @@ func (vcdClient *VCDClient) GetAlbPoolByName(edgeGatewayId string, name string) 
 }
 
 // GetAlbPoolById fetches ALB Pool By Id
-func (vcdClient *VCDClient) GetAlbPoolById(id string) (*NsxtAlbPool, error) {
+func (vcdClient *VCDClient) GetAlbPoolById(ctx context.Context, id string) (*NsxtAlbPool, error) {
 	client := vcdClient.Client
 
 	if id == "" {
@@ -105,7 +106,7 @@ func (vcdClient *VCDClient) GetAlbPoolById(id string) (*NsxtAlbPool, error) {
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbPools
-	apiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	apiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +117,7 @@ func (vcdClient *VCDClient) GetAlbPoolById(id string) (*NsxtAlbPool, error) {
 	}
 
 	typeResponse := &types.NsxtAlbPool{}
-	err = client.OpenApiGetItem(apiVersion, urlRef, nil, &typeResponse, nil)
+	err = client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, &typeResponse, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -130,11 +131,11 @@ func (vcdClient *VCDClient) GetAlbPoolById(id string) (*NsxtAlbPool, error) {
 }
 
 // CreateNsxtAlbPool creates NSX-T ALB Pool based on supplied configuration
-func (vcdClient *VCDClient) CreateNsxtAlbPool(albPoolConfig *types.NsxtAlbPool) (*NsxtAlbPool, error) {
+func (vcdClient *VCDClient) CreateNsxtAlbPool(ctx context.Context, albPoolConfig *types.NsxtAlbPool) (*NsxtAlbPool, error) {
 	client := vcdClient.Client
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbPools
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +150,7 @@ func (vcdClient *VCDClient) CreateNsxtAlbPool(albPoolConfig *types.NsxtAlbPool) 
 		vcdClient:   vcdClient,
 	}
 
-	err = client.OpenApiPostItem(minimumApiVersion, urlRef, nil, albPoolConfig, returnObject.NsxtAlbPool, nil)
+	err = client.OpenApiPostItem(ctx, minimumApiVersion, urlRef, nil, albPoolConfig, returnObject.NsxtAlbPool, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating NSX-T ALB Pool: %s", err)
 	}
@@ -158,10 +159,10 @@ func (vcdClient *VCDClient) CreateNsxtAlbPool(albPoolConfig *types.NsxtAlbPool) 
 }
 
 // Update updates NSX-T ALB Pool based on supplied configuration
-func (nsxtAlbPool *NsxtAlbPool) Update(albPoolConfig *types.NsxtAlbPool) (*NsxtAlbPool, error) {
+func (nsxtAlbPool *NsxtAlbPool) Update(ctx context.Context, albPoolConfig *types.NsxtAlbPool) (*NsxtAlbPool, error) {
 	client := nsxtAlbPool.vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbPools
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +181,7 @@ func (nsxtAlbPool *NsxtAlbPool) Update(albPoolConfig *types.NsxtAlbPool) (*NsxtA
 		vcdClient:   nsxtAlbPool.vcdClient,
 	}
 
-	err = client.OpenApiPutItem(minimumApiVersion, urlRef, nil, albPoolConfig, responseAlbController.NsxtAlbPool, nil)
+	err = client.OpenApiPutItem(ctx, minimumApiVersion, urlRef, nil, albPoolConfig, responseAlbController.NsxtAlbPool, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error updating NSX-T ALB Pool: %s", err)
 	}
@@ -189,10 +190,10 @@ func (nsxtAlbPool *NsxtAlbPool) Update(albPoolConfig *types.NsxtAlbPool) (*NsxtA
 }
 
 // Delete deletes NSX-T ALB Pool
-func (nsxtAlbPool *NsxtAlbPool) Delete() error {
+func (nsxtAlbPool *NsxtAlbPool) Delete(ctx context.Context) error {
 	client := nsxtAlbPool.vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbPools
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -206,7 +207,7 @@ func (nsxtAlbPool *NsxtAlbPool) Delete() error {
 		return err
 	}
 
-	err = client.OpenApiDeleteItem(minimumApiVersion, urlRef, nil, nil)
+	err = client.OpenApiDeleteItem(ctx, minimumApiVersion, urlRef, nil, nil)
 	if err != nil {
 		return fmt.Errorf("error deleting NSX-T ALB Pool: %s", err)
 	}

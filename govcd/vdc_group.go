@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
@@ -22,8 +23,8 @@ type VdcGroup struct {
 
 // CreateNsxtVdcGroup create NSX-T VDC group with provided VDC IDs.
 // More generic creation method available also - CreateVdcGroup
-func (adminOrg *AdminOrg) CreateNsxtVdcGroup(name, description, startingVdcId string, participatingVdcIds []string) (*VdcGroup, error) {
-	participatingVdcs, err := composeParticipatingOrgVdcs(adminOrg, startingVdcId, participatingVdcIds)
+func (adminOrg *AdminOrg) CreateNsxtVdcGroup(ctx context.Context, name, description, startingVdcId string, participatingVdcIds []string) (*VdcGroup, error) {
+	participatingVdcs, err := composeParticipatingOrgVdcs(ctx, adminOrg, startingVdcId, participatingVdcIds)
 	if err != nil {
 		return nil, err
 	}
@@ -38,13 +39,13 @@ func (adminOrg *AdminOrg) CreateNsxtVdcGroup(name, description, startingVdcId st
 	vdcGroupConfig.NetworkProviderType = "NSX_T"
 	vdcGroupConfig.Type = "LOCAL"
 	vdcGroupConfig.ParticipatingOrgVdcs = participatingVdcs
-	return adminOrg.CreateVdcGroup(vdcGroupConfig)
+	return adminOrg.CreateVdcGroup(ctx, vdcGroupConfig)
 }
 
 // composeParticipatingOrgVdcs converts fetched candidate VDCs to []types.ParticipatingOrgVdcs
 // returns error also in case participatingVdcId not found as candidate VDC.
-func composeParticipatingOrgVdcs(adminOrg *AdminOrg, startingVdcId string, participatingVdcIds []string) ([]types.ParticipatingOrgVdcs, error) {
-	candidateVdcs, err := adminOrg.GetAllNsxtVdcGroupCandidates(startingVdcId, nil)
+func composeParticipatingOrgVdcs(ctx context.Context, adminOrg *AdminOrg, startingVdcId string, participatingVdcIds []string) ([]types.ParticipatingOrgVdcs, error) {
+	candidateVdcs, err := adminOrg.GetAllNsxtVdcGroupCandidates(ctx, startingVdcId, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -90,20 +91,20 @@ func contains(item string, slice []string) bool {
 
 // CreateVdcGroup create VDC group with provided VDC ref.
 // Only supports NSX-T VDCs.
-func (adminOrg *AdminOrg) CreateVdcGroup(vdcGroup *types.VdcGroup) (*VdcGroup, error) {
+func (adminOrg *AdminOrg) CreateVdcGroup(ctx context.Context, vdcGroup *types.VdcGroup) (*VdcGroup, error) {
 	tenantContext, err := adminOrg.getTenantContext()
 	if err != nil {
 		return nil, err
 	}
-	return createVdcGroup(adminOrg, vdcGroup, getTenantContextHeader(tenantContext))
+	return createVdcGroup(ctx, adminOrg, vdcGroup, getTenantContextHeader(tenantContext))
 }
 
 // createVdcGroup create VDC group with provided VDC ref.
 // Only supports NSX-T VDCs.
-func createVdcGroup(adminOrg *AdminOrg, vdcGroup *types.VdcGroup,
+func createVdcGroup(ctx context.Context, adminOrg *AdminOrg, vdcGroup *types.VdcGroup,
 	additionalHeader map[string]string) (*VdcGroup, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVdcGroups
-	apiVersion, err := adminOrg.client.checkOpenApiEndpointCompatibility(endpoint)
+	apiVersion, err := adminOrg.client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +121,7 @@ func createVdcGroup(adminOrg *AdminOrg, vdcGroup *types.VdcGroup,
 		parent:   adminOrg,
 	}
 
-	err = adminOrg.client.OpenApiPostItem(apiVersion, urlRef, nil,
+	err = adminOrg.client.OpenApiPostItem(ctx, apiVersion, urlRef, nil,
 		vdcGroup, typeResponse.VdcGroup, additionalHeader)
 	if err != nil {
 		return nil, err
@@ -130,24 +131,24 @@ func createVdcGroup(adminOrg *AdminOrg, vdcGroup *types.VdcGroup,
 }
 
 // GetAllNsxtVdcGroupCandidates returns NSXT candidate VDCs for VDC group
-func (adminOrg *AdminOrg) GetAllNsxtVdcGroupCandidates(startingVdcId string, queryParameters url.Values) ([]*types.CandidateVdc, error) {
+func (adminOrg *AdminOrg) GetAllNsxtVdcGroupCandidates(ctx context.Context, startingVdcId string, queryParameters url.Values) ([]*types.CandidateVdc, error) {
 	queryParams := copyOrNewUrlValues(queryParameters)
 	queryParams = queryParameterFilterAnd("_context==LOCAL", queryParams)
 	queryParams = queryParameterFilterAnd(fmt.Sprintf("_context==%s", startingVdcId), queryParams)
 	queryParams.Add("filterEncoded", "true")
 	queryParams.Add("links", "true")
-	return adminOrg.GetAllVdcGroupCandidates(queryParams)
+	return adminOrg.GetAllVdcGroupCandidates(ctx, queryParams)
 }
 
 // GetAllVdcGroupCandidates returns candidate VDCs for VDC group
-func (adminOrg *AdminOrg) GetAllVdcGroupCandidates(queryParameters url.Values) ([]*types.CandidateVdc, error) {
+func (adminOrg *AdminOrg) GetAllVdcGroupCandidates(ctx context.Context, queryParameters url.Values) ([]*types.CandidateVdc, error) {
 	tenantContext, err := adminOrg.getTenantContext()
 	if err != nil {
 		return nil, err
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVdcGroupsCandidateVdcs
-	minimumApiVersion, err := adminOrg.client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := adminOrg.client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +159,7 @@ func (adminOrg *AdminOrg) GetAllVdcGroupCandidates(queryParameters url.Values) (
 	}
 
 	responses := []*types.CandidateVdc{}
-	err = adminOrg.client.OpenApiGetAllItems(minimumApiVersion, urlRef, queryParameters, &responses, getTenantContextHeader(tenantContext))
+	err = adminOrg.client.OpenApiGetAllItems(ctx, minimumApiVersion, urlRef, queryParameters, &responses, getTenantContextHeader(tenantContext))
 	if err != nil {
 		return nil, err
 	}
@@ -167,9 +168,9 @@ func (adminOrg *AdminOrg) GetAllVdcGroupCandidates(queryParameters url.Values) (
 }
 
 // Delete deletes VDC group
-func (vdcGroup *VdcGroup) Delete() error {
+func (vdcGroup *VdcGroup) Delete(ctx context.Context) error {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVdcGroups
-	minimumApiVersion, err := vdcGroup.client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := vdcGroup.client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -183,7 +184,7 @@ func (vdcGroup *VdcGroup) Delete() error {
 		return err
 	}
 
-	err = vdcGroup.client.OpenApiDeleteItem(minimumApiVersion, urlRef, nil, nil)
+	err = vdcGroup.client.OpenApiDeleteItem(ctx, minimumApiVersion, urlRef, nil, nil)
 
 	if err != nil {
 		return fmt.Errorf("error deleting VDC group: %s", err)
@@ -193,14 +194,14 @@ func (vdcGroup *VdcGroup) Delete() error {
 }
 
 // GetAllVdcGroups retrieves all VDC groups. Query parameters can be supplied to perform additional filtering
-func (adminOrg *AdminOrg) GetAllVdcGroups(queryParameters url.Values) ([]*VdcGroup, error) {
+func (adminOrg *AdminOrg) GetAllVdcGroups(ctx context.Context, queryParameters url.Values) ([]*VdcGroup, error) {
 	tenantContext, err := adminOrg.getTenantContext()
 	if err != nil {
 		return nil, err
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVdcGroups
-	minimumApiVersion, err := adminOrg.client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := adminOrg.client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +212,7 @@ func (adminOrg *AdminOrg) GetAllVdcGroups(queryParameters url.Values) ([]*VdcGro
 	}
 
 	responses := []*types.VdcGroup{}
-	err = adminOrg.client.OpenApiGetAllItems(minimumApiVersion, urlRef, queryParameters, &responses, getTenantContextHeader(tenantContext))
+	err = adminOrg.client.OpenApiGetAllItems(ctx, minimumApiVersion, urlRef, queryParameters, &responses, getTenantContextHeader(tenantContext))
 	if err != nil {
 		return nil, err
 	}
@@ -242,14 +243,14 @@ func (adminOrg *AdminOrg) GetAllVdcGroups(queryParameters url.Values) ([]*VdcGro
 // search brute force too. Reference to issue:
 // https://github.com/golang/go/issues/4013
 // https://github.com/czos/goamz/pull/11/files
-func (adminOrg *AdminOrg) GetVdcGroupByName(name string) (*VdcGroup, error) {
-	slowSearch, params, err := shouldDoSlowSearch("name", name, adminOrg.client)
+func (adminOrg *AdminOrg) GetVdcGroupByName(ctx context.Context, name string) (*VdcGroup, error) {
+	slowSearch, params, err := shouldDoSlowSearch(ctx, "name", name, adminOrg.client)
 	if err != nil {
 		return nil, err
 	}
 
 	var foundVdcGroups []*VdcGroup
-	vdcGroups, err := adminOrg.GetAllVdcGroups(params)
+	vdcGroups, err := adminOrg.GetAllVdcGroups(ctx, params)
 	if err != nil {
 		return nil, err
 	}
@@ -281,14 +282,14 @@ func (adminOrg *AdminOrg) GetVdcGroupByName(name string) (*VdcGroup, error) {
 }
 
 // GetVdcGroupById Returns VDC group using provided ID
-func (adminOrg *AdminOrg) GetVdcGroupById(id string) (*VdcGroup, error) {
+func (adminOrg *AdminOrg) GetVdcGroupById(ctx context.Context, id string) (*VdcGroup, error) {
 	tenantContext, err := adminOrg.getTenantContext()
 	if err != nil {
 		return nil, err
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVdcGroups
-	minimumApiVersion, err := adminOrg.client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := adminOrg.client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -309,7 +310,7 @@ func (adminOrg *AdminOrg) GetVdcGroupById(id string) (*VdcGroup, error) {
 		parent:   adminOrg,
 	}
 
-	err = adminOrg.client.OpenApiGetItem(minimumApiVersion, urlRef, nil, vdcGroup.VdcGroup, getTenantContextHeader(tenantContext))
+	err = adminOrg.client.OpenApiGetItem(ctx, minimumApiVersion, urlRef, nil, vdcGroup.VdcGroup, getTenantContextHeader(tenantContext))
 	if err != nil {
 		return nil, err
 	}
@@ -318,7 +319,7 @@ func (adminOrg *AdminOrg) GetVdcGroupById(id string) (*VdcGroup, error) {
 }
 
 // GetVdcGroupById Returns VDC group using provided ID
-func (org *Org) GetVdcGroupById(id string) (*VdcGroup, error) {
+func (org *Org) GetVdcGroupById(ctx context.Context, id string) (*VdcGroup, error) {
 	if id == "" {
 		return nil, fmt.Errorf("empty VDC group ID")
 	}
@@ -329,7 +330,7 @@ func (org *Org) GetVdcGroupById(id string) (*VdcGroup, error) {
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVdcGroups
-	minimumApiVersion, err := org.client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := org.client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -346,7 +347,7 @@ func (org *Org) GetVdcGroupById(id string) (*VdcGroup, error) {
 		parent:   org,
 	}
 
-	err = org.client.OpenApiGetItem(minimumApiVersion, urlRef, nil, vdcGroup.VdcGroup, getTenantContextHeader(tenantContext))
+	err = org.client.OpenApiGetItem(ctx, minimumApiVersion, urlRef, nil, vdcGroup.VdcGroup, getTenantContextHeader(tenantContext))
 	if err != nil {
 		return nil, err
 	}
@@ -356,29 +357,29 @@ func (org *Org) GetVdcGroupById(id string) (*VdcGroup, error) {
 
 // Update updates existing Vdc group. Allows changing only name and description and participating VCDs
 // Not restrictive update method also available - GenericUpdate
-func (vdcGroup *VdcGroup) Update(name, description string, participatingOrgVddIs []string) (*VdcGroup, error) {
+func (vdcGroup *VdcGroup) Update(ctx context.Context, name, description string, participatingOrgVddIs []string) (*VdcGroup, error) {
 
 	vdcGroup.VdcGroup.Name = name
 	vdcGroup.VdcGroup.Description = description
 
-	participatingOrgVdcs, err := composeParticipatingOrgVdcs(vdcGroup.parent.fullObject().(*AdminOrg), vdcGroup.VdcGroup.Id, participatingOrgVddIs)
+	participatingOrgVdcs, err := composeParticipatingOrgVdcs(ctx, vdcGroup.parent.fullObject().(*AdminOrg), vdcGroup.VdcGroup.Id, participatingOrgVddIs)
 	if err != nil {
 		return nil, err
 	}
 	vdcGroup.VdcGroup.ParticipatingOrgVdcs = participatingOrgVdcs
 
-	return vdcGroup.GenericUpdate()
+	return vdcGroup.GenericUpdate(ctx)
 }
 
 // GenericUpdate updates existing Vdc group. API allows changing only name and description and participating VCDs
-func (vdcGroup *VdcGroup) GenericUpdate() (*VdcGroup, error) {
+func (vdcGroup *VdcGroup) GenericUpdate(ctx context.Context) (*VdcGroup, error) {
 	tenantContext, err := vdcGroup.getTenantContext()
 	if err != nil {
 		return nil, err
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVdcGroups
-	minimumApiVersion, err := vdcGroup.client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := vdcGroup.client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -399,7 +400,7 @@ func (vdcGroup *VdcGroup) GenericUpdate() (*VdcGroup, error) {
 		parent:   vdcGroup.parent,
 	}
 
-	err = vdcGroup.client.OpenApiPutItem(minimumApiVersion, urlRef, nil, vdcGroup.VdcGroup,
+	err = vdcGroup.client.OpenApiPutItem(ctx, minimumApiVersion, urlRef, nil, vdcGroup.VdcGroup,
 		returnVdcGroup.VdcGroup, getTenantContextHeader(tenantContext))
 	if err != nil {
 		return nil, fmt.Errorf("error updating VDC group: %s", err)
@@ -409,13 +410,13 @@ func (vdcGroup *VdcGroup) GenericUpdate() (*VdcGroup, error) {
 }
 
 // UpdateDfwPolicies updates distributed firewall policies
-func (vdcGroup *VdcGroup) UpdateDfwPolicies(dfwPolicies types.DfwPolicies) (*VdcGroup, error) {
+func (vdcGroup *VdcGroup) UpdateDfwPolicies(ctx context.Context, dfwPolicies types.DfwPolicies) (*VdcGroup, error) {
 	tenantContext, err := vdcGroup.getTenantContext()
 	if err != nil {
 		return nil, err
 	}
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVdcGroupsDfwPolicies
-	minimumApiVersion, err := vdcGroup.client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := vdcGroup.client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -429,25 +430,25 @@ func (vdcGroup *VdcGroup) UpdateDfwPolicies(dfwPolicies types.DfwPolicies) (*Vdc
 		return nil, err
 	}
 
-	err = vdcGroup.client.OpenApiPutItem(minimumApiVersion, urlRef, nil, dfwPolicies,
+	err = vdcGroup.client.OpenApiPutItem(ctx, minimumApiVersion, urlRef, nil, dfwPolicies,
 		nil, getTenantContextHeader(tenantContext))
 	if err != nil {
 		return nil, fmt.Errorf("error updating VDC group Dfw policies: %s", err)
 	}
 
 	adminOrg := vdcGroup.parent.fullObject().(*AdminOrg)
-	return adminOrg.GetVdcGroupById(vdcGroup.VdcGroup.Id)
+	return adminOrg.GetVdcGroupById(ctx, vdcGroup.VdcGroup.Id)
 }
 
 // UpdateDefaultDfwPolicies updates distributed firewall default policies
-func (vdcGroup *VdcGroup) UpdateDefaultDfwPolicies(defaultDfwPolicies types.DefaultPolicy) (*VdcGroup, error) {
+func (vdcGroup *VdcGroup) UpdateDefaultDfwPolicies(ctx context.Context, defaultDfwPolicies types.DefaultPolicy) (*VdcGroup, error) {
 	tenantContext, err := vdcGroup.getTenantContext()
 	if err != nil {
 		return nil, err
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVdcGroupsDfwDefaultPolicies
-	minimumApiVersion, err := vdcGroup.client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := vdcGroup.client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -461,39 +462,39 @@ func (vdcGroup *VdcGroup) UpdateDefaultDfwPolicies(defaultDfwPolicies types.Defa
 		return nil, err
 	}
 
-	err = vdcGroup.client.OpenApiPutItem(minimumApiVersion, urlRef, nil, defaultDfwPolicies,
+	err = vdcGroup.client.OpenApiPutItem(ctx, minimumApiVersion, urlRef, nil, defaultDfwPolicies,
 		nil, getTenantContextHeader(tenantContext))
 	if err != nil {
 		return nil, fmt.Errorf("error updating VDC group default DFW policies: %s", err)
 	}
 
 	adminOrg := vdcGroup.parent.fullObject().(*AdminOrg)
-	return adminOrg.GetVdcGroupById(vdcGroup.VdcGroup.Id)
+	return adminOrg.GetVdcGroupById(ctx, vdcGroup.VdcGroup.Id)
 }
 
 // ActivateDfw activates distributed firewall
-func (vdcGroup *VdcGroup) ActivateDfw() (*VdcGroup, error) {
-	return vdcGroup.UpdateDfwPolicies(types.DfwPolicies{
+func (vdcGroup *VdcGroup) ActivateDfw(ctx context.Context) (*VdcGroup, error) {
+	return vdcGroup.UpdateDfwPolicies(ctx, types.DfwPolicies{
 		Enabled: true,
 	})
 }
 
 // DeactivateDfw deactivates distributed firewall
-func (vdcGroup *VdcGroup) DeactivateDfw() (*VdcGroup, error) {
-	return vdcGroup.UpdateDfwPolicies(types.DfwPolicies{
+func (vdcGroup *VdcGroup) DeactivateDfw(ctx context.Context) (*VdcGroup, error) {
+	return vdcGroup.UpdateDfwPolicies(ctx, types.DfwPolicies{
 		Enabled: false,
 	})
 }
 
 // GetDfwPolicies retrieves all distributed firewall policies
-func (vdcGroup *VdcGroup) GetDfwPolicies() (*types.DfwPolicies, error) {
+func (vdcGroup *VdcGroup) GetDfwPolicies(ctx context.Context) (*types.DfwPolicies, error) {
 	tenantContext, err := vdcGroup.getTenantContext()
 	if err != nil {
 		return nil, err
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVdcGroupsDfwPolicies
-	minimumApiVersion, err := vdcGroup.client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := vdcGroup.client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -504,7 +505,7 @@ func (vdcGroup *VdcGroup) GetDfwPolicies() (*types.DfwPolicies, error) {
 	}
 
 	response := types.DfwPolicies{}
-	err = vdcGroup.client.OpenApiGetItem(minimumApiVersion, urlRef, nil, &response, getTenantContextHeader(tenantContext))
+	err = vdcGroup.client.OpenApiGetItem(ctx, minimumApiVersion, urlRef, nil, &response, getTenantContextHeader(tenantContext))
 	if err != nil {
 		return nil, err
 	}
@@ -513,8 +514,8 @@ func (vdcGroup *VdcGroup) GetDfwPolicies() (*types.DfwPolicies, error) {
 }
 
 // EnableDefaultPolicy activates default dfw policy
-func (vdcGroup *VdcGroup) EnableDefaultPolicy() (*VdcGroup, error) {
-	dfwPolicies, err := vdcGroup.GetDfwPolicies()
+func (vdcGroup *VdcGroup) EnableDefaultPolicy(ctx context.Context) (*VdcGroup, error) {
+	dfwPolicies, err := vdcGroup.GetDfwPolicies(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -523,12 +524,12 @@ func (vdcGroup *VdcGroup) EnableDefaultPolicy() (*VdcGroup, error) {
 		return nil, fmt.Errorf("DFW has to be enabled before changing  Default policy")
 	}
 	dfwPolicies.DefaultPolicy.Enabled = takeBoolPointer(true)
-	return vdcGroup.UpdateDefaultDfwPolicies(*dfwPolicies.DefaultPolicy)
+	return vdcGroup.UpdateDefaultDfwPolicies(ctx, *dfwPolicies.DefaultPolicy)
 }
 
 // DisableDefaultPolicy deactivates default dfw policy
-func (vdcGroup *VdcGroup) DisableDefaultPolicy() (*VdcGroup, error) {
-	dfwPolicies, err := vdcGroup.GetDfwPolicies()
+func (vdcGroup *VdcGroup) DisableDefaultPolicy(ctx context.Context) (*VdcGroup, error) {
+	dfwPolicies, err := vdcGroup.GetDfwPolicies(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -537,7 +538,7 @@ func (vdcGroup *VdcGroup) DisableDefaultPolicy() (*VdcGroup, error) {
 		return nil, fmt.Errorf("DFW has to be enabled before changing Default policy")
 	}
 	dfwPolicies.DefaultPolicy.Enabled = takeBoolPointer(false)
-	return vdcGroup.UpdateDefaultDfwPolicies(*dfwPolicies.DefaultPolicy)
+	return vdcGroup.UpdateDefaultDfwPolicies(ctx, *dfwPolicies.DefaultPolicy)
 }
 
 func getOwnerTypeFromUrn(urn string) (string, error) {
@@ -580,13 +581,13 @@ func OwnerIsVdc(urn string) bool {
 // GetCapabilities allows to retrieve a list of VDC capabilities. It has a list of values. Some particularly useful are:
 // * networkProvider - overlay stack responsible for providing network functionality. (NSX_V or NSX_T)
 // * crossVdc - supports cross vDC network creation
-func (vdcGroup *VdcGroup) GetCapabilities() ([]types.VdcCapability, error) {
+func (vdcGroup *VdcGroup) GetCapabilities(ctx context.Context) ([]types.VdcCapability, error) {
 	if vdcGroup.VdcGroup.Id == "" {
 		return nil, fmt.Errorf("VDC ID must be set to get capabilities")
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVdcCapabilities
-	minimumApiVersion, err := vdcGroup.client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := vdcGroup.client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -597,7 +598,7 @@ func (vdcGroup *VdcGroup) GetCapabilities() ([]types.VdcCapability, error) {
 	}
 
 	capabilities := make([]types.VdcCapability, 0)
-	err = vdcGroup.client.OpenApiGetAllItems(minimumApiVersion, urlRef, nil, &capabilities, nil)
+	err = vdcGroup.client.OpenApiGetAllItems(ctx, minimumApiVersion, urlRef, nil, &capabilities, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -606,8 +607,8 @@ func (vdcGroup *VdcGroup) GetCapabilities() ([]types.VdcCapability, error) {
 
 // IsNsxt is a convenience function to check if VDC is backed by NSX-T pVdc
 // If error occurs - it returns false
-func (vdcGroup *VdcGroup) IsNsxt() bool {
-	vdcCapabilities, err := vdcGroup.GetCapabilities()
+func (vdcGroup *VdcGroup) IsNsxt(ctx context.Context) bool {
+	vdcCapabilities, err := vdcGroup.GetCapabilities(ctx)
 	if err != nil {
 		return false
 	}

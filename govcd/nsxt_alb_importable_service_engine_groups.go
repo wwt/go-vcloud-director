@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -22,7 +23,7 @@ type NsxtAlbImportableServiceEngineGroups struct {
 }
 
 // GetAllAlbImportableServiceEngineGroups lists all Importable Service Engine Groups available in ALB Controller
-func (vcdClient *VCDClient) GetAllAlbImportableServiceEngineGroups(parentAlbCloudUrn string, queryParameters url.Values) ([]*NsxtAlbImportableServiceEngineGroups, error) {
+func (vcdClient *VCDClient) GetAllAlbImportableServiceEngineGroups(ctx context.Context, parentAlbCloudUrn string, queryParameters url.Values) ([]*NsxtAlbImportableServiceEngineGroups, error) {
 	client := vcdClient.Client
 	if parentAlbCloudUrn == "" {
 		return nil, fmt.Errorf("parentAlbCloudUrn is required")
@@ -32,7 +33,7 @@ func (vcdClient *VCDClient) GetAllAlbImportableServiceEngineGroups(parentAlbClou
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbImportableServiceEngineGroups
-	apiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	apiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +46,7 @@ func (vcdClient *VCDClient) GetAllAlbImportableServiceEngineGroups(parentAlbClou
 	queryParams := copyOrNewUrlValues(queryParameters)
 	queryParams = queryParameterFilterAnd(fmt.Sprintf("_context==%s", parentAlbCloudUrn), queryParams)
 	typeResponses := []*types.NsxtAlbImportableServiceEngineGroups{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParams, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParams, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -62,8 +63,8 @@ func (vcdClient *VCDClient) GetAllAlbImportableServiceEngineGroups(parentAlbClou
 }
 
 // GetAlbImportableServiceEngineGroupByName returns importable NSX-T ALB Clouds.
-func (vcdClient *VCDClient) GetAlbImportableServiceEngineGroupByName(parentAlbCloudUrn, name string) (*NsxtAlbImportableServiceEngineGroups, error) {
-	albClouds, err := vcdClient.GetAllAlbImportableServiceEngineGroups(parentAlbCloudUrn, nil)
+func (vcdClient *VCDClient) GetAlbImportableServiceEngineGroupByName(ctx context.Context, parentAlbCloudUrn, name string) (*NsxtAlbImportableServiceEngineGroups, error) {
+	albClouds, err := vcdClient.GetAllAlbImportableServiceEngineGroups(ctx, parentAlbCloudUrn, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error finding NSX-T ALB Importable Service Engine Group by Name '%s': %s", name, err)
 	}
@@ -88,8 +89,8 @@ func (vcdClient *VCDClient) GetAlbImportableServiceEngineGroupByName(parentAlbCl
 
 // GetAlbImportableServiceEngineGroupById
 // Note. ID filtering is performed on client side
-func (vcdClient *VCDClient) GetAlbImportableServiceEngineGroupById(parentAlbCloudUrn, id string) (*NsxtAlbImportableServiceEngineGroups, error) {
-	albClouds, err := vcdClient.GetAllAlbImportableServiceEngineGroups(parentAlbCloudUrn, nil)
+func (vcdClient *VCDClient) GetAlbImportableServiceEngineGroupById(ctx context.Context, parentAlbCloudUrn, id string) (*NsxtAlbImportableServiceEngineGroups, error) {
+	albClouds, err := vcdClient.GetAllAlbImportableServiceEngineGroups(ctx, parentAlbCloudUrn, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error finding NSX-T ALB Importable Service Engine Group by ID '%s': %s", id, err)
 	}
@@ -112,7 +113,7 @@ func (vcdClient *VCDClient) GetAlbImportableServiceEngineGroupById(parentAlbClou
 }
 
 // GetAllAlbImportableServiceEngineGroups lists all Importable Service Engine Groups available in ALB Controller
-func (nsxtAlbCloud *NsxtAlbCloud) GetAllAlbImportableServiceEngineGroups(parentAlbCloudUrn string, queryParameters url.Values) ([]*NsxtAlbImportableServiceEngineGroups, error) {
+func (nsxtAlbCloud *NsxtAlbCloud) GetAllAlbImportableServiceEngineGroups(ctx context.Context, parentAlbCloudUrn string, queryParameters url.Values) ([]*NsxtAlbImportableServiceEngineGroups, error) {
 	client := nsxtAlbCloud.vcdClient.Client
 	if parentAlbCloudUrn == "" {
 		return nil, fmt.Errorf("parentAlbCloudUrn is required")
@@ -122,7 +123,7 @@ func (nsxtAlbCloud *NsxtAlbCloud) GetAllAlbImportableServiceEngineGroups(parentA
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbImportableServiceEngineGroups
-	apiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	apiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +136,7 @@ func (nsxtAlbCloud *NsxtAlbCloud) GetAllAlbImportableServiceEngineGroups(parentA
 	queryParams := copyOrNewUrlValues(queryParameters)
 	queryParams = queryParameterFilterAnd(fmt.Sprintf("_context==%s", parentAlbCloudUrn), queryParams)
 	typeResponses := []*types.NsxtAlbImportableServiceEngineGroups{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParams, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParams, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -152,8 +153,8 @@ func (nsxtAlbCloud *NsxtAlbCloud) GetAllAlbImportableServiceEngineGroups(parentA
 }
 
 // GetAlbImportableServiceEngineGroupByName returns importable NSX-T ALB Clouds.
-func (nsxtAlbCloud *NsxtAlbCloud) GetAlbImportableServiceEngineGroupByName(parentAlbCloudUrn, name string) (*NsxtAlbImportableServiceEngineGroups, error) {
-	albClouds, err := nsxtAlbCloud.vcdClient.GetAllAlbImportableServiceEngineGroups(parentAlbCloudUrn, nil)
+func (nsxtAlbCloud *NsxtAlbCloud) GetAlbImportableServiceEngineGroupByName(ctx context.Context, parentAlbCloudUrn, name string) (*NsxtAlbImportableServiceEngineGroups, error) {
+	albClouds, err := nsxtAlbCloud.vcdClient.GetAllAlbImportableServiceEngineGroups(ctx, parentAlbCloudUrn, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error finding NSX-T ALB Importable Service Engine Group by Name '%s': %s", name, err)
 	}
@@ -178,8 +179,8 @@ func (nsxtAlbCloud *NsxtAlbCloud) GetAlbImportableServiceEngineGroupByName(paren
 
 // GetAlbImportableServiceEngineGroupById
 // Note. ID filtering is performed on client side
-func (nsxtAlbCloud *NsxtAlbCloud) GetAlbImportableServiceEngineGroupById(parentAlbCloudUrn, id string) (*NsxtAlbImportableServiceEngineGroups, error) {
-	albClouds, err := nsxtAlbCloud.vcdClient.GetAllAlbImportableServiceEngineGroups(parentAlbCloudUrn, nil)
+func (nsxtAlbCloud *NsxtAlbCloud) GetAlbImportableServiceEngineGroupById(ctx context.Context, parentAlbCloudUrn, id string) (*NsxtAlbImportableServiceEngineGroups, error) {
+	albClouds, err := nsxtAlbCloud.vcdClient.GetAllAlbImportableServiceEngineGroups(ctx, parentAlbCloudUrn, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error finding NSX-T ALB Importable Service Engine Group by ID '%s': %s", id, err)
 	}

@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
@@ -31,10 +32,10 @@ type NsxtNatRule struct {
 }
 
 // GetAllNatRules retrieves all NAT rules with an optional queryParameters filter.
-func (egw *NsxtEdgeGateway) GetAllNatRules(queryParameters url.Values) ([]*NsxtNatRule, error) {
+func (egw *NsxtEdgeGateway) GetAllNatRules(ctx context.Context, queryParameters url.Values) ([]*NsxtNatRule, error) {
 	client := egw.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointNsxtNatRules
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +46,7 @@ func (egw *NsxtEdgeGateway) GetAllNatRules(queryParameters url.Values) ([]*NsxtN
 	}
 
 	typeResponses := []*types.NsxtNatRule{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParameters, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParameters, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -66,10 +67,10 @@ func (egw *NsxtEdgeGateway) GetAllNatRules(queryParameters url.Values) ([]*NsxtN
 // GetNatRuleByName finds a NAT rule by Name and returns it
 //
 // Note. API does not enforce name uniqueness therefore an error will be thrown if two rules with the same name exist
-func (egw *NsxtEdgeGateway) GetNatRuleByName(name string) (*NsxtNatRule, error) {
+func (egw *NsxtEdgeGateway) GetNatRuleByName(ctx context.Context, name string) (*NsxtNatRule, error) {
 	// Ideally this function would use OpenAPI filters to perform server side filtering, but this endpoint does not
 	// support any filters - even ID. Therefore one must retrieve all items and look if there is an item with the same ID
-	allNatRules, err := egw.GetAllNatRules(nil)
+	allNatRules, err := egw.GetAllNatRules(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error retriving all NSX-T NAT rules: %s", err)
 	}
@@ -94,10 +95,10 @@ func (egw *NsxtEdgeGateway) GetNatRuleByName(name string) (*NsxtNatRule, error) 
 }
 
 // GetNatRuleById finds a NAT rule by ID and returns it
-func (egw *NsxtEdgeGateway) GetNatRuleById(id string) (*NsxtNatRule, error) {
+func (egw *NsxtEdgeGateway) GetNatRuleById(ctx context.Context, id string) (*NsxtNatRule, error) {
 	// Ideally this function would use OpenAPI filters to perform server side filtering, but this endpoint does not
 	// support any filters - even ID. Therefore one must retrieve all items and look if there is an item with the same ID
-	allNatRules, err := egw.GetAllNatRules(nil)
+	allNatRules, err := egw.GetAllNatRules(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error retriving all NSX-T NAT rules: %s", err)
 	}
@@ -116,10 +117,10 @@ func (egw *NsxtEdgeGateway) GetNatRuleById(id string) (*NsxtNatRule, error) {
 // Note. API has a limitation, that it does not return ID for created rule. To work around it this function creates
 // a NAT rule, fetches all rules and finds a rule with exactly the same field values and returns it (including ID)
 // There is still a slight risk to retrieve wrong ID if exactly the same rule already exists.
-func (egw *NsxtEdgeGateway) CreateNatRule(natRuleConfig *types.NsxtNatRule) (*NsxtNatRule, error) {
+func (egw *NsxtEdgeGateway) CreateNatRule(ctx context.Context, natRuleConfig *types.NsxtNatRule) (*NsxtNatRule, error) {
 	client := egw.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointNsxtNatRules
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -133,19 +134,19 @@ func (egw *NsxtEdgeGateway) CreateNatRule(natRuleConfig *types.NsxtNatRule) (*Ns
 	// Creating NAT rule must follow different way than usual OpenAPI one because this item has an API bug and
 	// NAT rule ID is not returned after this object is created. The only way to find its ID afterwards is to GET all
 	// items, and manually match it based on rule name, etc.
-	task, err := client.OpenApiPostItemAsync(apiVersion, urlRef, nil, natRuleConfig)
+	task, err := client.OpenApiPostItemAsync(ctx, apiVersion, urlRef, nil, natRuleConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error creating NSX-T NAT rule: %s", err)
 	}
 
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("task failed while creating NSX-T NAT rule: %s", err)
 	}
 
 	// queryParameters (API side filtering) are not used because pretty much nothing is accepted as filter (such fields as
 	// name, description, ruleType and even ID are not allowed
-	allNatRules, err := egw.GetAllNatRules(nil)
+	allNatRules, err := egw.GetAllNatRules(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching all NAT rules: %s", err)
 	}
@@ -161,10 +162,10 @@ func (egw *NsxtEdgeGateway) CreateNatRule(natRuleConfig *types.NsxtNatRule) (*Ns
 }
 
 // Update allows users to update NSX-T NAT rule
-func (nsxtNat *NsxtNatRule) Update(natRuleConfig *types.NsxtNatRule) (*NsxtNatRule, error) {
+func (nsxtNat *NsxtNatRule) Update(ctx context.Context, natRuleConfig *types.NsxtNatRule) (*NsxtNatRule, error) {
 	client := nsxtNat.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointNsxtNatRules
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +185,7 @@ func (nsxtNat *NsxtNatRule) Update(natRuleConfig *types.NsxtNatRule) (*NsxtNatRu
 		edgeGatewayId: nsxtNat.edgeGatewayId,
 	}
 
-	err = client.OpenApiPutItem(apiVersion, urlRef, nil, natRuleConfig, returnObject.NsxtNatRule, nil)
+	err = client.OpenApiPutItem(ctx, apiVersion, urlRef, nil, natRuleConfig, returnObject.NsxtNatRule, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error updating NSX-T NAT Rule: %s", err)
 	}
@@ -193,10 +194,10 @@ func (nsxtNat *NsxtNatRule) Update(natRuleConfig *types.NsxtNatRule) (*NsxtNatRu
 }
 
 // Delete deletes NSX-T NAT rule
-func (nsxtNat *NsxtNatRule) Delete() error {
+func (nsxtNat *NsxtNatRule) Delete(ctx context.Context) error {
 	client := nsxtNat.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointNsxtNatRules
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -210,7 +211,7 @@ func (nsxtNat *NsxtNatRule) Delete() error {
 		return err
 	}
 
-	err = client.OpenApiDeleteItem(apiVersion, urlRef, nil, nil)
+	err = client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil, nil)
 
 	if err != nil {
 		return fmt.Errorf("error deleting NSX-T NAT Rule: %s", err)

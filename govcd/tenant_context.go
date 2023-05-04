@@ -39,16 +39,20 @@ type genericCatalog interface {
 }
 
 // Implementation of organization interface for Org
-func (org *Org) orgId() string                          { return org.Org.ID }
-func (org *Org) orgName() string                        { return org.Org.Name }
-func (org *Org) tenantContext() (*TenantContext, error) { return org.getTenantContext() }
-func (org *Org) fullObject() interface{}                { return org }
+func (org *Org) orgId() string   { return org.Org.ID }
+func (org *Org) orgName() string { return org.Org.Name }
+func (org *Org) tenantContext() (*TenantContext, error) {
+	return org.getTenantContext()
+}
+func (org *Org) fullObject() interface{} { return org }
 
 // Implementation of organization interface for AdminOrg
-func (adminOrg *AdminOrg) orgId() string                          { return adminOrg.AdminOrg.ID }
-func (adminOrg *AdminOrg) orgName() string                        { return adminOrg.AdminOrg.Name }
-func (adminOrg *AdminOrg) tenantContext() (*TenantContext, error) { return adminOrg.getTenantContext() }
-func (adminOrg *AdminOrg) fullObject() interface{}                { return adminOrg }
+func (adminOrg *AdminOrg) orgId() string   { return adminOrg.AdminOrg.ID }
+func (adminOrg *AdminOrg) orgName() string { return adminOrg.AdminOrg.Name }
+func (adminOrg *AdminOrg) tenantContext() (*TenantContext, error) {
+	return adminOrg.getTenantContext()
+}
+func (adminOrg *AdminOrg) fullObject() interface{} { return adminOrg }
 
 // Implementation of genericVdc interface for Vdc
 func (vdc *Vdc) vdcId() string          { return vdc.Vdc.ID }

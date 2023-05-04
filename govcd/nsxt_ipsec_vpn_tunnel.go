@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
@@ -27,10 +28,10 @@ type NsxtIpSecVpnTunnel struct {
 }
 
 // GetAllIpSecVpnTunnels returns all IPsec VPN Tunnel configurations
-func (egw *NsxtEdgeGateway) GetAllIpSecVpnTunnels(queryParameters url.Values) ([]*NsxtIpSecVpnTunnel, error) {
+func (egw *NsxtEdgeGateway) GetAllIpSecVpnTunnels(ctx context.Context, queryParameters url.Values) ([]*NsxtIpSecVpnTunnel, error) {
 	client := egw.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSecVpnTunnel
-	apiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	apiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +42,7 @@ func (egw *NsxtEdgeGateway) GetAllIpSecVpnTunnels(queryParameters url.Values) ([
 	}
 
 	typeResponses := []*types.NsxtIpSecVpnTunnel{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParameters, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParameters, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -60,14 +61,14 @@ func (egw *NsxtEdgeGateway) GetAllIpSecVpnTunnels(queryParameters url.Values) ([
 }
 
 // GetIpSecVpnTunnelById retrieves single IPsec VPN Tunnel by ID
-func (egw *NsxtEdgeGateway) GetIpSecVpnTunnelById(id string) (*NsxtIpSecVpnTunnel, error) {
+func (egw *NsxtEdgeGateway) GetIpSecVpnTunnelById(ctx context.Context, id string) (*NsxtIpSecVpnTunnel, error) {
 	if id == "" {
 		return nil, fmt.Errorf("canot find NSX-T IPsec VPN Tunnel configuration without ID")
 	}
 
 	client := egw.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSecVpnTunnel
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +84,7 @@ func (egw *NsxtEdgeGateway) GetIpSecVpnTunnelById(id string) (*NsxtIpSecVpnTunne
 		edgeGatewayId: egw.EdgeGateway.ID,
 	}
 
-	err = client.OpenApiGetItem(minimumApiVersion, urlRef, nil, returnObject.NsxtIpSecVpn, nil)
+	err = client.OpenApiGetItem(ctx, minimumApiVersion, urlRef, nil, returnObject.NsxtIpSecVpn, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -95,12 +96,12 @@ func (egw *NsxtEdgeGateway) GetIpSecVpnTunnelById(id string) (*NsxtIpSecVpnTunne
 //
 // Note. Name uniqueness is not enforced therefore it might exist a few IPsec VPN Tunnels with the same name.
 // An error will be returned in that case.
-func (egw *NsxtEdgeGateway) GetIpSecVpnTunnelByName(name string) (*NsxtIpSecVpnTunnel, error) {
+func (egw *NsxtEdgeGateway) GetIpSecVpnTunnelByName(ctx context.Context, name string) (*NsxtIpSecVpnTunnel, error) {
 	if name == "" {
 		return nil, fmt.Errorf("canot find NSX-T IPsec VPN Tunnel configuration without Name")
 	}
 
-	allVpns, err := egw.GetAllIpSecVpnTunnels(nil)
+	allVpns, err := egw.GetAllIpSecVpnTunnels(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving all NSX-T IPsec VPN Tunnel configurations: %s", err)
 	}
@@ -123,14 +124,14 @@ func (egw *NsxtEdgeGateway) GetIpSecVpnTunnelByName(name string) (*NsxtIpSecVpnT
 	}
 
 	// Retrieving again the object by ID, because only it includes Pre-shared Key
-	return egw.GetIpSecVpnTunnelById(allResults[0].NsxtIpSecVpn.ID)
+	return egw.GetIpSecVpnTunnelById(ctx, allResults[0].NsxtIpSecVpn.ID)
 }
 
 // CreateIpSecVpnTunnel creates IPsec VPN Tunnel and returns it
-func (egw *NsxtEdgeGateway) CreateIpSecVpnTunnel(ipSecVpnConfig *types.NsxtIpSecVpnTunnel) (*NsxtIpSecVpnTunnel, error) {
+func (egw *NsxtEdgeGateway) CreateIpSecVpnTunnel(ctx context.Context, ipSecVpnConfig *types.NsxtIpSecVpnTunnel) (*NsxtIpSecVpnTunnel, error) {
 	client := egw.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSecVpnTunnel
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -140,18 +141,18 @@ func (egw *NsxtEdgeGateway) CreateIpSecVpnTunnel(ipSecVpnConfig *types.NsxtIpSec
 		return nil, err
 	}
 
-	task, err := client.OpenApiPostItemAsync(minimumApiVersion, urlRef, nil, ipSecVpnConfig)
+	task, err := client.OpenApiPostItemAsync(ctx, minimumApiVersion, urlRef, nil, ipSecVpnConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error creating NSX-T IPsec VPN Tunnel configuration: %s", err)
 	}
 
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("task failed while creating NSX-T IPsec VPN Tunnel configuration: %s", err)
 	}
 
 	// filtering even by Name is not supported on VCD side
-	allVpns, err := egw.GetAllIpSecVpnTunnels(nil)
+	allVpns, err := egw.GetAllIpSecVpnTunnels(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving all NSX-T IPsec VPN Tunnel configuration after creation: %s", err)
 	}
@@ -159,7 +160,7 @@ func (egw *NsxtEdgeGateway) CreateIpSecVpnTunnel(ipSecVpnConfig *types.NsxtIpSec
 	for index, singleConfig := range allVpns {
 		if singleConfig.IsEqualTo(ipSecVpnConfig) {
 			// retrieve exact value by ID, because only this endpoint includes private key
-			ipSecVpn, err := egw.GetIpSecVpnTunnelById(allVpns[index].NsxtIpSecVpn.ID)
+			ipSecVpn, err := egw.GetIpSecVpnTunnelById(ctx, allVpns[index].NsxtIpSecVpn.ID)
 			if err != nil {
 				return nil, fmt.Errorf("error retrieving NSX-T IPsec VPN Tunnel configuration: %s", err)
 			}
@@ -172,10 +173,10 @@ func (egw *NsxtEdgeGateway) CreateIpSecVpnTunnel(ipSecVpnConfig *types.NsxtIpSec
 }
 
 // Update updates NSX-T IPsec VPN Tunnel configuration with newly supplied data.
-func (ipSecVpn *NsxtIpSecVpnTunnel) Update(ipSecVpnConfig *types.NsxtIpSecVpnTunnel) (*NsxtIpSecVpnTunnel, error) {
+func (ipSecVpn *NsxtIpSecVpnTunnel) Update(ctx context.Context, ipSecVpnConfig *types.NsxtIpSecVpnTunnel) (*NsxtIpSecVpnTunnel, error) {
 	client := ipSecVpn.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSecVpnTunnel
-	apiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	apiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +196,7 @@ func (ipSecVpn *NsxtIpSecVpnTunnel) Update(ipSecVpnConfig *types.NsxtIpSecVpnTun
 		edgeGatewayId: ipSecVpn.edgeGatewayId,
 	}
 
-	err = client.OpenApiPutItem(apiVersion, urlRef, nil, ipSecVpnConfig, returnObject.NsxtIpSecVpn, nil)
+	err = client.OpenApiPutItem(ctx, apiVersion, urlRef, nil, ipSecVpnConfig, returnObject.NsxtIpSecVpn, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error updating NSX-T IPsec VPN Tunnel configuration: %s", err)
 	}
@@ -204,10 +205,10 @@ func (ipSecVpn *NsxtIpSecVpnTunnel) Update(ipSecVpnConfig *types.NsxtIpSecVpnTun
 }
 
 // Delete allows users to delete NSX-T IPsec VPN Tunnel
-func (ipSecVpn *NsxtIpSecVpnTunnel) Delete() error {
+func (ipSecVpn *NsxtIpSecVpnTunnel) Delete(ctx context.Context) error {
 	client := ipSecVpn.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSecVpnTunnel
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -221,7 +222,7 @@ func (ipSecVpn *NsxtIpSecVpnTunnel) Delete() error {
 		return err
 	}
 
-	err = ipSecVpn.client.OpenApiDeleteItem(minimumApiVersion, urlRef, nil, nil)
+	err = ipSecVpn.client.OpenApiDeleteItem(ctx, minimumApiVersion, urlRef, nil, nil)
 	if err != nil {
 		return fmt.Errorf("error deleting NSX-T IPsec VPN Tunnel configuration: %s", err)
 	}
@@ -233,10 +234,10 @@ func (ipSecVpn *NsxtIpSecVpnTunnel) Delete() error {
 //
 // Note. This is not being immediately populated and may appear after some time depending on
 // NsxtIpSecVpnTunnelSecurityProfile.DpdConfiguration
-func (ipSecVpn *NsxtIpSecVpnTunnel) GetStatus() (*types.NsxtIpSecVpnTunnelStatus, error) {
+func (ipSecVpn *NsxtIpSecVpnTunnel) GetStatus(ctx context.Context) (*types.NsxtIpSecVpnTunnelStatus, error) {
 	client := ipSecVpn.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSecVpnTunnelStatus
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -252,7 +253,7 @@ func (ipSecVpn *NsxtIpSecVpnTunnel) GetStatus() (*types.NsxtIpSecVpnTunnelStatus
 
 	ipSecVpnTunnelStatus := &types.NsxtIpSecVpnTunnelStatus{}
 
-	err = ipSecVpn.client.OpenApiGetItem(minimumApiVersion, urlRef, nil, ipSecVpnTunnelStatus, nil)
+	err = ipSecVpn.client.OpenApiGetItem(ctx, minimumApiVersion, urlRef, nil, ipSecVpnTunnelStatus, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error getting NSX-T IPsec VPN Tunnel status: %s", err)
 	}
@@ -262,10 +263,10 @@ func (ipSecVpn *NsxtIpSecVpnTunnel) GetStatus() (*types.NsxtIpSecVpnTunnelStatus
 
 // UpdateTunnelConnectionProperties allows user to customize IPsec VPN Tunnel Security Profile when the default one
 // does not fit requirements.
-func (ipSecVpn *NsxtIpSecVpnTunnel) UpdateTunnelConnectionProperties(ipSecVpnTunnelConnectionProperties *types.NsxtIpSecVpnTunnelSecurityProfile) (*types.NsxtIpSecVpnTunnelSecurityProfile, error) {
+func (ipSecVpn *NsxtIpSecVpnTunnel) UpdateTunnelConnectionProperties(ctx context.Context, ipSecVpnTunnelConnectionProperties *types.NsxtIpSecVpnTunnelSecurityProfile) (*types.NsxtIpSecVpnTunnelSecurityProfile, error) {
 	client := ipSecVpn.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSecVpnTunnelConnectionProperties
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +281,7 @@ func (ipSecVpn *NsxtIpSecVpnTunnel) UpdateTunnelConnectionProperties(ipSecVpnTun
 	}
 
 	ipSecVpnTunnelProfile := &types.NsxtIpSecVpnTunnelSecurityProfile{}
-	err = ipSecVpn.client.OpenApiPutItem(minimumApiVersion, urlRef, nil, ipSecVpnTunnelConnectionProperties, ipSecVpnTunnelProfile, nil)
+	err = ipSecVpn.client.OpenApiPutItem(ctx, minimumApiVersion, urlRef, nil, ipSecVpnTunnelConnectionProperties, ipSecVpnTunnelProfile, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error updating NSX-T IPsec VPN Connection Properties: %s", err)
 	}
@@ -289,10 +290,10 @@ func (ipSecVpn *NsxtIpSecVpnTunnel) UpdateTunnelConnectionProperties(ipSecVpnTun
 }
 
 // GetTunnelConnectionProperties retrieves IPsec VPN Tunnel Security Profile
-func (ipSecVpn *NsxtIpSecVpnTunnel) GetTunnelConnectionProperties() (*types.NsxtIpSecVpnTunnelSecurityProfile, error) {
+func (ipSecVpn *NsxtIpSecVpnTunnel) GetTunnelConnectionProperties(ctx context.Context) (*types.NsxtIpSecVpnTunnelSecurityProfile, error) {
 	client := ipSecVpn.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSecVpnTunnelConnectionProperties
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +308,7 @@ func (ipSecVpn *NsxtIpSecVpnTunnel) GetTunnelConnectionProperties() (*types.Nsxt
 	}
 
 	ipSecVpnTunnelProfile := &types.NsxtIpSecVpnTunnelSecurityProfile{}
-	err = ipSecVpn.client.OpenApiGetItem(minimumApiVersion, urlRef, nil, ipSecVpnTunnelProfile, nil)
+	err = ipSecVpn.client.OpenApiGetItem(ctx, minimumApiVersion, urlRef, nil, ipSecVpnTunnelProfile, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving NSX-T IPsec VPN Connection Properties: %s", err)
 	}

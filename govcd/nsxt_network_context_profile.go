@@ -1,6 +1,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
@@ -12,9 +13,9 @@ import (
 // * Org VDC ID - to get Network Context Profiles scoped for VDC
 // * Network provider ID - to get Network Context Profiles scoped for attached NSX-T environment
 // * VDC Group ID - to get Network Context Profiles scoped for attached NSX-T environment
-func GetAllNetworkContextProfiles(client *Client, queryParameters url.Values) ([]*types.NsxtNetworkContextProfile, error) {
+func GetAllNetworkContextProfiles(ctx context.Context, client *Client, queryParameters url.Values) ([]*types.NsxtNetworkContextProfile, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointNetworkContextProfiles
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -25,7 +26,7 @@ func GetAllNetworkContextProfiles(client *Client, queryParameters url.Values) ([
 	}
 
 	typeResponses := []*types.NsxtNetworkContextProfile{}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParameters, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParameters, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +46,7 @@ func GetAllNetworkContextProfiles(client *Client, queryParameters url.Values) ([
 // * SYSTEM
 // * PROVIDER
 // * TENANT
-func GetNetworkContextProfilesByNameScopeAndContext(client *Client, name, scope, contextId string) (*types.NsxtNetworkContextProfile, error) {
+func GetNetworkContextProfilesByNameScopeAndContext(ctx context.Context, client *Client, name, scope, contextId string) (*types.NsxtNetworkContextProfile, error) {
 	if name == "" || contextId == "" || scope == "" {
 		return nil, fmt.Errorf("error - 'name', 'scope' and 'contextId' must be specified")
 	}
@@ -55,7 +56,7 @@ func GetNetworkContextProfilesByNameScopeAndContext(client *Client, name, scope,
 	queryParams = queryParameterFilterAnd(fmt.Sprintf("_context==%s", contextId), queryParams)
 	queryParams = queryParameterFilterAnd(fmt.Sprintf("scope==%s", scope), queryParams)
 
-	allProfiles, err := GetAllNetworkContextProfiles(client, queryParams)
+	allProfiles, err := GetAllNetworkContextProfiles(ctx, client, queryParams)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving Network Context Profiles by name '%s', scope '%s' and context ID '%s': %s ",
 			name, scope, contextId, err)
