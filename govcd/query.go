@@ -24,12 +24,11 @@ func NewResults(cli *Client) *Results {
 	}
 }
 
-func (vcdCli *VCDClient) Query(ctx context.Context, params map[string]string) (Results, error) {
+func (vcdClient *VCDClient) Query(ctx context.Context, params map[string]string) (Results, error) {
 
-	req := vcdCli.Client.NewRequest(ctx, params, http.MethodGet, vcdCli.QueryHREF, nil)
-	req.Header.Add("Accept", "vnd.vmware.vcloud.org+xml;version="+vcdCli.Client.APIVersion)
-
-	return getResult(&vcdCli.Client, req)
+	req := vcdClient.Client.NewRequest(ctx, params, http.MethodGet, vcdClient.QueryHREF, nil)
+	req.Header.Add("Accept", "vnd.vmware.vcloud.org+xml;version="+vcdClient.Client.APIVersion)
+	return getResult(&vcdClient.Client, req)
 }
 
 func (vdc *Vdc) Query(ctx context.Context, params map[string]string) (Results, error) {
@@ -46,27 +45,39 @@ func (client *Client) QueryWithNotEncodedParams(ctx context.Context, params map[
 	return client.QueryWithNotEncodedParamsWithApiVersion(ctx, params, notEncodedParams, client.APIVersion)
 }
 
-// QueryWithNotEncodedParams uses Query API to search for requested data
-func (client *Client) QueryWithNotEncodedParamsWithApiVersion(ctx context.Context, params map[string]string, notEncodedParams map[string]string, apiVersion string) (Results, error) {
-	queryUlr := client.VCDHREF
-	queryUlr.Path += "/query"
+func (client *Client) QueryWithNotEncodedParamsWithHeaders(ctx context.Context, params map[string]string, notEncodedParams map[string]string, headers map[string]string) (Results, error) {
+	return client.QueryWithNotEncodedParamsWithApiVersionWithHeaders(ctx, params, notEncodedParams, client.APIVersion, headers)
+}
 
-	req := client.NewRequestWitNotEncodedParamsWithApiVersion(ctx, params, notEncodedParams, http.MethodGet, queryUlr, nil, apiVersion)
+//QueryWithNotEncodedParamsWithApiVersion uses Query API to search for requested data
+func (client *Client) QueryWithNotEncodedParamsWithApiVersion(ctx context.Context, params map[string]string, notEncodedParams map[string]string, apiVersion string) (Results, error) {
+	return client.QueryWithNotEncodedParamsWithApiVersionWithHeaders(ctx, params, notEncodedParams, apiVersion, nil)
+}
+
+func (client *Client) QueryWithNotEncodedParamsWithApiVersionWithHeaders(ctx context.Context, params map[string]string, notEncodedParams map[string]string, apiVersion string, headers map[string]string) (Results, error) {
+	queryUrl := client.VCDHREF
+	queryUrl.Path += "/query"
+
+	req := client.NewRequestWitNotEncodedParamsWithApiVersion(ctx, params, notEncodedParams, http.MethodGet, queryUrl, nil, apiVersion)
 	req.Header.Add("Accept", "vnd.vmware.vcloud.org+xml;version="+apiVersion)
+
+	for k, v := range headers {
+		req.Header.Add(k, v)
+	}
 
 	return getResult(client, req)
 }
 
-func (vcdCli *VCDClient) QueryWithNotEncodedParams(ctx context.Context, params map[string]string, notEncodedParams map[string]string) (Results, error) {
-	return vcdCli.Client.QueryWithNotEncodedParams(ctx, params, notEncodedParams)
+func (vcdClient *VCDClient) QueryWithNotEncodedParams(ctx context.Context, params map[string]string, notEncodedParams map[string]string) (Results, error) {
+	return vcdClient.Client.QueryWithNotEncodedParams(ctx, params, notEncodedParams)
 }
 
 func (vdc *Vdc) QueryWithNotEncodedParams(ctx context.Context, params map[string]string, notEncodedParams map[string]string) (Results, error) {
 	return vdc.client.QueryWithNotEncodedParams(ctx, params, notEncodedParams)
 }
 
-func (vcdCli *VCDClient) QueryWithNotEncodedParamsWithApiVersion(ctx context.Context, params map[string]string, notEncodedParams map[string]string, apiVersion string) (Results, error) {
-	return vcdCli.Client.QueryWithNotEncodedParamsWithApiVersion(ctx, params, notEncodedParams, apiVersion)
+func (vcdClient *VCDClient) QueryWithNotEncodedParamsWithApiVersion(ctx context.Context, params map[string]string, notEncodedParams map[string]string, apiVersion string) (Results, error) {
+	return vcdClient.Client.QueryWithNotEncodedParamsWithApiVersion(ctx, params, notEncodedParams, apiVersion)
 }
 
 func (vdc *Vdc) QueryWithNotEncodedParamsWithApiVersion(ctx context.Context, params map[string]string, notEncodedParams map[string]string, apiVersion string) (Results, error) {

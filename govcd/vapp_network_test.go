@@ -1,4 +1,4 @@
-// +build vapp functional ALL
+//go:build vapp || functional || ALL
 
 /*
  * Copyright 2020 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -83,7 +83,7 @@ func (vcd *TestVCD) Test_UpdateNetworkFirewallRules(check *C) {
 func (vcd *TestVCD) prepareVappWithVappNetwork(check *C, vappName, orgVdcNetworkName string) (*VApp, string, *types.NetworkConfigSection, error) {
 	fmt.Printf("Running: %s\n", check.TestName())
 
-	vapp, err := createVappForTest(ctx, vcd, vappName)
+	vapp, err := deployVappForTest(ctx, vcd, vappName)
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
 

@@ -1,4 +1,4 @@
-// +build system functional ALL
+//go:build system || functional || ALL
 
 /*
  * Copyright 2019 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -8,6 +8,7 @@ package govcd
 
 import (
 	"fmt"
+	"strings"
 
 	. "gopkg.in/check.v1"
 
@@ -455,7 +456,7 @@ func (vcd *TestVCD) Test_QueryOrgVdcNetworkByNameWithSpace(check *C) {
 
 	AddToCleanupList(networkName, "network", vcd.org.Org.Name+"|"+vcd.vdc.Vdc.Name, "Test_CreateOrgVdcNetworkDirect")
 
-	// err = task.WaitTaskCompletion()
+	// err = task.WaitTaskCompletion(ctx)
 	err = task.WaitInspectTaskCompletion(ctx, LogTask, 10)
 	if err != nil {
 		fmt.Printf("error performing task: %s", err)
@@ -519,7 +520,7 @@ func (vcd *TestVCD) Test_QueryProviderVdcEntities(check *C) {
 	if storageProfileName == "" {
 		check.Skip("Skipping storage profile query: no storage profile was given")
 	}
-	storageProfiles, err := vcd.client.QueryProviderVdcStorageProfiles(ctx)
+	storageProfiles, err := vcd.client.Client.QueryAllProviderVdcStorageProfiles(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(len(storageProfiles) > 0, Equals, true)
 	storageProfileFound := false
@@ -567,6 +568,75 @@ func (vcd *TestVCD) Test_QueryProviderVdcByName(check *C) {
 
 }
 
+func (vcd *TestVCD) Test_QueryAdminOrgVdcStorageProfileByID(check *C) {
+	if !vcd.client.Client.IsSysAdmin {
+		check.Skip("Skipping Admin VDC StorageProfile query: can't query as tenant user")
+	}
+	if vcd.config.VCD.StorageProfile.SP1 == "" {
+		check.Skip("Skipping VDC StorageProfile query: no StorageProfile ID was given")
+	}
+	ref, err := vcd.vdc.FindStorageProfileReference(vcd.config.VCD.StorageProfile.SP1)
+	check.Assert(err, IsNil)
+	expectedStorageProfileID, err := GetUuidFromHref(ref.HREF, true)
+	check.Assert(err, IsNil)
+	vdcStorageProfile, err := QueryAdminOrgVdcStorageProfileByID(vcd.client, ref.ID)
+	check.Assert(err, IsNil)
+
+	storageProfileFound := false
+
+	storageProfileID, err := GetUuidFromHref(vdcStorageProfile.HREF, true)
+	check.Assert(err, IsNil)
+	if storageProfileID == expectedStorageProfileID {
+		storageProfileFound = true
+	}
+
+	if testVerbose {
+		fmt.Printf("StorageProfile %s\n", vdcStorageProfile.Name)
+		fmt.Printf("\t href    %s\n", vdcStorageProfile.HREF)
+		fmt.Printf("\t enabled %v\n", vdcStorageProfile.IsEnabled)
+		fmt.Println("")
+	}
+
+	check.Assert(storageProfileFound, Equals, true)
+}
+
+func (vcd *TestVCD) Test_QueryOrgVdcStorageProfileByID(check *C) {
+	if vcd.config.VCD.StorageProfile.SP1 == "" {
+		check.Skip("Skipping VDC StorageProfile query: no StorageProfile ID was given")
+	}
+
+	// Setup Org user and connection
+	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	check.Assert(err, IsNil)
+
+	orgUserVcdClient, _, err := newOrgUserConnection(adminOrg, "query-org-vdc-storage-profile-by-id", "CHANGE-ME", vcd.config.Provider.Url, true)
+	check.Assert(err, IsNil)
+
+	ref, err := vcd.vdc.FindStorageProfileReference(vcd.config.VCD.StorageProfile.SP1)
+	check.Assert(err, IsNil)
+	expectedStorageProfileID, err := GetUuidFromHref(ref.HREF, true)
+	check.Assert(err, IsNil)
+	vdcStorageProfile, err := QueryOrgVdcStorageProfileByID(orgUserVcdClient, ref.ID)
+	check.Assert(err, IsNil)
+
+	storageProfileFound := false
+
+	storageProfileID, err := GetUuidFromHref(vdcStorageProfile.HREF, true)
+	check.Assert(err, IsNil)
+	if storageProfileID == expectedStorageProfileID {
+		storageProfileFound = true
+	}
+
+	if testVerbose {
+		fmt.Printf("StorageProfile %s\n", vdcStorageProfile.Name)
+		fmt.Printf("\t href    %s\n", vdcStorageProfile.HREF)
+		fmt.Printf("\t enabled %v\n", vdcStorageProfile.IsEnabled)
+		fmt.Println("")
+	}
+
+	check.Assert(storageProfileFound, Equals, true)
+}
+
 func (vcd *TestVCD) Test_QueryNetworkPoolByName(check *C) {
 	if vcd.config.VCD.ProviderVdc.NetworkPool == "" {
 		check.Skip("Skipping Provider VDC network pool query: no provider VDC network pool was given")
@@ -608,10 +678,12 @@ func (vcd *TestVCD) Test_GetStorageProfileByHref(check *C) {
 	check.Assert(adminVdc, NotNil)
 
 	// Get storage profile by href
-	foundStorageProfile, err := GetStorageProfileByHref(ctx, vcd.client, adminVdc.AdminVdc.VdcStorageProfiles.VdcStorageProfile[0].HREF)
+	foundStorageProfile, err := vcd.client.Client.GetStorageProfileByHref(ctx, adminVdc.AdminVdc.VdcStorageProfiles.VdcStorageProfile[0].HREF)
 	check.Assert(err, IsNil)
-	check.Assert(foundStorageProfile, Not(Equals), types.VdcStorageProfile{})
 	check.Assert(foundStorageProfile, NotNil)
+	check.Assert(foundStorageProfile.IopsSettings, NotNil)
+	check.Assert(foundStorageProfile, Not(Equals), types.VdcStorageProfile{})
+	check.Assert(foundStorageProfile.IopsSettings, Not(Equals), types.VdcStorageProfileIopsSettings{})
 }
 
 func (vcd *TestVCD) Test_GetOrgList(check *C) {
@@ -628,5 +700,45 @@ func (vcd *TestVCD) Test_GetOrgList(check *C) {
 			}
 		}
 		check.Assert(foundOrg, Equals, true)
+	}
+}
+
+func (vcd *TestVCD) TestQueryAllVdcs(check *C) {
+	if vcd.skipAdminTests {
+		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
+	}
+
+	allVdcs, err := vcd.client.Client.QueryAllVdcs()
+	check.Assert(err, IsNil)
+
+	// Check for at least that many VDCs in VCD
+	// expectedVdcCountInSystem = 1 NSX-V VDC
+	expectedVdcCountInSystem := 1
+	// If an NSX-T VDC exists - then expected count of VDCs is at least 2
+	if vcd.config.VCD.Nsxt.Vdc != "" {
+		expectedVdcCountInSystem++
+	}
+
+	if testVerbose {
+		fmt.Printf("# List contains at least %d VDCs.", expectedVdcCountInSystem)
+	}
+	check.Assert(len(allVdcs) >= expectedVdcCountInSystem, Equals, true)
+	// Check that known VDCs are inside the list
+
+	knownVdcs := []string{vcd.config.VCD.Vdc}
+	if vcd.config.VCD.Nsxt.Vdc != "" {
+		knownVdcs = append(knownVdcs, vcd.config.VCD.Nsxt.Vdc)
+	}
+
+	foundVdcNames := make([]string, len(allVdcs))
+	for vdcIndex, vdc := range allVdcs {
+		foundVdcNames[vdcIndex] = vdc.Name
+	}
+
+	if testVerbose {
+		fmt.Printf("# Checking result contains all known VDCs (%s).", strings.Join((knownVdcs), ", "))
+	}
+	for _, knownVdcName := range knownVdcs {
+		check.Assert(contains(knownVdcName, foundVdcNames), Equals, true)
 	}
 }

@@ -1,4 +1,4 @@
-// +build org functional ALL
+//go:build org || functional || ALL
 
 /*
  * Copyright 2019 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -194,6 +194,22 @@ func (vcd *TestVCD) TestOrg_AdminOrg_QueryCatalogList(check *C) {
 	catalogsInAdminOrg, err := adminOrg.QueryCatalogList(ctx)
 	check.Assert(err, IsNil)
 
+	// gets a specific catalog as an adminOrg
+	singleCatalogInAdminOrg, err := adminOrg.FindCatalogRecords(vcd.config.VCD.Catalog.Name)
+	check.Assert(err, IsNil)
+	check.Assert(singleCatalogInAdminOrg, NotNil)
+	check.Assert(len(singleCatalogInAdminOrg), Equals, 1)
+
+	// try to get a non-existent catalog
+	nonExistentCatalog, err := adminOrg.FindCatalogRecords("iCompletelyMadeThisUp")
+	check.Assert(nonExistentCatalog, IsNil)
+	check.Assert(err, Equals, ErrorEntityNotFound)
+
+	// try to get a non-existent catalog with space
+	spaceTestCatalog, err := adminOrg.FindCatalogRecords("space test catalog name")
+	check.Assert(spaceTestCatalog, IsNil)
+	check.Assert(err, Equals, ErrorEntityNotFound)
+
 	// gets the catalog list as an Org
 	catalogsInOrg, err := org.QueryCatalogList(ctx)
 	check.Assert(err, IsNil)
@@ -232,7 +248,7 @@ func (vcd *TestVCD) TestOrg_AdminOrg_QueryCatalogList(check *C) {
 }
 
 // Test_GetAllVDCs checks that adminOrg.GetAllVDCs returns at least one VDC
-func (vcd *TestVCD) Test_GetAllVDCs(check *C) {
+func (vcd *TestVCD) Test_AdminOrgGetAllVDCs(check *C) {
 	if vcd.skipAdminTests {
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
@@ -246,6 +262,11 @@ func (vcd *TestVCD) Test_GetAllVDCs(check *C) {
 	vdcs, err := adminOrg.GetAllVDCs(ctx, true)
 	check.Assert(err, IsNil)
 	check.Assert(len(vdcs) > 0, Equals, true)
+
+	// If NSX-T VDC is configured we expect to see at least 2 VDCs (NSX-V and NSX-T)
+	if vcd.config.VCD.Nsxt.Vdc != "" {
+		check.Assert(len(vdcs) >= 2, Equals, true)
+	}
 }
 
 // Test_GetAllStorageProfileReferences checks that adminOrg.GetAllStorageProfileReferences returns at least one storage

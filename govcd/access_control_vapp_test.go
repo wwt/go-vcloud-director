@@ -1,4 +1,4 @@
-// +build functional vapp ALL
+//go:build functional || vapp || ALL
 
 /*
  * Copyright 2020 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -10,8 +10,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-
-	. "gopkg.in/check.v1"
 
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 )
@@ -36,6 +34,7 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 		check.Skip("Test_VappAccessControl: VDC name not given.")
 		return
 	}
+	vcd.checkSkipWhenApiToken(check)
 	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
@@ -56,10 +55,10 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 	}
 
 	// Create a new vApp
-	vapp, err := makeEmptyVapp(ctx, vdc, vappName)
+	vapp, err := makeEmptyVapp(ctx, vdc, vappName, "")
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
-	AddToCleanupList(vappName, "vapp", vcd.config.VCD.Org+"|"+vcd.config.VCD.Vdc, "Test_VappAccessControl")
+	AddToCleanupList(vappName, "vapp", vcd.config.VCD.Vdc, "Test_VappAccessControl")
 
 	checkEmpty := func() {
 		settings, err := vapp.GetAccessControl(ctx, vappTenantContext)
@@ -119,8 +118,8 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 		IsSharedToEveryone:  false,
 		EveryoneAccessLevel: nil,
 		AccessSettings: &types.AccessSettingList{
-			[]*types.AccessSetting{
-				&types.AccessSetting{
+			AccessSetting: []*types.AccessSetting{
+				{
 					Subject: &types.LocalSubject{
 						HREF: users[0].user.User.Href,
 						Name: users[0].user.User.Name,
@@ -151,8 +150,8 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 		IsSharedToEveryone:  false,
 		EveryoneAccessLevel: nil,
 		AccessSettings: &types.AccessSettingList{
-			[]*types.AccessSetting{
-				&types.AccessSetting{
+			AccessSetting: []*types.AccessSetting{
+				{
 					Subject: &types.LocalSubject{
 						HREF: users[0].user.User.Href,
 						//Name: users[0].user.User.Name, // Pass info without name for one of the subjects
@@ -161,7 +160,7 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 					ExternalSubject: nil,
 					AccessLevel:     types.ControlAccessReadOnly,
 				},
-				&types.AccessSetting{
+				{
 					Subject: &types.LocalSubject{
 						HREF: users[1].user.User.Href,
 						Name: users[1].user.User.Name,
@@ -186,8 +185,8 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 		IsSharedToEveryone:  false,
 		EveryoneAccessLevel: nil,
 		AccessSettings: &types.AccessSettingList{
-			[]*types.AccessSetting{
-				&types.AccessSetting{
+			AccessSetting: []*types.AccessSetting{
+				{
 					Subject: &types.LocalSubject{
 						HREF: users[0].user.User.Href,
 						Name: users[0].user.User.Name,
@@ -196,7 +195,7 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 					ExternalSubject: nil,
 					AccessLevel:     types.ControlAccessReadOnly,
 				},
-				&types.AccessSetting{
+				{
 					Subject: &types.LocalSubject{
 						HREF: users[1].user.User.Href,
 						//Name: users[1].user.User.Name,// Pass info without name for one of the subjects
@@ -205,7 +204,7 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 					ExternalSubject: nil,
 					AccessLevel:     types.ControlAccessFullControl,
 				},
-				&types.AccessSetting{
+				{
 					Subject: &types.LocalSubject{
 						HREF: users[2].user.User.Href,
 						Name: users[2].user.User.Name,
@@ -231,6 +230,6 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 
 	orgInfo, err := vapp.getOrgInfo(ctx)
 	check.Assert(err, IsNil)
-	check.Assert(orgInfo.id, Equals, extractUuid(org.AdminOrg.ID))
-	check.Assert(orgInfo.name, Equals, org.AdminOrg.Name)
+	check.Assert(orgInfo.OrgId, Equals, extractUuid(org.AdminOrg.ID))
+	check.Assert(orgInfo.OrgName, Equals, org.AdminOrg.Name)
 }

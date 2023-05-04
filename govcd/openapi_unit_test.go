@@ -1,4 +1,4 @@
-// +build unit ALL
+//go:build unit || ALL
 
 package govcd
 

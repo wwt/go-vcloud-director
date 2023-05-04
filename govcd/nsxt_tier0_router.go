@@ -26,7 +26,7 @@ type NsxtTier0Router struct {
 // Note. NSX-T manager ID is mandatory and must be in URN format (e.g.
 // urn:vcloud:nsxtmanager:09722307-aee0-4623-af95-7f8e577c9ebc)
 
-func (vcdCli *VCDClient) GetImportableNsxtTier0RouterByName(ctx context.Context, name, nsxtManagerId string) (*NsxtTier0Router, error) {
+func (vcdClient *VCDClient) GetImportableNsxtTier0RouterByName(ctx context.Context, name, nsxtManagerId string) (*NsxtTier0Router, error) {
 	if nsxtManagerId == "" {
 		return nil, fmt.Errorf("no NSX-T manager ID specified")
 	}
@@ -48,7 +48,7 @@ func (vcdCli *VCDClient) GetImportableNsxtTier0RouterByName(ctx context.Context,
 		queryParameters.Add("filter", "displayName=="+name)
 	*/
 
-	nsxtTier0Routers, err := vcdCli.GetAllImportableNsxtTier0Routers(ctx, nsxtManagerId, nil)
+	nsxtTier0Routers, err := vcdClient.GetAllImportableNsxtTier0Routers(ctx, nsxtManagerId, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not find NSX-T Tier-0 router with name '%s' for NSX-T manager with id '%s': %s",
 			name, nsxtManagerId, err)
@@ -95,18 +95,18 @@ func filterNsxtTier0RoutersInExternalNetworks(name string, allNnsxtTier0Routers 
 //
 // Note. IDs of Tier-0 routers do not have a standard and may look as strings when they are created using UI or as UUIDs
 // when they are created using API
-func (vcdCli *VCDClient) GetAllImportableNsxtTier0Routers(ctx context.Context, nsxtManagerId string, queryParameters url.Values) ([]*NsxtTier0Router, error) {
+func (vcdClient *VCDClient) GetAllImportableNsxtTier0Routers(ctx context.Context, nsxtManagerId string, queryParameters url.Values) ([]*NsxtTier0Router, error) {
 	if !isUrn(nsxtManagerId) {
 		return nil, fmt.Errorf("NSX-T manager ID is not URN (e.g. 'urn:vcloud:nsxtmanager:09722307-aee0-4623-af95-7f8e577c9ebc)', got: %s", nsxtManagerId)
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointImportableTier0Routers
-	minimumApiVersion, err := vcdCli.Client.checkOpenApiEndpointCompatibility(ctx, endpoint)
+	minimumApiVersion, err := vcdClient.Client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
 
-	urlRef, err := vcdCli.Client.OpenApiBuildEndpoint(endpoint)
+	urlRef, err := vcdClient.Client.OpenApiBuildEndpoint(endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (vcdCli *VCDClient) GetAllImportableNsxtTier0Routers(ctx context.Context, n
 	queryParams := queryParameterFilterAnd("_context=="+nsxtManagerId, queryParameters)
 
 	typeResponses := []*types.NsxtTier0Router{{}}
-	err = vcdCli.Client.OpenApiGetAllItems(ctx, minimumApiVersion, urlRef, queryParams, &typeResponses)
+	err = vcdClient.Client.OpenApiGetAllItems(ctx, minimumApiVersion, urlRef, queryParams, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ func (vcdCli *VCDClient) GetAllImportableNsxtTier0Routers(ctx context.Context, n
 	for sliceIndex := range typeResponses {
 		returnObjects[sliceIndex] = &NsxtTier0Router{
 			NsxtTier0Router: typeResponses[sliceIndex],
-			client:          &vcdCli.Client,
+			client:          &vcdClient.Client,
 		}
 	}
 

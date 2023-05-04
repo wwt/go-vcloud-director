@@ -121,7 +121,7 @@ func (egw *EdgeGateway) AddDhcpPool(ctx context.Context, network *types.OrgVDCNe
 	for {
 		buffer := bytes.NewBufferString(xml.Header + string(output))
 
-		apiEndpoint, _ := url.ParseRequestURI(egw.EdgeGateway.HREF)
+		apiEndpoint := urlParseRequestURI(egw.EdgeGateway.HREF)
 		apiEndpoint.Path += "/action/configureServices"
 
 		req := egw.client.NewRequest(ctx, map[string]string{}, http.MethodPost, *apiEndpoint, buffer)
@@ -198,7 +198,7 @@ func (egw *EdgeGateway) RemoveNATPortMapping(ctx context.Context, natType, exter
 		NatService: newNatService,
 	}
 
-	apiEndpoint, _ := url.ParseRequestURI(egw.EdgeGateway.HREF)
+	apiEndpoint := urlParseRequestURI(egw.EdgeGateway.HREF)
 	apiEndpoint.Path += "/action/configureServices"
 
 	// Return the task
@@ -264,7 +264,7 @@ func (egw *EdgeGateway) RemoveNATRuleAsync(ctx context.Context, id string) (Task
 		NatService: natServiceToUpdate,
 	}
 
-	egwConfigureHref, _ := url.ParseRequestURI(egw.EdgeGateway.HREF)
+	egwConfigureHref := urlParseRequestURI(egw.EdgeGateway.HREF)
 	egwConfigureHref.Path += "/action/configureServices"
 
 	// Return the task
@@ -429,7 +429,7 @@ func (egw *EdgeGateway) UpdateNatRuleAsync(ctx context.Context, natRule *types.N
 		NatService: natServiceToUpdate,
 	}
 
-	egwConfigureHref, _ := url.ParseRequestURI(egw.EdgeGateway.HREF)
+	egwConfigureHref := urlParseRequestURI(egw.EdgeGateway.HREF)
 	egwConfigureHref.Path += "/action/configureServices"
 
 	// Return the task
@@ -507,7 +507,7 @@ func (egw *EdgeGateway) AddNATRuleAsync(ctx context.Context, ruleDetails NatRule
 		NatService: newNatService,
 	}
 
-	egwConfigureHref, _ := url.ParseRequestURI(egw.EdgeGateway.HREF)
+	egwConfigureHref := urlParseRequestURI(egw.EdgeGateway.HREF)
 	egwConfigureHref.Path += "/action/configureServices"
 
 	// Return the task
@@ -655,7 +655,7 @@ func (egw *EdgeGateway) AddNATPortMappingWithUplink(ctx context.Context, network
 		NatService: newNatService,
 	}
 
-	apiEndpoint, _ := url.ParseRequestURI(egw.EdgeGateway.HREF)
+	apiEndpoint := urlParseRequestURI(egw.EdgeGateway.HREF)
 	apiEndpoint.Path += "/action/configureServices"
 
 	// Return the task
@@ -688,7 +688,7 @@ func (egw *EdgeGateway) CreateFirewallRules(ctx context.Context, defaultAction s
 	for {
 		buffer := bytes.NewBufferString(xml.Header + string(output))
 
-		apiEndpoint, _ := url.ParseRequestURI(egw.EdgeGateway.HREF)
+		apiEndpoint := urlParseRequestURI(egw.EdgeGateway.HREF)
 		apiEndpoint.Path += "/action/configureServices"
 
 		req := egw.client.NewRequest(ctx, map[string]string{}, http.MethodPost, *apiEndpoint, buffer)
@@ -838,7 +838,7 @@ func (egw *EdgeGateway) Remove1to1Mapping(ctx context.Context, internal, externa
 	// Fix
 	newEdgeConfig.NatService.IsEnabled = true
 
-	apiEndpoint, _ := url.ParseRequestURI(egw.EdgeGateway.HREF)
+	apiEndpoint := urlParseRequestURI(egw.EdgeGateway.HREF)
 	apiEndpoint.Path += "/action/configureServices"
 
 	// Return the task
@@ -933,7 +933,7 @@ func (egw *EdgeGateway) Create1to1Mapping(ctx context.Context, internal, externa
 
 	newEdgeConfig.FirewallService.FirewallRule = append(newEdgeConfig.FirewallService.FirewallRule, fwout)
 
-	apiEndpoint, _ := url.ParseRequestURI(egw.EdgeGateway.HREF)
+	apiEndpoint := urlParseRequestURI(egw.EdgeGateway.HREF)
 	apiEndpoint.Path += "/action/configureServices"
 
 	// Return the task
@@ -951,7 +951,7 @@ func (egw *EdgeGateway) AddIpsecVPN(ctx context.Context, ipsecVPNConfig *types.E
 
 	ipsecVPNConfig.Xmlns = types.XMLNamespaceVCloud
 
-	apiEndpoint, _ := url.ParseRequestURI(egw.EdgeGateway.HREF)
+	apiEndpoint := urlParseRequestURI(egw.EdgeGateway.HREF)
 	apiEndpoint.Path += "/action/configureServices"
 
 	// Return the task
@@ -1175,7 +1175,7 @@ func (egw *EdgeGateway) UpdateLBGeneralParams(ctx context.Context, enabled, acce
 }
 
 // GetFirewallConfig retrieves firewall configuration and can be used
-// to alter master configuration options. These are 3 fields only:
+// to alter main configuration options. These are 3 fields only:
 // FirewallConfigWithXml.Enabled, FirewallConfigWithXml.DefaultPolicy.LoggingEnabled and
 // FirewallConfigWithXml.DefaultPolicy.Action
 func (egw *EdgeGateway) GetFirewallConfig(ctx context.Context) (*types.FirewallConfigWithXml, error) {

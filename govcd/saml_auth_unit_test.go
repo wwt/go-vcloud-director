@@ -1,4 +1,4 @@
-// +build unit ALL
+//go:build unit || ALL
 
 /*
  * Copyright 2020 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -7,7 +7,7 @@
 package govcd
 
 import (
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -19,6 +19,7 @@ import (
 
 // testVcdMockAuthToken is the expected vcdCli.Client.VCDToken value after `Authentication()`
 // function passes mock SAML authentication process
+// #nosec G101 -- These credentials are fake for testing purposes
 const testVcdMockAuthToken = "e3b02b30b8ff4e87ac38db785b0172b5"
 
 // samlMockServer struct allows to attach HTTP handlers to use additional variables (like
@@ -173,7 +174,7 @@ func (mockServer *samlMockServer) adfsSamlAuthHandler(w http.ResponseWriter, r *
 	}
 
 	// Replace known dynamic strings to 'REPLACED' string
-	gotBody, _ := ioutil.ReadAll(r.Body)
+	gotBody, _ := io.ReadAll(r.Body)
 	gotBodyString := string(gotBody)
 	re := regexp.MustCompile(`(<a:To s:mustUnderstand="1">).*(</a:To>)`)
 	gotBodyString = re.ReplaceAllString(gotBodyString, `${1}REPLACED${2}`)

@@ -1,15 +1,15 @@
 /*
- * Copyright 2019 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
+ * Copyright 2021 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
  */
 
 package govcd
 
 import (
 	"context"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strconv"
 	"time"
 
@@ -29,7 +29,7 @@ func NewVApp(cli *Client) *VApp {
 	}
 }
 
-func (vcdCli *VCDClient) NewVApp(client *Client) VApp {
+func (vcdClient *VCDClient) NewVApp(client *Client) VApp {
 	newvapp := NewVApp(client)
 	return *newvapp
 }
@@ -41,6 +41,7 @@ type VappNetworkSettings struct {
 	Description        string
 	Gateway            string
 	NetMask            string
+	SubnetPrefixLength string
 	DNS1               string
 	DNS2               string
 	DNSSuffix          string
@@ -62,7 +63,7 @@ type DhcpSettings struct {
 // Returns the vdc where the vapp resides in.
 func (vapp *VApp) getParentVDC(ctx context.Context) (Vdc, error) {
 	for _, link := range vapp.VApp.Link {
-		if link.Type == "application/vnd.vmware.vcloud.vdc+xml" {
+		if (link.Type == types.MimeVDC || link.Type == types.MimeAdminVDC) && link.Rel == "up" {
 
 			vdc := NewVdc(vapp.client)
 
@@ -72,6 +73,11 @@ func (vapp *VApp) getParentVDC(ctx context.Context) (Vdc, error) {
 				return Vdc{}, err
 			}
 
+			parent, err := vdc.getParentOrg(ctx)
+			if err != nil {
+				return Vdc{}, err
+			}
+			vdc.parent = parent
 			return *vdc, nil
 		}
 	}
@@ -148,6 +154,39 @@ func (vapp *VApp) AddVM(ctx context.Context, orgVdcNetworks []*types.OrgVDCNetwo
 	return vapp.AddNewVM(ctx, name, vappTemplate, &networkConnectionSection, acceptAllEulas)
 }
 
+// AddRawVM accepts raw types.ReComposeVAppParams which contains all information for VM creation
+func (vapp *VApp) AddRawVM(ctx context.Context, vAppComposition *types.ReComposeVAppParams) (*VM, error) {
+	apiEndpoint := urlParseRequestURI(vapp.VApp.HREF)
+	apiEndpoint.Path += "/action/recomposeVApp"
+
+	// Return the task
+	task, err := vapp.client.ExecuteTaskRequest(ctx, apiEndpoint.String(), http.MethodPost, types.MimeRecomposeVappParams, "error instantiating a new VM: %s", vAppComposition)
+	if err != nil {
+		return nil, fmt.Errorf("error instantiating a new VM: %s", err)
+	}
+
+	err = task.WaitTaskCompletion(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("VM creation task failed: %s", err)
+	}
+
+	// VM task does not return any reference to VM therefore it must be looked up by name after
+	// creation
+
+	var vmName string
+	if vAppComposition.SourcedItem != nil && vAppComposition.SourcedItem.Source != nil {
+		vmName = vAppComposition.SourcedItem.Source.Name
+	}
+
+	vm, err := vapp.GetVMByName(ctx, vmName, true)
+	if err != nil {
+		return nil, fmt.Errorf("error finding VM %s in vApp %s after creation: %s", vAppComposition.Name, vapp.VApp.Name, err)
+	}
+
+	return vm, nil
+
+}
+
 // AddNewVM adds VM from vApp template with custom NetworkConnectionSection
 func (vapp *VApp) AddNewVM(ctx context.Context, name string, vappTemplate VAppTemplate, network *types.NetworkConnectionSection, acceptAllEulas bool) (Task, error) {
 	return vapp.AddNewVMWithStorageProfile(ctx, name, vappTemplate, network, nil, acceptAllEulas)
@@ -173,7 +212,6 @@ func (vapp *VApp) AddNewVMWithComputePolicy(ctx context.Context, name string, va
 func addNewVMW(ctx context.Context, vapp *VApp, name string, vappTemplate VAppTemplate,
 	network *types.NetworkConnectionSection,
 	storageProfileRef *types.Reference, computePolicy *types.VdcComputePolicy, acceptAllEulas bool) (Task, error) {
-
 	if vappTemplate == (VAppTemplate{}) || vappTemplate.VAppTemplate == nil {
 		return Task{}, fmt.Errorf("vApp Template can not be empty")
 	}
@@ -224,11 +262,8 @@ func addNewVMW(ctx context.Context, vapp *VApp, name string, vappTemplate VAppTe
 		vAppComposition.SourcedItem.StorageProfile = storageProfileRef
 	}
 
-	if computePolicy != nil && vapp.client.APIVCDMaxVersionIs(ctx, "< 33.0") {
-		util.Logger.Printf("[Warning] compute policy is ignored because VCD version doesn't support it")
-	}
 	// Add compute policy
-	if computePolicy != nil && computePolicy.ID != "" && vapp.client.APIVCDMaxVersionIs(ctx, "> 32.0") {
+	if computePolicy != nil && computePolicy.ID != "" {
 		vdcComputePolicyHref, err := vapp.client.OpenApiBuildEndpoint(types.OpenApiPathVersion1_0_0, types.OpenApiEndpointVdcComputePolicies, computePolicy.ID)
 		if err != nil {
 			return Task{}, fmt.Errorf("error constructing HREF for compute policy")
@@ -239,14 +274,12 @@ func addNewVMW(ctx context.Context, vapp *VApp, name string, vappTemplate VAppTe
 	// Inject network config
 	vAppComposition.SourcedItem.InstantiationParams.NetworkConnectionSection = network
 
-	apiEndpoint, _ := url.ParseRequestURI(vapp.VApp.HREF)
+	apiEndpoint := urlParseRequestURI(vapp.VApp.HREF)
 	apiEndpoint.Path += "/action/recomposeVApp"
 
 	// Return the task
-	return vapp.client.ExecuteTaskRequestWithApiVersion(ctx, apiEndpoint.String(), http.MethodPost,
-		types.MimeRecomposeVappParams, "error instantiating a new VM: %s", vAppComposition,
-		vapp.client.GetSpecificApiVersionOnCondition(ctx, ">= 33.0", "33.0"))
-
+	return vapp.client.ExecuteTaskRequest(ctx, apiEndpoint.String(), http.MethodPost,
+		types.MimeRecomposeVappParams, "error instantiating a new VM: %s", vAppComposition)
 }
 
 // ========================= issue#252 ==================================
@@ -282,7 +315,7 @@ func (vapp *VApp) RemoveVM(ctx context.Context, vm VM) error {
 		},
 	}
 
-	apiEndpoint, _ := url.ParseRequestURI(vapp.VApp.HREF)
+	apiEndpoint := urlParseRequestURI(vapp.VApp.HREF)
 	apiEndpoint.Path += "/action/recomposeVApp"
 
 	deleteTask, err := vapp.client.ExecuteTaskRequest(ctx, apiEndpoint.String(), http.MethodPost,
@@ -306,7 +339,7 @@ func (vapp *VApp) PowerOn(ctx context.Context) (Task, error) {
 		return Task{}, fmt.Errorf("error powering on vApp: %s", err)
 	}
 
-	apiEndpoint, _ := url.ParseRequestURI(vapp.VApp.HREF)
+	apiEndpoint := urlParseRequestURI(vapp.VApp.HREF)
 	apiEndpoint.Path += "/power/action/powerOn"
 
 	// Return the task
@@ -316,7 +349,7 @@ func (vapp *VApp) PowerOn(ctx context.Context) (Task, error) {
 
 func (vapp *VApp) PowerOff(ctx context.Context) (Task, error) {
 
-	apiEndpoint, _ := url.ParseRequestURI(vapp.VApp.HREF)
+	apiEndpoint := urlParseRequestURI(vapp.VApp.HREF)
 	apiEndpoint.Path += "/power/action/powerOff"
 
 	// Return the task
@@ -327,7 +360,7 @@ func (vapp *VApp) PowerOff(ctx context.Context) (Task, error) {
 
 func (vapp *VApp) Reboot(ctx context.Context) (Task, error) {
 
-	apiEndpoint, _ := url.ParseRequestURI(vapp.VApp.HREF)
+	apiEndpoint := urlParseRequestURI(vapp.VApp.HREF)
 	apiEndpoint.Path += "/power/action/reboot"
 
 	// Return the task
@@ -337,7 +370,7 @@ func (vapp *VApp) Reboot(ctx context.Context) (Task, error) {
 
 func (vapp *VApp) Reset(ctx context.Context) (Task, error) {
 
-	apiEndpoint, _ := url.ParseRequestURI(vapp.VApp.HREF)
+	apiEndpoint := urlParseRequestURI(vapp.VApp.HREF)
 	apiEndpoint.Path += "/power/action/reset"
 
 	// Return the task
@@ -347,7 +380,7 @@ func (vapp *VApp) Reset(ctx context.Context) (Task, error) {
 
 func (vapp *VApp) Suspend(ctx context.Context) (Task, error) {
 
-	apiEndpoint, _ := url.ParseRequestURI(vapp.VApp.HREF)
+	apiEndpoint := urlParseRequestURI(vapp.VApp.HREF)
 	apiEndpoint.Path += "/power/action/suspend"
 
 	// Return the task
@@ -357,7 +390,7 @@ func (vapp *VApp) Suspend(ctx context.Context) (Task, error) {
 
 func (vapp *VApp) Shutdown(ctx context.Context) (Task, error) {
 
-	apiEndpoint, _ := url.ParseRequestURI(vapp.VApp.HREF)
+	apiEndpoint := urlParseRequestURI(vapp.VApp.HREF)
 	apiEndpoint.Path += "/power/action/shutdown"
 
 	// Return the task
@@ -372,7 +405,7 @@ func (vapp *VApp) Undeploy(ctx context.Context) (Task, error) {
 		UndeployPowerAction: "powerOff",
 	}
 
-	apiEndpoint, _ := url.ParseRequestURI(vapp.VApp.HREF)
+	apiEndpoint := urlParseRequestURI(vapp.VApp.HREF)
 	apiEndpoint.Path += "/action/undeploy"
 
 	// Return the task
@@ -387,7 +420,7 @@ func (vapp *VApp) Deploy(ctx context.Context) (Task, error) {
 		PowerOn: false,
 	}
 
-	apiEndpoint, _ := url.ParseRequestURI(vapp.VApp.HREF)
+	apiEndpoint := urlParseRequestURI(vapp.VApp.HREF)
 	apiEndpoint.Path += "/action/deploy"
 
 	// Return the task
@@ -434,7 +467,7 @@ func (vapp *VApp) Customize(ctx context.Context, computername, script string, ch
 		ChangeSid:           takeBoolPointer(changeSid),
 	}
 
-	apiEndpoint, _ := url.ParseRequestURI(vapp.VApp.Children.VM[0].HREF)
+	apiEndpoint := urlParseRequestURI(vapp.VApp.Children.VM[0].HREF)
 	apiEndpoint.Path += "/guestCustomizationSection/"
 
 	// Return the task
@@ -547,7 +580,7 @@ func (vapp *VApp) ChangeCPUCountWithCore(ctx context.Context, virtualCpuCount in
 		},
 	}
 
-	apiEndpoint, _ := url.ParseRequestURI(vapp.VApp.Children.VM[0].HREF)
+	apiEndpoint := urlParseRequestURI(vapp.VApp.Children.VM[0].HREF)
 	apiEndpoint.Path += "/virtualHardwareSection/cpu"
 
 	// Return the task
@@ -638,7 +671,7 @@ func (vapp *VApp) SetOvf(ctx context.Context, parameters map[string]string) (Tas
 		ProductSection: vapp.VApp.Children.VM[0].ProductSection,
 	}
 
-	apiEndpoint, _ := url.ParseRequestURI(vapp.VApp.Children.VM[0].HREF)
+	apiEndpoint := urlParseRequestURI(vapp.VApp.Children.VM[0].HREF)
 	apiEndpoint.Path += "/productSections"
 
 	// Return the task
@@ -696,7 +729,7 @@ func (vapp *VApp) ChangeNetworkConfig(ctx context.Context, networks []map[string
 
 	}
 
-	apiEndpoint, _ := url.ParseRequestURI(vapp.VApp.Children.VM[0].HREF)
+	apiEndpoint := urlParseRequestURI(vapp.VApp.Children.VM[0].HREF)
 	apiEndpoint.Path += "/networkConnectionSection/"
 
 	// Return the task
@@ -738,7 +771,7 @@ func (vapp *VApp) ChangeMemorySize(ctx context.Context, size int) (Task, error) 
 		},
 	}
 
-	apiEndpoint, _ := url.ParseRequestURI(vapp.VApp.Children.VM[0].HREF)
+	apiEndpoint := urlParseRequestURI(vapp.VApp.Children.VM[0].HREF)
 	apiEndpoint.Path += "/virtualHardwareSection/memory"
 
 	// Return the task
@@ -887,14 +920,22 @@ func (vapp *VApp) CreateVappNetworkAsync(ctx context.Context, newNetworkSettings
 			FenceMode:        types.FenceModeIsolated,
 			GuestVlanAllowed: newNetworkSettings.GuestVLANAllowed,
 			Features:         networkFeatures,
-			IPScopes: &types.IPScopes{IPScope: []*types.IPScope{&types.IPScope{IsInherited: false, Gateway: newNetworkSettings.Gateway,
-				Netmask: newNetworkSettings.NetMask, DNS1: newNetworkSettings.DNS1,
-				DNS2: newNetworkSettings.DNS2, DNSSuffix: newNetworkSettings.DNSSuffix, IsEnabled: true,
-				IPRanges: &types.IPRanges{IPRange: newNetworkSettings.StaticIPRanges}}}},
+			IPScopes: &types.IPScopes{
+				IPScope: []*types.IPScope{{
+					IsInherited:        false,
+					Gateway:            newNetworkSettings.Gateway,
+					Netmask:            newNetworkSettings.NetMask,
+					SubnetPrefixLength: newNetworkSettings.SubnetPrefixLength,
+					DNS1:               newNetworkSettings.DNS1,
+					DNS2:               newNetworkSettings.DNS2,
+					DNSSuffix:          newNetworkSettings.DNSSuffix,
+					IsEnabled:          true,
+					IPRanges:           &types.IPRanges{IPRange: newNetworkSettings.StaticIPRanges}}}},
 			RetainNetInfoAcrossDeployments: newNetworkSettings.RetainIpMacEnabled,
 		},
 		IsDeployed: false,
 	}
+
 	if orgNetwork != nil {
 		vappConfiguration.Configuration.ParentNetwork = &types.Reference{
 			HREF: orgNetwork.HREF,
@@ -1006,6 +1047,9 @@ func (vapp *VApp) UpdateNetworkAsync(ctx context.Context, networkSettingsToUpdat
 	if networkToUpdate == (types.VAppNetworkConfiguration{}) {
 		return Task{}, fmt.Errorf("not found network to update with Id %s", networkSettingsToUpdate.ID)
 	}
+	if networkToUpdate.Configuration == nil {
+		networkToUpdate.Configuration = &types.NetworkConfiguration{}
+	}
 	networkToUpdate.Configuration.RetainNetInfoAcrossDeployments = networkSettingsToUpdate.RetainIpMacEnabled
 	// new network to connect
 	if networkToUpdate.Configuration.ParentNetwork == nil && orgNetwork != nil {
@@ -1034,6 +1078,10 @@ func (vapp *VApp) UpdateNetworkAsync(ctx context.Context, networkSettingsToUpdat
 	// for case when range is one ip address
 	if networkSettingsToUpdate.DhcpSettings != nil && networkSettingsToUpdate.DhcpSettings.IPRange != nil && networkSettingsToUpdate.DhcpSettings.IPRange.EndAddress == "" {
 		networkSettingsToUpdate.DhcpSettings.IPRange.EndAddress = networkSettingsToUpdate.DhcpSettings.IPRange.StartAddress
+	}
+
+	if networkToUpdate.Configuration.Features == nil {
+		networkToUpdate.Configuration.Features = &types.NetworkFeatures{}
 	}
 
 	// remove DHCP config
@@ -1118,6 +1166,9 @@ func (vapp *VApp) UpdateOrgNetworkAsync(ctx context.Context, networkSettingsToUp
 		fenceMode = types.FenceModeNAT
 	}
 
+	if networkToUpdate.Configuration == nil {
+		networkToUpdate.Configuration = &types.NetworkConfiguration{}
+	}
 	networkToUpdate.Configuration.RetainNetInfoAcrossDeployments = networkSettingsToUpdate.RetainIpMacEnabled
 	networkToUpdate.Configuration.FenceMode = fenceMode
 
@@ -1135,12 +1186,12 @@ func validateNetworkConfigSettings(networkSettings *VappNetworkSettings) error {
 		return errors.New("network gateway IP is missing")
 	}
 
-	if networkSettings.NetMask == "" {
-		return errors.New("network mask config is missing")
+	if networkSettings.NetMask == "" && networkSettings.SubnetPrefixLength == "" {
+		return errors.New("network mask and subnet prefix length config is missing, exactly one is required")
 	}
 
-	if networkSettings.NetMask == "" {
-		return errors.New("network mask config is missing")
+	if networkSettings.NetMask != "" && networkSettings.SubnetPrefixLength != "" {
+		return errors.New("exactly one of netmask and prefix length can be supplied")
 	}
 
 	if networkSettings.DhcpSettings != nil && networkSettings.DhcpSettings.IPRange == nil {
@@ -1242,7 +1293,7 @@ func updateNetworkConfigurations(ctx context.Context, vapp *VApp, networkConfigu
 		NetworkConfig: networkConfigurations,
 	}
 
-	apiEndpoint, _ := url.ParseRequestURI(vapp.VApp.HREF)
+	apiEndpoint := urlParseRequestURI(vapp.VApp.HREF)
 	apiEndpoint.Path += "/networkConfigSection/"
 
 	// Return the task
@@ -1363,16 +1414,163 @@ func (client *Client) QueryVappList(ctx context.Context) ([]*types.QueryResultVA
 }
 
 // getOrgInfo finds the organization to which the vApp belongs (through the VDC), and returns its name and ID
-func (vapp *VApp) getOrgInfo(ctx context.Context) (orgInfoType, error) {
+func (vapp *VApp) getOrgInfo(ctx context.Context) (*TenantContext, error) {
 	previous, exists := orgInfoCache[vapp.VApp.ID]
 	if exists {
 		return previous, nil
 	}
-	//var orgHref string
 	var err error
 	vdc, err := vapp.getParentVDC(ctx)
 	if err != nil {
-		return orgInfoType{}, err
+		return nil, err
 	}
-	return getOrgInfo(ctx, vapp.client, vdc.Vdc.Link, vapp.VApp.ID, vapp.VApp.Name, "vApp")
+	return vdc.getTenantContext()
+}
+
+// UpdateNameDescription can change the name and the description of a vApp
+// If name is empty, it is left unchanged.
+func (vapp *VApp) UpdateNameDescription(ctx context.Context, newName, newDescription string) error {
+	if vapp == nil || vapp.VApp.HREF == "" {
+		return fmt.Errorf("vApp or href cannot be empty")
+	}
+
+	// Skip update if we are using the original values
+	if (newName == vapp.VApp.Name || newName == "") && (newDescription == vapp.VApp.Description) {
+		return nil
+	}
+
+	opType := types.MimeRecomposeVappParams
+
+	href := ""
+	for _, link := range vapp.VApp.Link {
+		if link.Type == opType && link.Rel == "recompose" {
+			href = link.HREF
+			break
+		}
+	}
+
+	if href == "" {
+		return fmt.Errorf("no appropriate link for update found for vApp %s", vapp.VApp.Name)
+	}
+
+	if newName == "" {
+		newName = vapp.VApp.Name
+	}
+
+	recomposeParams := &types.SmallRecomposeVappParams{
+		XMLName:     xml.Name{},
+		Ovf:         types.XMLNamespaceOVF,
+		Xsi:         types.XMLNamespaceXSI,
+		Xmlns:       types.XMLNamespaceVCloud,
+		Name:        newName,
+		Description: newDescription,
+		Deploy:      vapp.VApp.Deployed,
+	}
+
+	task, err := vapp.client.ExecuteTaskRequest(ctx, href, http.MethodPost,
+		opType, "error updating vapp: %s", recomposeParams)
+
+	if err != nil {
+		return fmt.Errorf("unable to update vApp: %s", err)
+	}
+
+	err = task.WaitTaskCompletion(ctx)
+	if err != nil {
+		return fmt.Errorf("task for updating vApp failed: %s", err)
+	}
+	return vapp.Refresh(ctx)
+}
+
+// UpdateDescription changes the description of a vApp
+func (vapp *VApp) UpdateDescription(ctx context.Context, newDescription string) error {
+	return vapp.UpdateNameDescription(ctx, "", newDescription)
+}
+
+// Rename changes the name of a vApp
+func (vapp *VApp) Rename(ctx context.Context, newName string) error {
+	return vapp.UpdateNameDescription(ctx, newName, vapp.VApp.Description)
+}
+
+func (vapp *VApp) getTenantContext(ctx context.Context) (*TenantContext, error) {
+	parentVdc, err := vapp.getParentVDC(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return parentVdc.getTenantContext()
+}
+
+// RenewLease updates the lease terms for the vApp
+func (vapp *VApp) RenewLease(ctx context.Context, deploymentLeaseInSeconds, storageLeaseInSeconds int) error {
+
+	href := ""
+	if vapp.VApp.LeaseSettingsSection != nil {
+		if vapp.VApp.LeaseSettingsSection.DeploymentLeaseInSeconds == deploymentLeaseInSeconds &&
+			vapp.VApp.LeaseSettingsSection.StorageLeaseInSeconds == storageLeaseInSeconds {
+			// Requested parameters are the same as existing parameters: exit without updating
+			return nil
+		}
+		href = vapp.VApp.LeaseSettingsSection.HREF
+	}
+	if href == "" {
+		for _, link := range vapp.VApp.Link {
+			if link.Rel == "edit" && link.Type == types.MimeLeaseSettingSection {
+				href = link.HREF
+				break
+			}
+		}
+	}
+	if href == "" {
+		return fmt.Errorf("link to update lease sttings not found for vApp %s", vapp.VApp.Name)
+	}
+
+	var leaseSettings = types.UpdateLeaseSettingsSection{
+		HREF:                     href,
+		XmlnsOvf:                 types.XMLNamespaceOVF,
+		Xmlns:                    types.XMLNamespaceVCloud,
+		OVFInfo:                  "Lease section settings",
+		Type:                     types.MimeLeaseSettingSection,
+		DeploymentLeaseInSeconds: takeIntAddress(deploymentLeaseInSeconds),
+		StorageLeaseInSeconds:    takeIntAddress(storageLeaseInSeconds),
+	}
+
+	task, err := vapp.client.ExecuteTaskRequest(ctx, href, http.MethodPut,
+		types.MimeLeaseSettingSection, "error updating vapp lease : %s", &leaseSettings)
+
+	if err != nil {
+		return fmt.Errorf("unable to update vApp lease: %s", err)
+	}
+
+	err = task.WaitTaskCompletion(ctx)
+	if err != nil {
+		return fmt.Errorf("task for updating vApp lease failed: %s", err)
+	}
+	return vapp.Refresh(ctx)
+}
+
+// GetLease retrieves the lease terms for a vApp
+func (vapp *VApp) GetLease(ctx context.Context) (*types.LeaseSettingsSection, error) {
+
+	href := ""
+	if vapp.VApp.LeaseSettingsSection != nil {
+		href = vapp.VApp.LeaseSettingsSection.HREF
+	}
+	if href == "" {
+		for _, link := range vapp.VApp.Link {
+			if link.Type == types.MimeLeaseSettingSection {
+				href = link.HREF
+				break
+			}
+		}
+	}
+	if href == "" {
+		return nil, fmt.Errorf("link to retrieve lease settings not found for vApp %s", vapp.VApp.Name)
+	}
+	var leaseSettings types.LeaseSettingsSection
+
+	_, err := vapp.client.ExecuteRequest(ctx, href, http.MethodGet, "", "error getting vApp lease info: %s", nil, &leaseSettings)
+
+	if err != nil {
+		return nil, err
+	}
+	return &leaseSettings, nil
 }

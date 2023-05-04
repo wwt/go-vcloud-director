@@ -1,4 +1,4 @@
-// +build vm functional ALL
+//go:build vm || functional || ALL
 
 /*
 * Copyright 2021 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -48,12 +48,8 @@ func (vcd *TestVCD) Test_FindVMByHREF(check *C) {
 
 // Test attach disk to VM and detach disk from VM
 func (vcd *TestVCD) Test_VMAttachOrDetachDisk(check *C) {
-	if vcd.config.VCD.Disk.Size <= 0 {
-		check.Skip("skipping test because disk size is 0")
-	}
-
 	// Find VM
-	if vcd.vapp.VApp == nil {
+	if vcd.vapp != nil && vcd.vapp.VApp == nil {
 		check.Skip("skipping test because no vApp is found")
 	}
 
@@ -79,7 +75,7 @@ func (vcd *TestVCD) Test_VMAttachOrDetachDisk(check *C) {
 	// Create disk
 	diskCreateParamsDisk := &types.Disk{
 		Name:        TestVMAttachOrDetachDisk,
-		Size:        vcd.config.VCD.Disk.Size,
+		SizeMb:      1,
 		Description: TestVMAttachOrDetachDisk,
 	}
 
@@ -104,7 +100,7 @@ func (vcd *TestVCD) Test_VMAttachOrDetachDisk(check *C) {
 	disk, err := vcd.vdc.GetDiskByHref(ctx, diskHREF)
 	check.Assert(err, IsNil)
 	check.Assert(disk.Disk.Name, Equals, diskCreateParamsDisk.Name)
-	check.Assert(disk.Disk.Size, Equals, diskCreateParamsDisk.Size)
+	check.Assert(disk.Disk.SizeMb, Equals, diskCreateParamsDisk.SizeMb)
 	check.Assert(disk.Disk.Description, Equals, diskCreateParamsDisk.Description)
 
 	// Attach disk
@@ -143,11 +139,6 @@ func (vcd *TestVCD) Test_VMAttachDisk(check *C) {
 	if vcd.skipVappTests {
 		check.Skip("Skipping test because vapp was not successfully created at setup")
 	}
-
-	if vcd.config.VCD.Disk.Size <= 0 {
-		check.Skip("skipping test because disk size is 0")
-	}
-
 	if vcd.skipVappTests {
 		check.Skip("skipping test because vApp wasn't properly created")
 	}
@@ -175,7 +166,7 @@ func (vcd *TestVCD) Test_VMAttachDisk(check *C) {
 	// Create disk
 	diskCreateParamsDisk := &types.Disk{
 		Name:        TestVMAttachDisk,
-		Size:        vcd.config.VCD.Disk.Size,
+		SizeMb:      1,
 		Description: TestVMAttachDisk,
 	}
 
@@ -200,7 +191,7 @@ func (vcd *TestVCD) Test_VMAttachDisk(check *C) {
 	disk, err := vcd.vdc.GetDiskByHref(ctx, diskHREF)
 	check.Assert(err, IsNil)
 	check.Assert(disk.Disk.Name, Equals, diskCreateParamsDisk.Name)
-	check.Assert(disk.Disk.Size, Equals, diskCreateParamsDisk.Size)
+	check.Assert(disk.Disk.SizeMb, Equals, diskCreateParamsDisk.SizeMb)
 	check.Assert(disk.Disk.Description, Equals, diskCreateParamsDisk.Description)
 
 	// Attach disk
@@ -235,11 +226,6 @@ func (vcd *TestVCD) Test_VMAttachDisk(check *C) {
 
 // Test detach disk from VM
 func (vcd *TestVCD) Test_VMDetachDisk(check *C) {
-
-	if vcd.config.VCD.Disk.Size <= 0 {
-		check.Skip("skipping test because disk size is 0")
-	}
-
 	if vcd.skipVappTests {
 		check.Skip("skipping test because vApp wasn't properly created")
 	}
@@ -267,7 +253,7 @@ func (vcd *TestVCD) Test_VMDetachDisk(check *C) {
 	// Create disk
 	diskCreateParamsDisk := &types.Disk{
 		Name:        TestVMDetachDisk,
-		Size:        vcd.config.VCD.Disk.Size,
+		SizeMb:      1,
 		Description: TestVMDetachDisk,
 	}
 
@@ -293,7 +279,7 @@ func (vcd *TestVCD) Test_VMDetachDisk(check *C) {
 	disk, err := vcd.vdc.GetDiskByHref(ctx, diskHREF)
 	check.Assert(err, IsNil)
 	check.Assert(disk.Disk.Name, Equals, diskCreateParamsDisk.Name)
-	check.Assert(disk.Disk.Size, Equals, diskCreateParamsDisk.Size)
+	check.Assert(disk.Disk.SizeMb, Equals, diskCreateParamsDisk.SizeMb)
 	check.Assert(disk.Disk.Description, Equals, diskCreateParamsDisk.Description)
 
 	// Attach disk
@@ -336,7 +322,7 @@ func (vcd *TestVCD) Test_HandleInsertOrEjectMedia(check *C) {
 	itemName := "TestHandleInsertOrEjectMedia"
 
 	// Find VApp
-	if vcd.vapp.VApp == nil {
+	if vcd.vapp != nil && vcd.vapp.VApp == nil {
 		check.Skip("skipping test because no vApp is found")
 	}
 
@@ -405,7 +391,7 @@ func (vcd *TestVCD) Test_InsertOrEjectMedia(check *C) {
 	itemName := "TestInsertOrEjectMedia"
 
 	// Find VApp
-	if vcd.vapp.VApp == nil {
+	if vcd.vapp != nil && vcd.vapp.VApp == nil {
 		check.Skip("skipping test because no vApp is found")
 	}
 
@@ -488,7 +474,7 @@ func (vcd *TestVCD) Test_AnswerVmQuestion(check *C) {
 	itemName := "TestAnswerVmQuestion"
 
 	// Find VApp
-	if vcd.vapp.VApp == nil {
+	if vcd.vapp != nil && vcd.vapp.VApp == nil {
 		check.Skip("skipping test because no vApp is found")
 	}
 
@@ -557,6 +543,12 @@ func (vcd *TestVCD) Test_AnswerVmQuestion(check *C) {
 	err = vm.Refresh(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(isMediaInjected(vm.VM.VirtualHardwareSection.Item), Equals, false)
+
+	// Remove catalog item so far other tests don't fail
+	task, err := media.Delete()
+	check.Assert(err, IsNil)
+	err = task.WaitTaskCompletion(ctx)
+	check.Assert(err, IsNil)
 }
 
 func (vcd *TestVCD) Test_VMChangeCPUCountWithCore(check *C) {
@@ -696,7 +688,8 @@ func (vcd *TestVCD) Test_VMPowerOnPowerOff(check *C) {
 	// Ensure VM is not powered on
 	vmStatus, err := vm.GetStatus(ctx)
 	check.Assert(err, IsNil)
-	if vmStatus != "POWERED_OFF" {
+	if vmStatus != "POWERED_OFF" && vmStatus != "PARTIALLY_POWERED_OFF" {
+		fmt.Printf("VM status: %s, powering off", vmStatus)
 		task, err := vm.PowerOff(ctx)
 		check.Assert(err, IsNil)
 		err = task.WaitTaskCompletion(ctx)
@@ -725,7 +718,71 @@ func (vcd *TestVCD) Test_VMPowerOnPowerOff(check *C) {
 	check.Assert(err, IsNil)
 	vmStatus, err = vm.GetStatus(ctx)
 	check.Assert(err, IsNil)
-	check.Assert(vmStatus, Equals, "POWERED_OFF")
+	check.Assert(vmStatus == "POWERED_OFF" || vmStatus == "PARTIALLY_POWERED_OFF", Equals, true)
+}
+
+func (vcd *TestVCD) Test_VmShutdown(check *C) {
+	if vcd.skipVappTests {
+		check.Skip("Skipping test because vapp was not successfully created at setup")
+	}
+	vapp := vcd.findFirstVapp()
+	existingVm, vmName := vcd.findFirstVm(vapp)
+	if vmName == "" {
+		check.Skip("skipping test because no VM is found")
+	}
+	vm, err := vcd.client.Client.GetVMByHref(existingVm.HREF)
+	check.Assert(err, IsNil)
+
+	vdc, err := vm.GetParentVdc()
+	check.Assert(err, IsNil)
+
+	// Ensure VM is not powered on
+	vmStatus, err := vm.GetStatus()
+	check.Assert(err, IsNil)
+	fmt.Println("VM status: ", vmStatus)
+
+	if vmStatus != "POWERED_ON" {
+		task, err := vm.PowerOn()
+		check.Assert(err, IsNil)
+		err = task.WaitTaskCompletion(ctx)
+		check.Assert(err, IsNil)
+		check.Assert(task.Task.Status, Equals, "success")
+	}
+
+	// Wait until Guest Tools gets to `REBOOT_PENDING` or `GC_COMPLETE` as there is no real way to
+	// check if VM has Guest Tools operating
+	for {
+		err = vm.Refresh(ctx)
+		check.Assert(err, IsNil)
+
+		vmQuery, err := vdc.QueryVM(vapp.VApp.Name, vm.VM.Name)
+		check.Assert(err, IsNil)
+
+		printVerbose("VM Tools Status: %s\n", vmQuery.VM.GcStatus)
+		if vmQuery.VM.GcStatus == "GC_COMPLETE" || vmQuery.VM.GcStatus == "REBOOT_PENDING" {
+			break
+		}
+
+		time.Sleep(3 * time.Second)
+	}
+	printVerbose("Shuting down VM:\n")
+
+	task, err := vm.Shutdown()
+	check.Assert(err, IsNil)
+	err = task.WaitTaskCompletion(ctx)
+	check.Assert(err, IsNil)
+	check.Assert(task.Task.Status, Equals, "success")
+
+	newStatus, err := vm.GetStatus()
+	check.Assert(err, IsNil)
+	printVerbose("New VM status: %s\n", newStatus)
+	check.Assert(newStatus, Equals, "POWERED_OFF")
+
+	// End of test - power on the VM to leave it running
+	task, err = vm.PowerOn()
+	check.Assert(err, IsNil)
+	err = task.WaitTaskCompletion(ctx)
+	check.Assert(err, IsNil)
 }
 
 func (vcd *TestVCD) Test_GetNetworkConnectionSection(check *C) {
@@ -950,7 +1007,8 @@ func (vcd *TestVCD) Test_AddInternalDisk(check *C) {
 	updateVdcFastProvisioning(ctx, vcd, check, previousProvisioningValue)
 
 	// delete Vapp early to avoid env capacity issue
-	deleteVapp(ctx, vcd, vmName)
+	err = deleteVapp(ctx, vcd, vmName)
+	check.Assert(err, IsNil)
 }
 
 // createInternalDisk Finds available VM and creates internal Disk in it.
@@ -1063,7 +1121,8 @@ func (vcd *TestVCD) Test_DeleteInternalDisk(check *C) {
 	updateVdcFastProvisioning(ctx, vcd, check, previousProvisioningValue)
 
 	// delete Vapp early to avoid env capacity issue
-	deleteVapp(ctx, vcd, vmName)
+	err = deleteVapp(ctx, vcd, vmName)
+	check.Assert(err, IsNil)
 }
 
 // Test update internal disk for VM which has independent disk
@@ -1077,6 +1136,11 @@ func (vcd *TestVCD) Test_UpdateInternalDisk(check *C) {
 	ctx := context.Background()
 	vmName := "Test_UpdateInternalDisk"
 	vm, storageProfile, diskSettings, diskId, previousProvisioningValue, err := vcd.createInternalDisk(ctx, check, vmName, 1)
+	check.Assert(err, IsNil)
+
+	// verify VM description still available - test for bugfix #418
+	description := "Test_UpdateInternalDisk_Description"
+	vm, err = vm.UpdateVmSpecSection(vm.VM.VmSpecSection, description)
 	check.Assert(err, IsNil)
 
 	//verify
@@ -1114,6 +1178,11 @@ func (vcd *TestVCD) Test_UpdateInternalDisk(check *C) {
 	check.Assert(disk.BusNumber, Equals, diskSettings.BusNumber)
 	check.Assert(disk.AdapterType, Equals, diskSettings.AdapterType)
 
+	// verify VM description still available - test for bugfix #418
+	err = vm.Refresh(ctx)
+	check.Assert(err, IsNil)
+	check.Assert(vm.VM.Description, Equals, description)
+
 	// attach independent disk
 	independentDisk, err := attachIndependentDisk(ctx, vcd, check)
 	check.Assert(err, IsNil)
@@ -1127,7 +1196,8 @@ func (vcd *TestVCD) Test_UpdateInternalDisk(check *C) {
 	updateVdcFastProvisioning(ctx, vcd, check, previousProvisioningValue)
 
 	// delete Vapp early to avoid env capacity issue
-	deleteVapp(ctx, vcd, vmName)
+	err = deleteVapp(ctx, vcd, vmName)
+	check.Assert(err, IsNil)
 }
 
 func attachIndependentDisk(ctx context.Context, vcd *TestVCD, check *C) (*Disk, error) {
@@ -1151,7 +1221,7 @@ func attachIndependentDisk(ctx context.Context, vcd *TestVCD, check *C) (*Disk, 
 	// Create disk
 	diskCreateParamsDisk := &types.Disk{
 		Name:        TestAttachedVMDisk,
-		Size:        vcd.config.VCD.Disk.Size,
+		SizeMb:      1,
 		Description: TestAttachedVMDisk,
 	}
 
@@ -1176,7 +1246,7 @@ func attachIndependentDisk(ctx context.Context, vcd *TestVCD, check *C) (*Disk, 
 	disk, err := vcd.vdc.GetDiskByHref(ctx, diskHREF)
 	check.Assert(err, IsNil)
 	check.Assert(disk.Disk.Name, Equals, diskCreateParamsDisk.Name)
-	check.Assert(disk.Disk.Size, Equals, diskCreateParamsDisk.Size)
+	check.Assert(disk.Disk.SizeMb, Equals, diskCreateParamsDisk.SizeMb)
 	check.Assert(disk.Disk.Description, Equals, diskCreateParamsDisk.Description)
 
 	// Attach disk
@@ -1235,12 +1305,12 @@ func (vcd *TestVCD) Test_AddNewEmptyVMMultiNIC(check *C) {
 	}
 
 	// Find VApp
-	if vcd.vapp.VApp == nil {
+	if vcd.vapp != nil && vcd.vapp.VApp == nil {
 		check.Skip("skipping test because no vApp is found")
 	}
 	ctx := context.Background()
 
-	vapp, err := createVappForTest(ctx, vcd, "Test_AddNewEmptyVMMultiNIC")
+	vapp, err := deployVappForTest(ctx, vcd, "Test_AddNewEmptyVMMultiNIC")
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
 
@@ -1399,7 +1469,8 @@ func (vcd *TestVCD) Test_UpdateVmSpecSection(check *C) {
 	check.Assert(updatedVm.VM.Description, Equals, "updateDescription")
 
 	// delete Vapp early to avoid env capacity issue
-	deleteVapp(ctx, vcd, vmName)
+	err = deleteVapp(ctx, vcd, vmName)
+	check.Assert(err, IsNil)
 }
 
 func (vcd *TestVCD) Test_QueryVmList(check *C) {
@@ -1473,16 +1544,12 @@ func (vcd *TestVCD) Test_UpdateVmCpuAndMemoryHotAdd(check *C) {
 	check.Assert(updatedVm.VM.VMCapabilities.CPUHotAddEnabled, Equals, true)
 
 	// delete Vapp early to avoid env capacity issue
-	deleteVapp(ctx, vcd, vmName)
+	err = deleteVapp(ctx, vcd, vmName)
+	check.Assert(err, IsNil)
 }
 
 func (vcd *TestVCD) Test_AddNewEmptyVMWithVmComputePolicyAndUpdate(check *C) {
-	ctx := context.Background()
-	if vcd.client.Client.APIVCDMaxVersionIs(ctx, "< 33.0") {
-		check.Skip(fmt.Sprintf("Test %s requires VCD 10.0 (API version 33) or higher", check.TestName()))
-	}
-
-	vapp, err := createVappForTest(ctx, vcd, "Test_AddNewEmptyVMWithVmComputePolicy")
+	vapp, err := deployVappForTest(ctx, vcd, "Test_AddNewEmptyVMWithVmComputePolicy")
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
 
@@ -1494,7 +1561,7 @@ func (vcd *TestVCD) Test_AddNewEmptyVMWithVmComputePolicyAndUpdate(check *C) {
 		client: vcd.org.client,
 		VdcComputePolicy: &types.VdcComputePolicy{
 			Name:        check.TestName() + "_empty",
-			Description: "Empty policy created by test",
+			Description: takeStringPointer("Empty policy created by test"),
 		},
 	}
 
@@ -1502,7 +1569,7 @@ func (vcd *TestVCD) Test_AddNewEmptyVMWithVmComputePolicyAndUpdate(check *C) {
 		client: vcd.org.client,
 		VdcComputePolicy: &types.VdcComputePolicy{
 			Name:        check.TestName() + "_memory",
-			Description: "Empty policy created by test 2",
+			Description: takeStringPointer("Empty policy created by test 2"),
 			Memory:      takeIntAddress(2048),
 		},
 	}
@@ -1517,10 +1584,10 @@ func (vcd *TestVCD) Test_AddNewEmptyVMWithVmComputePolicyAndUpdate(check *C) {
 		vcd.infoCleanup(notFoundMsg, "vdc", vcd.vdc.Vdc.Name)
 	}
 
-	createdPolicy, err := adminOrg.CreateVdcComputePolicy(ctx, newComputePolicy.VdcComputePolicy)
+	createdPolicy, err := adminOrg.client.CreateVdcComputePolicy(ctx, newComputePolicy.VdcComputePolicy)
 	check.Assert(err, IsNil)
 
-	createdPolicy2, err := adminOrg.CreateVdcComputePolicy(ctx, newComputePolicy2.VdcComputePolicy)
+	createdPolicy2, err := adminOrg.client.CreateVdcComputePolicy(ctx, newComputePolicy2.VdcComputePolicy)
 	check.Assert(err, IsNil)
 
 	AddToCleanupList(createdPolicy.VdcComputePolicy.ID, "vdcComputePolicy", vcd.org.Org.Name, "Test_AddNewEmptyVMWithVmComputePolicyAndUpdate")
@@ -1637,7 +1704,7 @@ func (vcd *TestVCD) Test_VMUpdateStorageProfile(check *C) {
 	}
 	ctx := context.Background()
 
-	vapp, err := createVappForTest(ctx, vcd, "Test_VMUpdateStorageProfile")
+	vapp, err := deployVappForTest(ctx, vcd, "Test_VMUpdateStorageProfile")
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
 
@@ -1675,6 +1742,162 @@ func (vcd *TestVCD) Test_VMUpdateStorageProfile(check *C) {
 	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
+}
+
+func (vcd *TestVCD) Test_VMUpdateComputePolicies(check *C) {
+
+	providerVdc, err := vcd.client.GetProviderVdcByName(vcd.config.VCD.NsxtProviderVdc.Name)
+	check.Assert(err, IsNil)
+	check.Assert(providerVdc, NotNil)
+
+	vmGroup, err := vcd.client.GetVmGroupByNameAndProviderVdcUrn(vcd.config.VCD.NsxtProviderVdc.PlacementPolicyVmGroup, providerVdc.ProviderVdc.ID)
+	check.Assert(err, IsNil)
+	check.Assert(vmGroup, NotNil)
+
+	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	check.Assert(err, IsNil)
+	check.Assert(adminOrg, NotNil)
+
+	adminVdc, err := adminOrg.GetAdminVDCByName(vcd.nsxtVdc.Vdc.Name, false)
+	if adminVdc == nil || err != nil {
+		vcd.infoCleanup(notFoundMsg, "vdc", vcd.nsxtVdc.Vdc.Name)
+	}
+
+	// Create some Compute Policies
+	var placementPolicies []*VdcComputePolicyV2
+	var sizingPolicies []*VdcComputePolicyV2
+	numberOfPolicies := 2
+	for i := 0; i < numberOfPolicies; i++ {
+		sizingPolicyName := fmt.Sprintf("%s_Sizing%d", check.TestName(), i+1)
+		placementPolicyName := fmt.Sprintf("%s_Placement%d", check.TestName(), i+1)
+
+		sizingPolicies = append(sizingPolicies, &VdcComputePolicyV2{
+			VdcComputePolicyV2: &types.VdcComputePolicyV2{
+				VdcComputePolicy: types.VdcComputePolicy{
+					Name:         sizingPolicyName,
+					Description:  takeStringPointer("Empty sizing policy created by test"),
+					IsSizingOnly: true,
+				},
+				PolicyType: "VdcVmPolicy",
+			},
+		})
+
+		placementPolicies = append(placementPolicies, &VdcComputePolicyV2{
+			VdcComputePolicyV2: &types.VdcComputePolicyV2{
+				VdcComputePolicy: types.VdcComputePolicy{
+					Name:         placementPolicyName,
+					Description:  takeStringPointer("Empty placement policy created by test"),
+					IsSizingOnly: false,
+				},
+				PolicyType: "VdcVmPolicy",
+				PvdcNamedVmGroupsMap: []types.PvdcNamedVmGroupsMap{
+					{
+						NamedVmGroups: []types.OpenApiReferences{{
+							{
+								Name: vmGroup.VmGroup.Name,
+								ID:   fmt.Sprintf("urn:vcloud:namedVmGroup:%s", vmGroup.VmGroup.NamedVmGroupId),
+							},
+						}},
+						Pvdc: types.OpenApiReference{
+							Name: providerVdc.ProviderVdc.Name,
+							ID:   providerVdc.ProviderVdc.ID,
+						},
+					},
+				},
+			},
+		})
+
+		sizingPolicies[i], err = vcd.client.CreateVdcComputePolicyV2(sizingPolicies[i].VdcComputePolicyV2)
+		check.Assert(err, IsNil)
+		AddToCleanupList(sizingPolicies[i].VdcComputePolicyV2.ID, "vdcComputePolicy", vcd.org.Org.Name, sizingPolicyName)
+
+		placementPolicies[i], err = vcd.client.CreateVdcComputePolicyV2(placementPolicies[i].VdcComputePolicyV2)
+		check.Assert(err, IsNil)
+		AddToCleanupList(placementPolicies[i].VdcComputePolicyV2.ID, "vdcComputePolicy", vcd.org.Org.Name, placementPolicyName)
+	}
+
+	vdcComputePolicyHref, err := adminOrg.client.OpenApiBuildEndpoint(types.OpenApiPathVersion2_0_0, types.OpenApiEndpointVdcComputePolicies)
+	check.Assert(err, IsNil)
+
+	// Add the created compute policies to the ones that the VDC has already assigned
+	alreadyAssignedPolicies, err := adminVdc.GetAllAssignedVdcComputePoliciesV2(nil)
+	check.Assert(err, IsNil)
+	var allComputePoliciesToAssign []*types.Reference
+	for _, alreadyAssignedPolicy := range alreadyAssignedPolicies {
+		allComputePoliciesToAssign = append(allComputePoliciesToAssign, &types.Reference{HREF: vdcComputePolicyHref.String() + alreadyAssignedPolicy.VdcComputePolicyV2.ID})
+	}
+	for i := 0; i < numberOfPolicies; i++ {
+		allComputePoliciesToAssign = append(allComputePoliciesToAssign, &types.Reference{HREF: vdcComputePolicyHref.String() + sizingPolicies[i].VdcComputePolicyV2.ID})
+		allComputePoliciesToAssign = append(allComputePoliciesToAssign, &types.Reference{HREF: vdcComputePolicyHref.String() + placementPolicies[i].VdcComputePolicyV2.ID})
+	}
+
+	assignedVdcComputePolicies, err := adminVdc.SetAssignedComputePolicies(types.VdcComputePolicyReferences{VdcComputePolicyReference: allComputePoliciesToAssign})
+	check.Assert(err, IsNil)
+	check.Assert(len(alreadyAssignedPolicies)+numberOfPolicies*2, Equals, len(assignedVdcComputePolicies.VdcComputePolicyReference))
+
+	vapp, vm := createNsxtVAppAndVm(vcd, check)
+	check.Assert(vapp, NotNil)
+	check.Assert(vm, NotNil)
+
+	// Update all Compute Policies: Sizing and Placement
+	check.Assert(err, IsNil)
+	vm, err = vm.UpdateComputePolicyV2(sizingPolicies[0].VdcComputePolicyV2.ID, placementPolicies[0].VdcComputePolicyV2.ID, "")
+	check.Assert(err, IsNil)
+	check.Assert(vm.VM.ComputePolicy.VmSizingPolicy.ID, Equals, sizingPolicies[0].VdcComputePolicyV2.ID)
+	check.Assert(vm.VM.ComputePolicy.VmPlacementPolicy.ID, Equals, placementPolicies[0].VdcComputePolicyV2.ID)
+
+	// Update Sizing policy only
+	vm, err = vm.UpdateComputePolicyV2(sizingPolicies[0].VdcComputePolicyV2.ID, placementPolicies[1].VdcComputePolicyV2.ID, "")
+	check.Assert(err, IsNil)
+	check.Assert(vm.VM.ComputePolicy.VmSizingPolicy.ID, Equals, sizingPolicies[0].VdcComputePolicyV2.ID)
+	check.Assert(vm.VM.ComputePolicy.VmPlacementPolicy.ID, Equals, placementPolicies[1].VdcComputePolicyV2.ID)
+
+	// Update Placement policy only
+	vm, err = vm.UpdateComputePolicyV2(sizingPolicies[1].VdcComputePolicyV2.ID, placementPolicies[1].VdcComputePolicyV2.ID, "")
+	check.Assert(err, IsNil)
+	check.Assert(vm.VM.ComputePolicy.VmSizingPolicy.ID, Equals, sizingPolicies[1].VdcComputePolicyV2.ID)
+	check.Assert(vm.VM.ComputePolicy.VmPlacementPolicy.ID, Equals, placementPolicies[1].VdcComputePolicyV2.ID)
+
+	// Remove Placement Policy
+	vm, err = vm.UpdateComputePolicyV2(sizingPolicies[1].VdcComputePolicyV2.ID, "", "")
+	check.Assert(err, IsNil)
+	check.Assert(vm.VM.ComputePolicy.VmSizingPolicy.ID, Equals, sizingPolicies[1].VdcComputePolicyV2.ID)
+	check.Assert(vm.VM.ComputePolicy.VmPlacementPolicy, IsNil)
+
+	// Remove Sizing Policy
+	vm, err = vm.UpdateComputePolicyV2("", placementPolicies[1].VdcComputePolicyV2.ID, "")
+	check.Assert(err, IsNil)
+	check.Assert(vm.VM.ComputePolicy.VmSizingPolicy, IsNil)
+	check.Assert(vm.VM.ComputePolicy.VmPlacementPolicy.ID, Equals, placementPolicies[1].VdcComputePolicyV2.ID)
+
+	// Try to remove both, it should fail
+	_, err = vm.UpdateComputePolicyV2("", "", "")
+	check.Assert(err, NotNil)
+	check.Assert(true, Equals, strings.Contains(err.Error(), "either sizing policy ID or placement policy ID is needed"))
+
+	// Clean VM
+	task, err := vapp.Undeploy()
+	check.Assert(err, IsNil)
+	check.Assert(task, Not(Equals), Task{})
+
+	err = task.WaitTaskCompletion(ctx)
+	check.Assert(err, IsNil)
+
+	task, err = vapp.Delete()
+	check.Assert(err, IsNil)
+	check.Assert(task, Not(Equals), Task{})
+
+	err = task.WaitTaskCompletion(ctx)
+	check.Assert(err, IsNil)
+
+	// Cleanup assigned compute policies
+	var beforeTestPolicyReferences []*types.Reference
+	for _, assignedPolicy := range alreadyAssignedPolicies {
+		beforeTestPolicyReferences = append(beforeTestPolicyReferences, &types.Reference{HREF: vdcComputePolicyHref.String() + assignedPolicy.VdcComputePolicyV2.ID})
+	}
+
+	_, err = adminVdc.SetAssignedComputePolicies(types.VdcComputePolicyReferences{VdcComputePolicyReference: beforeTestPolicyReferences})
+	check.Assert(err, IsNil)
 }
 
 func (vcd *TestVCD) getNetworkConnection() *types.NetworkConnectionSection {
@@ -1811,9 +2034,11 @@ func (vcd *TestVCD) Test_CreateStandaloneVMFromTemplate(check *C) {
 	check.Assert(vmTemplate.Type, Not(Equals), "")
 	check.Assert(vmTemplate.Name, Not(Equals), "")
 
+	vmName := "testStandaloneTemplate"
+	vmDescription := "Standalone VM"
 	params := types.InstantiateVmTemplateParams{
 		Xmlns:            types.XMLNamespaceVCloud,
-		Name:             "testStandaloneTemplate",
+		Name:             vmName,
 		PowerOn:          true,
 		AllEULAsAccepted: true,
 		SourcedVmTemplateItem: &types.SourcedVmTemplateParams{
@@ -1824,9 +2049,14 @@ func (vcd *TestVCD) Test_CreateStandaloneVMFromTemplate(check *C) {
 				Type: vmTemplate.Type,
 				Name: vmTemplate.Name,
 			},
-			StorageProfile:                nil,
-			VmCapabilities:                nil,
-			VmGeneralParams:               nil,
+			StorageProfile: nil,
+			VmCapabilities: nil,
+			VmGeneralParams: &types.VMGeneralParams{
+				Name:               vmName,
+				Description:        vmDescription,
+				NeedsCustomization: false,
+				RegenerateBiosUuid: false,
+			},
 			VmTemplateInstantiationParams: nil,
 		},
 	}
@@ -1837,6 +2067,8 @@ func (vcd *TestVCD) Test_CreateStandaloneVMFromTemplate(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(vm, NotNil)
 	AddToCleanupList(vm.VM.ID, "standaloneVm", "", check.TestName())
+	check.Assert(vm.VM.Name, Equals, vmName)
+	check.Assert(vm.VM.Description, Equals, vmDescription)
 
 	_ = vdc.Refresh(ctx)
 	vappList = vdc.GetVappList()
@@ -1850,4 +2082,290 @@ func (vcd *TestVCD) Test_CreateStandaloneVMFromTemplate(check *C) {
 	_ = vdc.Refresh(ctx)
 	vappList = vdc.GetVappList()
 	check.Assert(len(vappList), Equals, vappNum)
+}
+
+func (vcd *TestVCD) Test_VMChangeCPU(check *C) {
+	if vcd.skipVappTests {
+		check.Skip("Skipping test because vapp was not successfully created at setup")
+	}
+
+	vapp := vcd.findFirstVapp()
+	existingVm, vmName := vcd.findFirstVm(vapp)
+	if vmName == "" {
+		check.Skip("skipping test because no VM is found")
+	}
+
+	currentCpus := existingVm.VmSpecSection.NumCpus
+	currentCores := existingVm.VmSpecSection.NumCoresPerSocket
+
+	check.Assert(0, Not(Equals), currentCpus)
+	check.Assert(0, Not(Equals), currentCores)
+
+	vm, err := vcd.client.Client.GetVMByHref(existingVm.HREF)
+	check.Assert(err, IsNil)
+
+	cores := 2
+	cpuCount := 4
+
+	err = vm.ChangeCPU(cpuCount, cores)
+	check.Assert(err, IsNil)
+
+	check.Assert(*vm.VM.VmSpecSection.NumCpus, Equals, cpuCount)
+	check.Assert(*vm.VM.VmSpecSection.NumCoresPerSocket, Equals, cores)
+
+	// return to previous value
+	err = vm.ChangeCPU(*currentCpus, *currentCores)
+	check.Assert(err, IsNil)
+}
+
+func (vcd *TestVCD) Test_VMChangeCPUAndCoreCount(check *C) {
+	if vcd.skipVappTests {
+		check.Skip("Skipping test because vApp was not successfully created at setup")
+	}
+
+	vapp := vcd.findFirstVapp()
+	existingVm, vmName := vcd.findFirstVm(vapp)
+	if vmName == "" {
+		check.Skip("skipping test because no VM is found")
+	}
+
+	currentCpus := existingVm.VmSpecSection.NumCpus
+	currentCores := existingVm.VmSpecSection.NumCoresPerSocket
+
+	check.Assert(0, Not(Equals), currentCpus)
+	check.Assert(0, Not(Equals), currentCores)
+
+	vm, err := vcd.client.Client.GetVMByHref(existingVm.HREF)
+	check.Assert(err, IsNil)
+
+	cores := 2
+	cpuCount := 4
+
+	err = vm.ChangeCPUAndCoreCount(&cpuCount, &cores)
+	check.Assert(err, IsNil)
+
+	check.Assert(*vm.VM.VmSpecSection.NumCpus, Equals, cpuCount)
+	check.Assert(*vm.VM.VmSpecSection.NumCoresPerSocket, Equals, cores)
+
+	// Try changing only CPU count and seeing if coreCount remains the same
+	newCpuCount := 2
+	err = vm.ChangeCPUAndCoreCount(&newCpuCount, nil)
+	check.Assert(err, IsNil)
+
+	check.Assert(*vm.VM.VmSpecSection.NumCpus, Equals, newCpuCount)
+	check.Assert(*vm.VM.VmSpecSection.NumCoresPerSocket, Equals, cores)
+
+	// Change only core count and check that CPU count remains as it was
+	newCoreCount := 1
+	err = vm.ChangeCPUAndCoreCount(nil, &newCoreCount)
+	check.Assert(err, IsNil)
+
+	check.Assert(*vm.VM.VmSpecSection.NumCpus, Equals, newCpuCount)
+	check.Assert(*vm.VM.VmSpecSection.NumCoresPerSocket, Equals, newCoreCount)
+
+	// return to previous value
+	err = vm.ChangeCPUAndCoreCount(currentCpus, currentCores)
+	check.Assert(err, IsNil)
+}
+
+func (vcd *TestVCD) Test_VMChangeMemory(check *C) {
+	if vcd.skipVappTests {
+		check.Skip("Skipping test because vapp was not successfully created at setup")
+	}
+
+	vapp := vcd.findFirstVapp()
+	existingVm, vmName := vcd.findFirstVm(vapp)
+	if vmName == "" {
+		check.Skip("skipping test because no VM is found")
+	}
+	check.Assert(existingVm.VmSpecSection.MemoryResourceMb, Not(IsNil))
+
+	currentMemory := existingVm.VmSpecSection.MemoryResourceMb.Configured
+	check.Assert(0, Not(Equals), currentMemory)
+
+	vm, err := vcd.client.Client.GetVMByHref(existingVm.HREF)
+	check.Assert(err, IsNil)
+
+	err = vm.ChangeMemory(2304)
+	check.Assert(err, IsNil)
+
+	check.Assert(existingVm.VmSpecSection.MemoryResourceMb, Not(IsNil))
+	check.Assert(vm.VM.VmSpecSection.MemoryResourceMb.Configured, Equals, int64(2304))
+
+	// return to previous value
+	err = vm.ChangeMemory(currentMemory)
+	check.Assert(err, IsNil)
+}
+
+func (vcd *TestVCD) Test_AddRawVm(check *C) {
+	vapp, vm := createNsxtVAppAndVm(vcd, check)
+	check.Assert(vapp, NotNil)
+	check.Assert(vm, NotNil)
+
+	// Check that vApp did not lose its state
+	vappStatus, err := vapp.GetStatus()
+	check.Assert(err, IsNil)
+	check.Assert(vappStatus, Equals, "MIXED") //vApp is powered on, but the VM within is powered off
+	check.Assert(vapp.VApp.Name, Equals, check.TestName())
+	check.Assert(vapp.VApp.Description, Equals, check.TestName())
+
+	// Check that VM is not powered on
+	vmStatus, err := vm.GetStatus()
+	check.Assert(err, IsNil)
+	check.Assert(vmStatus, Equals, "POWERED_OFF")
+
+	// Cleanup
+	task, err := vapp.Undeploy()
+	check.Assert(err, IsNil)
+	check.Assert(task, Not(Equals), Task{})
+
+	err = task.WaitTaskCompletion(ctx)
+	check.Assert(err, IsNil)
+
+	task, err = vapp.Delete()
+	check.Assert(err, IsNil)
+	check.Assert(task, Not(Equals), Task{})
+
+	err = task.WaitTaskCompletion(ctx)
+	check.Assert(err, IsNil)
+}
+
+func createNsxtVAppAndVm(vcd *TestVCD, check *C) (*VApp, *VM) {
+	cat, err := vcd.org.GetCatalogByName(vcd.config.VCD.Catalog.NsxtBackedCatalogName, false)
+	check.Assert(err, IsNil)
+	check.Assert(cat, NotNil)
+	// Populate Catalog Item
+	catitem, err := cat.GetCatalogItemByName(vcd.config.VCD.Catalog.NsxtCatalogItem, false)
+	check.Assert(err, IsNil)
+	check.Assert(catitem, NotNil)
+	// Get VAppTemplate
+	vapptemplate, err := catitem.GetVAppTemplate()
+	check.Assert(err, IsNil)
+	check.Assert(vapptemplate.VAppTemplate.Children.VM[0].HREF, NotNil)
+
+	vapp, err := vcd.nsxtVdc.CreateRawVApp(check.TestName(), check.TestName())
+	check.Assert(err, IsNil)
+	check.Assert(vapp, NotNil)
+	// After a successful creation, the entity is added to the cleanup list.
+	AddToCleanupList(vapp.VApp.Name, "vapp", vcd.nsxtVdc.Vdc.Name, check.TestName())
+
+	// Check that vApp is powered-off
+	vappStatus, err := vapp.GetStatus()
+	check.Assert(err, IsNil)
+	check.Assert(vappStatus, Equals, "RESOLVED")
+
+	task, err := vapp.PowerOn()
+	check.Assert(err, IsNil)
+	check.Assert(task, NotNil)
+	err = task.WaitTaskCompletion(ctx)
+	check.Assert(err, IsNil)
+
+	vappStatus, err = vapp.GetStatus()
+	check.Assert(err, IsNil)
+	check.Assert(vappStatus, Equals, "POWERED_ON")
+
+	// Once the operation is successful, we won't trigger a failure
+	// until after the vApp deletion
+	check.Check(vapp.VApp.Name, Equals, check.TestName())
+	check.Check(vapp.VApp.Description, Equals, check.TestName())
+
+	// Construct VM
+	vmDef := &types.ReComposeVAppParams{
+		Ovf:              types.XMLNamespaceOVF,
+		Xsi:              types.XMLNamespaceXSI,
+		Xmlns:            types.XMLNamespaceVCloud,
+		AllEULAsAccepted: true,
+		// Deploy:           false,
+		Name: vapp.VApp.Name,
+		// PowerOn: false, // Not touching power state at this phase
+		SourcedItem: &types.SourcedCompositionItemParam{
+			Source: &types.Reference{
+				HREF: vapptemplate.VAppTemplate.Children.VM[0].HREF,
+				Name: check.TestName() + "-vm-tmpl",
+			},
+			VMGeneralParams: &types.VMGeneralParams{
+				Description: "test-vm-description",
+			},
+			InstantiationParams: &types.InstantiationParams{
+				NetworkConnectionSection: &types.NetworkConnectionSection{},
+			},
+		},
+	}
+	vm, err := vapp.AddRawVM(vmDef)
+	check.Assert(err, IsNil)
+	check.Assert(vm, NotNil)
+	check.Assert(vm.VM.Name, Equals, vmDef.SourcedItem.Source.Name)
+
+	// Refresh vApp to have latest state
+	err = vapp.Refresh()
+	check.Assert(err, IsNil)
+
+	return vapp, vm
+}
+
+func (vcd *TestVCD) Test_GetOvfEnvironment(check *C) {
+	if vcd.skipVappTests {
+		check.Skip("Skipping test because vapp was not successfully created at setup")
+	}
+	vapp := vcd.findFirstVapp()
+	existingVm, vmName := vcd.findFirstVm(vapp)
+	if vmName == "" {
+		check.Skip("skipping test because no VM is found")
+	}
+	vm, err := vcd.client.Client.GetVMByHref(existingVm.HREF)
+	check.Assert(err, IsNil)
+
+	vmStatus, err := vm.GetStatus()
+	check.Assert(err, IsNil)
+	if vmStatus != "POWERED_ON" {
+		task, err := vm.PowerOn()
+		check.Assert(err, IsNil)
+		err = task.WaitTaskCompletion(ctx)
+		check.Assert(err, IsNil)
+		check.Assert(task.Task.Status, Equals, "success")
+	}
+
+	// Read ovfenv when VM is started
+	ovfenv, err := vm.GetEnvironment()
+	check.Assert(err, IsNil)
+	check.Assert(ovfenv, NotNil)
+
+	// Provides information from the virtualization platform like VM moref
+	check.Assert(strings.Contains(ovfenv.VCenterId, "vm-"), Equals, true)
+
+	// Check virtualization platform Vendor
+	check.Assert(ovfenv.PlatformSection, NotNil)
+	check.Assert(ovfenv.PlatformSection.Vendor, Equals, "VMware, Inc.")
+
+	// Check guest operating system level configuration for hostname
+	check.Assert(ovfenv.PropertySection, NotNil)
+	for _, p := range ovfenv.PropertySection.Properties {
+		if p.Key == "vCloud_computerName" {
+			check.Assert(p.Value, Not(Equals), "")
+		}
+	}
+	check.Assert(ovfenv.EthernetAdapterSection, NotNil)
+	for _, p := range ovfenv.EthernetAdapterSection.Adapters {
+		check.Assert(p.Mac, Not(Equals), "")
+	}
+
+	// PowerOff
+	task, err := vm.PowerOff()
+	check.Assert(err, IsNil)
+	err = task.WaitTaskCompletion(ctx)
+	check.Assert(err, IsNil)
+	check.Assert(task.Task.Status, Equals, "success")
+
+	ovfenv, err = vm.GetEnvironment()
+	check.Assert(strings.Contains(err.Error(), "OVF environment is only available when VM is powered on"), Equals, true)
+	check.Assert(ovfenv, IsNil)
+
+	// Leave things as they were
+	if vmStatus != "POWERED_OFF" {
+		task, err := vm.PowerOn()
+		check.Assert(err, IsNil)
+		err = task.WaitTaskCompletion(ctx)
+		check.Assert(err, IsNil)
+		check.Assert(task.Task.Status, Equals, "success")
+	}
 }

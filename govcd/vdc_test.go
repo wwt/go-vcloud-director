@@ -1,7 +1,7 @@
-// +build vdc functional ALL
+//go:build vdc || functional || ALL
 
 /*
- * Copyright 2019 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
+ * Copyright 2021 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
  */
 
 package govcd
@@ -9,6 +9,8 @@ package govcd
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"strings"
 
 	. "gopkg.in/check.v1"
 
@@ -267,6 +269,9 @@ func (vcd *TestVCD) Test_QueryVM(check *C) {
 	check.Assert(err, IsNil)
 
 	check.Assert(vm.VM.Name, Equals, vmName)
+
+	check.Assert(vm.VM.Moref, Not(Equals), "")
+	check.Assert(strings.HasPrefix(vm.VM.Moref, "vm-"), Equals, true)
 }
 
 func init() {
@@ -434,7 +439,8 @@ func (vcd *TestVCD) TestGetVappList(check *C) {
 
 	// Use the search engine to find the known vApp
 	criteria := NewFilterDef()
-	criteria.AddFilter(types.FilterNameRegex, TestSetUpSuite)
+	err = criteria.AddFilter(types.FilterNameRegex, TestSetUpSuite)
+	check.Assert(err, IsNil)
 	queryType := vcd.client.Client.GetQueryType(types.QtVapp)
 	queryItems, _, err := vcd.client.Client.SearchByFilter(ctx, queryType, criteria)
 	check.Assert(err, IsNil)
@@ -447,8 +453,10 @@ func (vcd *TestVCD) TestGetVappList(check *C) {
 	check.Assert(vmName, Not(Equals), "")
 	check.Assert(vm.HREF, Not(Equals), "")
 	criteria = NewFilterDef()
-	criteria.AddFilter(types.FilterNameRegex, vmName)
-	criteria.AddFilter(types.FilterParent, vapp.VApp.Name)
+	err = criteria.AddFilter(types.FilterNameRegex, vmName)
+	check.Assert(err, IsNil)
+	err = criteria.AddFilter(types.FilterParent, vapp.VApp.Name)
+	check.Assert(err, IsNil)
 	queryType = vcd.client.Client.GetQueryType(types.QtVm)
 	queryItems, _, err = vcd.client.Client.SearchByFilter(ctx, queryType, criteria)
 	check.Assert(err, IsNil)
@@ -467,9 +475,215 @@ func (vcd *TestVCD) TestGetVdcCapabilities(check *C) {
 
 func (vcd *TestVCD) TestVdcIsNsxt(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	check.Assert(vcd.nsxtVdc.IsNsxt(context.Background()), Equals, true)
+	check.Assert(vcd.nsxtVdc.IsNsxt(), Equals, true)
+	if vcd.vdc != nil {
+		check.Assert(vcd.vdc.IsNsxt(), Equals, false)
+	}
 }
 
 func (vcd *TestVCD) TestVdcIsNsxv(check *C) {
-	check.Assert(vcd.vdc.IsNsxv(context.Background()), Equals, true)
+	check.Assert(vcd.vdc.IsNsxv(), Equals, true)
+	// retrieve the same VDC as AdminVdc, to test the corresponding function
+	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	check.Assert(err, IsNil)
+	adminVdc, err := adminOrg.GetVDCByName(vcd.vdc.Vdc.Name, false)
+	check.Assert(err, IsNil)
+	check.Assert(adminVdc.IsNsxv(), Equals, true)
+	// if NSX-T is configured, we also check a NSX-T VDC
+	if vcd.nsxtVdc != nil {
+		check.Assert(vcd.nsxtVdc.IsNsxv(), Equals, false)
+		nsxtAdminVdc, err := adminOrg.GetAdminVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+		check.Assert(err, IsNil)
+		check.Assert(nsxtAdminVdc.IsNsxv(), Equals, false)
+	}
+}
+
+func (vcd *TestVCD) TestCreateRawVapp(check *C) {
+	org, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	check.Assert(err, IsNil)
+	check.Assert(org, NotNil)
+
+	vdc, err := org.GetVDCByName(vcd.config.VCD.Vdc, false)
+	check.Assert(err, IsNil)
+	check.Assert(vdc, NotNil)
+
+	name := check.TestName()
+	description := "test compose raw app"
+	vapp, err := vdc.CreateRawVApp(name, description)
+	check.Assert(err, IsNil)
+	AddToCleanupList(name, "vapp", vdc.Vdc.Name, name)
+
+	check.Assert(vapp.VApp.Name, Equals, name)
+	check.Assert(vapp.VApp.Description, Equals, description)
+	task, err := vapp.Delete()
+	check.Assert(err, IsNil)
+	err = task.WaitTaskCompletion(ctx)
+	check.Assert(err, IsNil)
+}
+
+func (vcd *TestVCD) TestSetControlAccess(check *C) {
+	// Set VDC sharing to everyone
+	org, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	check.Assert(err, IsNil)
+	check.Assert(org, NotNil)
+
+	vdc, err := org.GetVDCByName(vcd.config.VCD.Vdc, false)
+	check.Assert(err, IsNil)
+	check.Assert(vdc, NotNil)
+
+	readControlAccessParams, err := vdc.SetControlAccess(true, "ReadOnly", nil, true)
+	check.Assert(err, IsNil)
+	check.Assert(readControlAccessParams, NotNil)
+	check.Assert(readControlAccessParams.IsSharedToEveryone, Equals, true)
+	check.Assert(*readControlAccessParams.EveryoneAccessLevel, Equals, "ReadOnly")
+	check.Assert(readControlAccessParams.AccessSettings, IsNil) // If not shared with users/groups, this will be nil
+
+	// Set VDC sharing to one user
+	orgUserRef := org.AdminOrg.Users.User[0]
+	user, err := org.GetUserByName(orgUserRef.Name, false)
+	check.Assert(err, IsNil)
+	check.Assert(user, NotNil)
+
+	accessSettings := []*types.AccessSetting{
+		{
+			AccessLevel: "ReadOnly",
+			Subject: &types.LocalSubject{
+				HREF: user.User.Href,
+				Name: user.User.Name,
+				Type: user.User.Type,
+			},
+		},
+	}
+
+	readControlAccessParams, err = vdc.SetControlAccess(false, "", accessSettings, true)
+	check.Assert(err, IsNil)
+	check.Assert(readControlAccessParams, NotNil)
+	check.Assert(len(readControlAccessParams.AccessSettings.AccessSetting) > 0, Equals, true)
+	check.Assert(assertVDCAccessSettings(accessSettings, readControlAccessParams.AccessSettings.AccessSetting), IsNil)
+
+	// Check that fail if both isSharedToEveryone and accessSettings is passed
+	readControlAccessParams, err = vdc.SetControlAccess(true, "ReadOnly", accessSettings, true)
+	check.Assert(err, NotNil)
+	check.Assert(readControlAccessParams, IsNil)
+
+	// Check DeleteControlAccess
+	readControlAccessParams, err = vdc.DeleteControlAccess(true)
+	check.Assert(err, IsNil)
+	check.Assert(readControlAccessParams.IsSharedToEveryone, Equals, false)
+	check.Assert(readControlAccessParams.AccessSettings, IsNil)
+}
+
+func assertVDCAccessSettings(wanted, received []*types.AccessSetting) error {
+	if len(wanted) != len(received) {
+		return fmt.Errorf("wanted and received access settings are not the same length")
+	}
+	for _, receivedAccessSetting := range received {
+		for i, wantedAccessSetting := range wanted {
+			if reflect.DeepEqual(*wantedAccessSetting.Subject, *receivedAccessSetting.Subject) && (wantedAccessSetting.AccessLevel == receivedAccessSetting.AccessLevel) {
+				break
+			}
+			if i == len(wanted)-1 {
+				return fmt.Errorf("access settings for user %s were not found or are not correct", wantedAccessSetting.Subject.Name)
+			}
+		}
+	}
+	return nil
+}
+
+// TestVAppTemplateRetrieval tests that VDC receiver objects can search vApp Templates successfully.
+func (vcd *TestVCD) TestVAppTemplateRetrieval(check *C) {
+	fmt.Printf("Running: %s\n", check.TestName())
+
+	if vcd.config.VCD.Catalog.NsxtCatalogItem == "" {
+		check.Skip(fmt.Sprintf("%s: Catalog Item not given. Test can't proceed", check.TestName()))
+	}
+
+	org, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	check.Assert(err, IsNil)
+	check.Assert(org, NotNil)
+
+	vdc, err := org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	check.Assert(err, IsNil)
+	check.Assert(vdc, NotNil)
+
+	// Test cases
+	vAppTemplate, err := vdc.GetVAppTemplateByName(vcd.config.VCD.Catalog.NsxtCatalogItem)
+	check.Assert(err, IsNil)
+	check.Assert(vAppTemplate.VAppTemplate.Name, Equals, vcd.config.VCD.Catalog.NsxtCatalogItem)
+	if vcd.config.VCD.Catalog.CatalogItemDescription != "" {
+		check.Assert(strings.Contains(vAppTemplate.VAppTemplate.Description, vcd.config.VCD.Catalog.CatalogItemDescription), Equals, true)
+	}
+
+	vAppTemplate, err = vcd.client.GetVAppTemplateById(vAppTemplate.VAppTemplate.ID)
+	check.Assert(err, IsNil)
+	check.Assert(vAppTemplate.VAppTemplate.Name, Equals, vcd.config.VCD.Catalog.NsxtCatalogItem)
+	if vcd.config.VCD.Catalog.CatalogItemDescription != "" {
+		check.Assert(strings.Contains(vAppTemplate.VAppTemplate.Description, vcd.config.VCD.Catalog.CatalogItemDescription), Equals, true)
+	}
+
+	vAppTemplate, err = vdc.GetVAppTemplateByNameOrId(vAppTemplate.VAppTemplate.ID, false)
+	check.Assert(err, IsNil)
+	check.Assert(vAppTemplate.VAppTemplate.Name, Equals, vcd.config.VCD.Catalog.NsxtCatalogItem)
+	if vcd.config.VCD.Catalog.CatalogItemDescription != "" {
+		check.Assert(strings.Contains(vAppTemplate.VAppTemplate.Description, vcd.config.VCD.Catalog.CatalogItemDescription), Equals, true)
+	}
+
+	vAppTemplate, err = vdc.GetVAppTemplateByNameOrId(vcd.config.VCD.Catalog.NsxtCatalogItem, false)
+	check.Assert(err, IsNil)
+	check.Assert(vAppTemplate.VAppTemplate.Name, Equals, vcd.config.VCD.Catalog.NsxtCatalogItem)
+	if vcd.config.VCD.Catalog.CatalogItemDescription != "" {
+		check.Assert(strings.Contains(vAppTemplate.VAppTemplate.Description, vcd.config.VCD.Catalog.CatalogItemDescription), Equals, true)
+	}
+
+	vAppTemplateRecord, err := vcd.client.QuerySynchronizedVAppTemplateById(vAppTemplate.VAppTemplate.ID)
+	check.Assert(err, IsNil)
+	check.Assert(vAppTemplateRecord.Name, Equals, vAppTemplate.VAppTemplate.Name)
+	check.Assert(vAppTemplateRecord.HREF, Equals, vAppTemplate.VAppTemplate.HREF)
+
+	vmTemplateRecord, err := vcd.client.QuerySynchronizedVmInVAppTemplateByHref(vAppTemplate.VAppTemplate.HREF, "**")
+	check.Assert(err, IsNil)
+	check.Assert(vmTemplateRecord, NotNil)
+
+	// Test non-existent vApp Template
+	_, err = vdc.GetVAppTemplateByName("INVALID")
+	check.Assert(err, NotNil)
+
+	_, err = vcd.client.QuerySynchronizedVmInVAppTemplateByHref(vAppTemplate.VAppTemplate.HREF, "INVALID")
+	check.Assert(err, Equals, ErrorEntityNotFound)
+}
+
+// TestMediaRetrieval tests that VDC receiver objects can search Media items successfully.
+func (vcd *TestVCD) TestMediaRetrieval(check *C) {
+	fmt.Printf("Running: %s\n", check.TestName())
+
+	if vcd.config.Media.NsxtMedia == "" {
+		check.Skip(fmt.Sprintf("%s: NSX-T Media item not given. Test can't proceed", check.TestName()))
+	}
+
+	org, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	check.Assert(err, IsNil)
+	check.Assert(org, NotNil)
+
+	catalog, err := org.GetCatalogByName(vcd.config.VCD.Catalog.NsxtBackedCatalogName, false)
+	check.Assert(err, IsNil)
+	check.Assert(catalog, NotNil)
+
+	vdc, err := org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	check.Assert(err, IsNil)
+	check.Assert(vdc, NotNil)
+
+	mediaFromCatalog, err := catalog.GetMediaByName(vcd.config.Media.NsxtMedia, false)
+	check.Assert(err, IsNil)
+	check.Assert(mediaFromCatalog, NotNil)
+
+	// Test cases
+	mediaFromVdc, err := vcd.client.QueryMediaById(mediaFromCatalog.Media.ID)
+	check.Assert(err, IsNil)
+	check.Assert(mediaFromCatalog.Media.HREF, Equals, mediaFromVdc.MediaRecord.HREF)
+	check.Assert(mediaFromCatalog.Media.Name, Equals, mediaFromVdc.MediaRecord.Name)
+
+	// Test non-existent Media item
+	mediaFromVdc, err = vcd.client.QueryMediaById("INVALID")
+	check.Assert(err, NotNil)
+	check.Assert(mediaFromVdc, IsNil)
 }
