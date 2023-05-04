@@ -49,7 +49,7 @@ func (client *Client) QueryWithNotEncodedParamsWithHeaders(ctx context.Context, 
 	return client.QueryWithNotEncodedParamsWithApiVersionWithHeaders(ctx, params, notEncodedParams, client.APIVersion, headers)
 }
 
-//QueryWithNotEncodedParamsWithApiVersion uses Query API to search for requested data
+// QueryWithNotEncodedParamsWithApiVersion uses Query API to search for requested data
 func (client *Client) QueryWithNotEncodedParamsWithApiVersion(ctx context.Context, params map[string]string, notEncodedParams map[string]string, apiVersion string) (Results, error) {
 	return client.QueryWithNotEncodedParamsWithApiVersionWithHeaders(ctx, params, notEncodedParams, apiVersion, nil)
 }
