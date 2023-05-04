@@ -32,16 +32,16 @@ func (vdc *Vdc) InstantiateVAppTemplate(ctx context.Context, template *types.Ins
 	}
 	vdcHref.Path += "/action/instantiateVAppTemplate"
 
-	vapptemplate := NewVAppTemplate(vdc.client)
+	var vapp types.VApp
 
-	_, err = vdc.client.ExecuteRequest(ctx, vdcHref.String(), http.MethodPut,
-		types.MimeInstantiateVappTemplateParams, "error instantiating a new vApp Template: %s", template, vapptemplate)
+	_, err = vdc.client.ExecuteRequest(ctx, vdcHref.String(), http.MethodPost,
+		types.MimeInstantiateVappTemplateParams, "error instantiating a new vApp Template: %s", template, vapp)
 	if err != nil {
 		return err
 	}
 
 	task := NewTask(vdc.client)
-	for _, taskItem := range vapptemplate.VAppTemplate.Tasks.Task {
+	for _, taskItem := range vapp.Tasks.Task {
 		task.Task = taskItem
 		err = task.WaitTaskCompletion(ctx)
 		if err != nil {
