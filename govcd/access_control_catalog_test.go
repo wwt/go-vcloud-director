@@ -48,7 +48,7 @@ func (vcd *TestVCD) Test_AdminCatalogAccessControl(check *C) {
 	AddToCleanupList(catalogName, "catalog", vcd.config.VCD.Org, check.TestName())
 	vcd.testCatalogAccessControl(adminorg, adminCatalog, check.TestName(), catalogName, check)
 
-	orgInfo, err := adminCatalog.getOrgInfo(ctx)
+	orgInfo, err := adminCatalog.getOrgInfo()
 	check.Assert(err, IsNil)
 	check.Assert(orgInfo.OrgId, Equals, extractUuid(adminorg.AdminOrg.ID))
 	check.Assert(orgInfo.OrgName, Equals, adminorg.AdminOrg.Name)
