@@ -9,13 +9,13 @@ import (
 
 func (vcd *TestVCD) Test_NsxEdgeBgpNeighbor(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointEdgeBgpNeighbor)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointEdgeBgpNeighbor)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	// Switch Edge Gateway to use dedicated uplink for the time of this test and then turn it off
@@ -35,24 +35,24 @@ func (vcd *TestVCD) Test_NsxEdgeBgpNeighbor(check *C) {
 		IpAddressTypeFiltering: "DISABLED",
 	}
 
-	createdBgpNeighbor, err := edge.CreateBgpNeighbor(bgpNeighbor)
+	createdBgpNeighbor, err := edge.CreateBgpNeighbor(ctx, bgpNeighbor)
 	check.Assert(err, IsNil)
 	check.Assert(createdBgpNeighbor, NotNil)
 
 	// Get all BGP Neighbors
-	BgpNeighbors, err := edge.GetAllBgpNeighbors(nil)
+	BgpNeighbors, err := edge.GetAllBgpNeighbors(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(BgpNeighbors, NotNil)
 	check.Assert(len(BgpNeighbors), Equals, 1)
 	check.Assert(BgpNeighbors[0].EdgeBgpNeighbor.NeighborAddress, Equals, bgpNeighbor.NeighborAddress)
 
 	// Get BGP Neighbor By Neighbor IP Address
-	bgpNeighborByIp, err := edge.GetBgpNeighborByIp(bgpNeighbor.NeighborAddress)
+	bgpNeighborByIp, err := edge.GetBgpNeighborByIp(ctx, bgpNeighbor.NeighborAddress)
 	check.Assert(err, IsNil)
 	check.Assert(bgpNeighborByIp, NotNil)
 
 	// Get BGP Neighbor By Id
-	bgpNeighborById, err := edge.GetBgpNeighborById(createdBgpNeighbor.EdgeBgpNeighbor.ID)
+	bgpNeighborById, err := edge.GetBgpNeighborById(ctx, createdBgpNeighbor.EdgeBgpNeighbor.ID)
 	check.Assert(err, IsNil)
 	check.Assert(bgpNeighborById, NotNil)
 
@@ -60,7 +60,7 @@ func (vcd *TestVCD) Test_NsxEdgeBgpNeighbor(check *C) {
 	bgpNeighbor.NeighborAddress = "12.12.12.12"
 	bgpNeighbor.ID = BgpNeighbors[0].EdgeBgpNeighbor.ID
 
-	updatedBgpNeighbor, err := BgpNeighbors[0].Update(bgpNeighbor)
+	updatedBgpNeighbor, err := BgpNeighbors[0].Update(ctx, bgpNeighbor)
 	check.Assert(err, IsNil)
 	check.Assert(updatedBgpNeighbor, NotNil)
 
@@ -71,11 +71,11 @@ func (vcd *TestVCD) Test_NsxEdgeBgpNeighbor(check *C) {
 	check.Assert(err, IsNil)
 
 	// Try to get deleted BGP Neighbor once again and ensure it is not there
-	notFoundByIp, err := edge.GetBgpNeighborByIp(bgpNeighbor.NeighborAddress)
+	notFoundByIp, err := edge.GetBgpNeighborByIp(ctx, bgpNeighbor.NeighborAddress)
 	check.Assert(err, NotNil)
 	check.Assert(notFoundByIp, IsNil)
 
-	notFoundById, err := edge.GetBgpNeighborById(createdBgpNeighbor.EdgeBgpNeighbor.ID)
+	notFoundById, err := edge.GetBgpNeighborById(ctx, createdBgpNeighbor.EdgeBgpNeighbor.ID)
 	check.Assert(err, NotNil)
 	check.Assert(notFoundById, IsNil)
 

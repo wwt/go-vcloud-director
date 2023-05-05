@@ -251,13 +251,13 @@ func (vcd *TestVCD) Test_OpenApiInlineStructCRUDRoles(check *C) {
 	}
 
 	testConnectionEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointTestConnection
-	apiVersionTestConnection, err := vcd.client.Client.checkOpenApiEndpointCompatibility(testConnectionEndpoint)
+	apiVersionTestConnection, err := vcd.client.Client.checkOpenApiEndpointCompatibility(ctx, testConnectionEndpoint)
 	check.Assert(err, IsNil)
 
 	urlRefTestConnection, err := vcd.client.Client.OpenApiBuildEndpoint(testConnectionEndpoint)
 	check.Assert(err, IsNil)
 
-	err = vcd.client.Client.OpenApiPostItemSync(apiVersionTestConnection, urlRefTestConnection, nil, testConnectionPayload, &testConnectionResult) // This call will get a 200 OK, which is what is being tested here
+	err = vcd.client.Client.OpenApiPostItemSync(ctx, apiVersionTestConnection, urlRefTestConnection, nil, testConnectionPayload, &testConnectionResult) // This call will get a 200 OK, which is what is being tested here
 	check.Assert(err, IsNil)
 
 	// Step 8 - update role using synchronous PUT function
@@ -319,7 +319,7 @@ func (vcd *TestVCD) Test_OpenApiTestConnection(check *C) {
 	}
 
 	for _, test := range tests {
-		result, err := vcd.client.Client.TestConnectionWithDefaults(test.SubscriptionURL)
+		result, err := vcd.client.Client.TestConnectionWithDefaults(ctx, test.SubscriptionURL)
 		check.Assert(err == nil, Equals, !test.WantedError)
 		check.Assert(result, Equals, test.WantedConnection)
 	}

@@ -16,7 +16,7 @@ func (vcd *TestVCD) Test_GetAllAlbServiceEngineGroups(check *C) {
 
 	controller, createdAlbCloud := spawnAlbControllerAndCloud(vcd, check)
 
-	importableSeGroups, err := vcd.client.GetAllAlbImportableServiceEngineGroups(createdAlbCloud.NsxtAlbCloud.ID, nil)
+	importableSeGroups, err := vcd.client.GetAllAlbImportableServiceEngineGroups(ctx, createdAlbCloud.NsxtAlbCloud.ID, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(importableSeGroups) > 0, Equals, true)
 
@@ -33,11 +33,11 @@ func (vcd *TestVCD) Test_GetAllAlbServiceEngineGroups(check *C) {
 	}
 
 	// Field is only available when using API version v37.0 onwards
-	if vcd.client.Client.APIVCDMaxVersionIs(">= 37.0") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, ">= 37.0") {
 		albSeGroup.SupportedFeatureSet = "PREMIUM"
 	}
 
-	createdSeGroup, err := vcd.client.CreateNsxtAlbServiceEngineGroup(albSeGroup)
+	createdSeGroup, err := vcd.client.CreateNsxtAlbServiceEngineGroup(ctx, albSeGroup)
 	check.Assert(err, IsNil)
 
 	check.Assert(createdSeGroup.NsxtAlbServiceEngineGroup.ID != "", Equals, true)
@@ -45,7 +45,7 @@ func (vcd *TestVCD) Test_GetAllAlbServiceEngineGroups(check *C) {
 	check.Assert(createdSeGroup.NsxtAlbServiceEngineGroup.Description, Equals, albSeGroup.Description)
 	check.Assert(createdSeGroup.NsxtAlbServiceEngineGroup.ReservationType, Equals, albSeGroup.ReservationType)
 	// Field is only populated in responses when using API version v37.0 onwards
-	if vcd.client.Client.APIVCDMaxVersionIs(">= 37.0") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, ">= 37.0") {
 		check.Assert(createdSeGroup.NsxtAlbServiceEngineGroup.SupportedFeatureSet, Equals, albSeGroup.SupportedFeatureSet)
 	}
 
@@ -57,12 +57,12 @@ func (vcd *TestVCD) Test_GetAllAlbServiceEngineGroups(check *C) {
 	check.Assert(err, IsNil)
 
 	// Find by Name
-	seGroupByName, err := vcd.client.GetAlbServiceEngineGroupByName("", createdSeGroup.NsxtAlbServiceEngineGroup.Name)
+	seGroupByName, err := vcd.client.GetAlbServiceEngineGroupByName(ctx, "", createdSeGroup.NsxtAlbServiceEngineGroup.Name)
 	check.Assert(err, IsNil)
 	check.Assert(seGroupByName, NotNil)
 
 	// Find by ID
-	seGroupById, err := vcd.client.GetAlbServiceEngineGroupById(createdSeGroup.NsxtAlbServiceEngineGroup.ID)
+	seGroupById, err := vcd.client.GetAlbServiceEngineGroupById(ctx, createdSeGroup.NsxtAlbServiceEngineGroup.ID)
 	check.Assert(err, IsNil)
 	check.Assert(seGroupById, NotNil)
 
@@ -72,14 +72,14 @@ func (vcd *TestVCD) Test_GetAllAlbServiceEngineGroups(check *C) {
 	// Test update
 	createdSeGroup.NsxtAlbServiceEngineGroup.Name = createdSeGroup.NsxtAlbServiceEngineGroup.Name + "updated"
 	// Field is only available when using API version v37.0 onwards
-	if vcd.client.Client.APIVCDMaxVersionIs(">= 37.0") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, ">= 37.0") {
 		albSeGroup.SupportedFeatureSet = "STANDARD"
 	}
-	updatedSeGroup, err := createdSeGroup.Update(createdSeGroup.NsxtAlbServiceEngineGroup)
+	updatedSeGroup, err := createdSeGroup.Update(ctx, createdSeGroup.NsxtAlbServiceEngineGroup)
 	check.Assert(err, IsNil)
 
 	// SupportedFeatureSet is a field only available since v37.0, in that case we ignore it in the following DeepEquals
-	if vcd.client.Client.APIVCDMaxVersionIs("< 37.0") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, "< 37.0") {
 		updatedSeGroup.NsxtAlbServiceEngineGroup.SupportedFeatureSet = createdSeGroup.NsxtAlbServiceEngineGroup.SupportedFeatureSet
 	}
 	check.Assert(updatedSeGroup.NsxtAlbServiceEngineGroup, DeepEquals, createdSeGroup.NsxtAlbServiceEngineGroup)
@@ -102,7 +102,7 @@ func spawnAlbControllerCloudServiceEngineGroup(vcd *TestVCD, check *C, seGroupRe
 
 	albController, createdAlbCloud := spawnAlbControllerAndCloud(vcd, check)
 
-	importableSeGroup, err := vcd.client.GetAlbImportableServiceEngineGroupByName(createdAlbCloud.NsxtAlbCloud.ID, vcd.config.VCD.Nsxt.NsxtAlbServiceEngineGroup)
+	importableSeGroup, err := vcd.client.GetAlbImportableServiceEngineGroupByName(ctx, createdAlbCloud.NsxtAlbCloud.ID, vcd.config.VCD.Nsxt.NsxtAlbServiceEngineGroup)
 	check.Assert(err, IsNil)
 
 	albSeGroup := &types.NsxtAlbServiceEngineGroup{
@@ -118,11 +118,11 @@ func spawnAlbControllerCloudServiceEngineGroup(vcd *TestVCD, check *C, seGroupRe
 	}
 
 	// Field is only available when using API version v37.0 onwards
-	if vcd.client.Client.APIVCDMaxVersionIs(">= 37.0") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, ">= 37.0") {
 		albSeGroup.SupportedFeatureSet = "PREMIUM"
 	}
 
-	createdSeGroup, err := vcd.client.CreateNsxtAlbServiceEngineGroup(albSeGroup)
+	createdSeGroup, err := vcd.client.CreateNsxtAlbServiceEngineGroup(ctx, albSeGroup)
 	check.Assert(err, IsNil)
 
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbServiceEngineGroups + createdSeGroup.NsxtAlbServiceEngineGroup.ID

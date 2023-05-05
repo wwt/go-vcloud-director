@@ -26,7 +26,7 @@ func (vcd *TestVCD) Test_VmGroupsCRUD(check *C) {
 	}
 
 	// We need the Provider VDC URN
-	pVdc, err := vcd.client.GetProviderVdcByName(vcd.config.VCD.NsxtProviderVdc.Name)
+	pVdc, err := vcd.client.GetProviderVdcByName(ctx, vcd.config.VCD.NsxtProviderVdc.Name)
 	check.Assert(err, IsNil)
 
 	vmGroup, err := vcd.client.GetVmGroupByNameAndProviderVdcUrn(vcd.config.VCD.NsxtProviderVdc.PlacementPolicyVmGroup, pVdc.ProviderVdc.ID)

@@ -21,21 +21,21 @@ func (vcd *TestVCD) Test_NsxtAlbController(check *C) {
 	newController := spawnAlbController(vcd, check)
 
 	// Get by Url
-	controllerByUrl, err := vcd.client.GetAlbControllerByUrl(newController.NsxtAlbController.Url)
+	controllerByUrl, err := vcd.client.GetAlbControllerByUrl(ctx, newController.NsxtAlbController.Url)
 	check.Assert(err, IsNil)
 
 	// Get by Name
-	controllerByName, err := vcd.client.GetAlbControllerByName(controllerByUrl.NsxtAlbController.Name)
+	controllerByName, err := vcd.client.GetAlbControllerByName(ctx, controllerByUrl.NsxtAlbController.Name)
 	check.Assert(err, IsNil)
 	check.Assert(controllerByName.NsxtAlbController.ID, Equals, controllerByUrl.NsxtAlbController.ID)
 
 	// Get by ID
-	controllerById, err := vcd.client.GetAlbControllerById(controllerByUrl.NsxtAlbController.ID)
+	controllerById, err := vcd.client.GetAlbControllerById(ctx, controllerByUrl.NsxtAlbController.ID)
 	check.Assert(err, IsNil)
 	check.Assert(controllerById.NsxtAlbController.ID, Equals, controllerByName.NsxtAlbController.ID)
 
 	// Get all Controllers and expect to find at least the known one
-	allControllers, err := vcd.client.GetAllAlbControllers(nil)
+	allControllers, err := vcd.client.GetAllAlbControllers(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(allControllers) > 0, Equals, true)
 	var foundController bool
@@ -49,7 +49,7 @@ func (vcd *TestVCD) Test_NsxtAlbController(check *C) {
 	// Check filtering for GetAllAlbControllers works
 	filter := url.Values{}
 	filter.Add("filter", "name=="+controllerByUrl.NsxtAlbController.Name)
-	filteredControllers, err := vcd.client.GetAllAlbControllers(nil)
+	filteredControllers, err := vcd.client.GetAllAlbControllers(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(filteredControllers), Equals, 1)
 	check.Assert(filteredControllers[0].NsxtAlbController.ID, Equals, controllerByUrl.NsxtAlbController.ID)
@@ -64,18 +64,18 @@ func (vcd *TestVCD) Test_NsxtAlbController(check *C) {
 		Password:    vcd.config.VCD.Nsxt.NsxtAlbControllerPassword,
 		LicenseType: "BASIC", // Not used since v37.0
 	}
-	updatedController, err := controllerByUrl.Update(updateControllerDef)
+	updatedController, err := controllerByUrl.Update(ctx, updateControllerDef)
 	check.Assert(err, IsNil)
 	check.Assert(updatedController.NsxtAlbController.Name, Equals, updateControllerDef.Name)
 	check.Assert(updatedController.NsxtAlbController.Description, Equals, updateControllerDef.Description)
 	check.Assert(updatedController.NsxtAlbController.Url, Equals, updateControllerDef.Url)
 	check.Assert(updatedController.NsxtAlbController.Username, Equals, updateControllerDef.Username)
-	if vcd.client.Client.APIVCDMaxVersionIs("< 37.0") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, "< 37.0") {
 		check.Assert(updatedController.NsxtAlbController.LicenseType, Equals, updateControllerDef.LicenseType)
 	}
 
 	// Revert settings to original ones
-	_, err = controllerByUrl.Update(controllerByUrl.NsxtAlbController)
+	_, err = controllerByUrl.Update(ctx, controllerByUrl.NsxtAlbController)
 	check.Assert(err, IsNil)
 
 	// Remove and make sure it is not found
@@ -83,7 +83,7 @@ func (vcd *TestVCD) Test_NsxtAlbController(check *C) {
 	check.Assert(err, IsNil)
 
 	// Try to find controller and expect an
-	_, err = vcd.client.GetAlbControllerByName(controllerByUrl.NsxtAlbController.Name)
+	_, err = vcd.client.GetAlbControllerByName(ctx, controllerByUrl.NsxtAlbController.Name)
 	check.Assert(ContainsNotFound(err), Equals, true)
 }
 
@@ -99,7 +99,7 @@ func spawnAlbController(vcd *TestVCD, check *C) *NsxtAlbController {
 		LicenseType: "ENTERPRISE", // Not used since v37.0
 	}
 
-	newController, err := vcd.client.CreateNsxtAlbController(newControllerDef)
+	newController, err := vcd.client.CreateNsxtAlbController(ctx, newControllerDef)
 	check.Assert(err, IsNil)
 	check.Assert(newController.NsxtAlbController.ID, Not(Equals), "")
 

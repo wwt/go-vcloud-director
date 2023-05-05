@@ -196,7 +196,7 @@ func (vcd *TestVCD) TestQueryCatalogItemAndVAppTemplateList(check *C) {
 	}
 
 	// Compare vApp templates from query with one retrieved by name
-	vAppTemplateQueryResult, err := catalog.QueryVappTemplateWithName(queryVappTemplatesByCatalog[0].Name)
+	vAppTemplateQueryResult, err := catalog.QueryVappTemplateWithName(ctx, queryVappTemplatesByCatalog[0].Name)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplateQueryResult, NotNil)
 	check.Assert(vAppTemplateQueryResult, DeepEquals, queryVappTemplatesByCatalog[0])
@@ -218,7 +218,7 @@ func (vcd *TestVCD) Test_DeleteNonEmptyCatalog(check *C) {
 	check.Assert(catalog, NotNil)
 
 	// add catalogItem
-	uploadTask, err := catalog.UploadOvf(vcd.config.OVA.OvaPath, catalogItemName, "upload from delete catalog item test", 1024)
+	uploadTask, err := catalog.UploadOvf(ctx, vcd.config.OVA.OvaPath, catalogItemName, "upload from delete catalog item test", 1024)
 	check.Assert(err, IsNil)
 	err = uploadTask.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
@@ -268,7 +268,7 @@ func (vcd *TestVCD) Test_QueryVappTemplateList(check *C) {
 	check.Assert(vAppTemplates[0].Name, Equals, vcd.config.VCD.Catalog.CatalogItem)
 
 	// Check the vApp Template retrieved before is the same as the one retrieved by name
-	vAppTemplate, err := cat.QueryVappTemplateWithName(vAppTemplates[0].Name)
+	vAppTemplate, err := cat.QueryVappTemplateWithName(ctx, vAppTemplates[0].Name)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplates, NotNil)
 	check.Assert(vAppTemplate, DeepEquals, vAppTemplates[0])

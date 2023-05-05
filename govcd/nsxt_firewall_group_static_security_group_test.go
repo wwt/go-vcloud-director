@@ -13,15 +13,15 @@ import (
 // Note. Security Group is one type of Firewall Group
 func (vcd *TestVCD) Test_NsxtStaticSecurityGroup(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	fwGroupDefinition := &types.NsxtFirewallGroup{
@@ -32,7 +32,7 @@ func (vcd *TestVCD) Test_NsxtStaticSecurityGroup(check *C) {
 	}
 
 	// Create firewall group and add to cleanup if it was created
-	createdSecGroup, err := nsxtVdc.CreateNsxtFirewallGroup(fwGroupDefinition)
+	createdSecGroup, err := nsxtVdc.CreateNsxtFirewallGroup(ctx, fwGroupDefinition)
 	check.Assert(err, IsNil)
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointFirewallGroups + createdSecGroup.NsxtFirewallGroup.ID
 	AddToCleanupListOpenApi(createdSecGroup.NsxtFirewallGroup.Name, check.TestName(), openApiEndpoint)
@@ -48,14 +48,14 @@ func (vcd *TestVCD) Test_NsxtStaticSecurityGroup(check *C) {
 	createdSecGroup.NsxtFirewallGroup.Description = "updated-description"
 	createdSecGroup.NsxtFirewallGroup.Name = check.TestName() + "-updated"
 
-	updatedSecGroup, err := createdSecGroup.Update(createdSecGroup.NsxtFirewallGroup)
+	updatedSecGroup, err := createdSecGroup.Update(ctx, createdSecGroup.NsxtFirewallGroup)
 	check.Assert(err, IsNil)
 	check.Assert(updatedSecGroup.NsxtFirewallGroup, DeepEquals, createdSecGroup.NsxtFirewallGroup)
 
 	check.Assert(updatedSecGroup, DeepEquals, createdSecGroup)
 
 	// Get all Firewall Groups and check if the created one is there
-	allSecGroups, err := org.GetAllNsxtFirewallGroups(nil, types.FirewallGroupTypeSecurityGroup)
+	allSecGroups, err := org.GetAllNsxtFirewallGroups(ctx, nil, types.FirewallGroupTypeSecurityGroup)
 	check.Assert(err, IsNil)
 	fwGroupFound := false
 	for i := range allSecGroups {
@@ -67,29 +67,29 @@ func (vcd *TestVCD) Test_NsxtStaticSecurityGroup(check *C) {
 	check.Assert(fwGroupFound, Equals, true)
 
 	// Get firewall group by name using Org
-	secGroupByName, err := org.GetNsxtFirewallGroupByName(updatedSecGroup.NsxtFirewallGroup.Name, types.FirewallGroupTypeSecurityGroup)
+	secGroupByName, err := org.GetNsxtFirewallGroupByName(ctx, updatedSecGroup.NsxtFirewallGroup.Name, types.FirewallGroupTypeSecurityGroup)
 	check.Assert(err, IsNil)
 
-	secGroupById, err := org.GetNsxtFirewallGroupById(updatedSecGroup.NsxtFirewallGroup.ID)
+	secGroupById, err := org.GetNsxtFirewallGroupById(ctx, updatedSecGroup.NsxtFirewallGroup.ID)
 	check.Assert(err, IsNil)
 	check.Assert(secGroupById.NsxtFirewallGroup, DeepEquals, secGroupByName.NsxtFirewallGroup)
 
 	// // Get firewall group by name using Vdc
-	vdcSecGroupByName, err := nsxtVdc.GetNsxtFirewallGroupByName(updatedSecGroup.NsxtFirewallGroup.Name, types.FirewallGroupTypeSecurityGroup)
+	vdcSecGroupByName, err := nsxtVdc.GetNsxtFirewallGroupByName(ctx, updatedSecGroup.NsxtFirewallGroup.Name, types.FirewallGroupTypeSecurityGroup)
 	check.Assert(err, IsNil)
 
-	vdcSecGroupById, err := nsxtVdc.GetNsxtFirewallGroupById(updatedSecGroup.NsxtFirewallGroup.ID)
+	vdcSecGroupById, err := nsxtVdc.GetNsxtFirewallGroupById(ctx, updatedSecGroup.NsxtFirewallGroup.ID)
 	check.Assert(err, IsNil)
 	check.Assert(vdcSecGroupById.NsxtFirewallGroup.ID, Not(Equals), "")
 	check.Assert(vdcSecGroupByName.NsxtFirewallGroup, DeepEquals, vdcSecGroupById.NsxtFirewallGroup)
 	check.Assert(vdcSecGroupByName.NsxtFirewallGroup, DeepEquals, secGroupById.NsxtFirewallGroup)
 
 	// Get Security Group using Edge Gateway
-	edgeSecGroup, err := edge.GetNsxtFirewallGroupByName(updatedSecGroup.NsxtFirewallGroup.Name, types.FirewallGroupTypeSecurityGroup)
+	edgeSecGroup, err := edge.GetNsxtFirewallGroupByName(ctx, updatedSecGroup.NsxtFirewallGroup.Name, types.FirewallGroupTypeSecurityGroup)
 	check.Assert(err, IsNil)
 	check.Assert(edgeSecGroup.NsxtFirewallGroup, DeepEquals, secGroupByName.NsxtFirewallGroup)
 
-	associatedVms, err := edgeSecGroup.GetAssociatedVms()
+	associatedVms, err := edgeSecGroup.GetAssociatedVms(ctx)
 	// Try to list associated VMs and expect an empty list (because no Org VDC network is attached)
 	check.Assert(err, IsNil)
 	check.Assert(len(associatedVms), Equals, 0)
@@ -105,15 +105,15 @@ func (vcd *TestVCD) Test_NsxtStaticSecurityGroup(check *C) {
 // Note. Security Group is one type of Firewall Group
 func (vcd *TestVCD) Test_NsxtSecurityGroupGetAssociatedVms(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	// Setup prerequisites - Routed Org VDC and add 2 VMs. With vApp and standalone
@@ -139,13 +139,13 @@ func (vcd *TestVCD) Test_NsxtSecurityGroupGetAssociatedVms(check *C) {
 	}
 
 	// Create firewall group and add to cleanup if it was created
-	createdSecGroup, err := nsxtVdc.CreateNsxtFirewallGroup(secGroupDefinition)
+	createdSecGroup, err := nsxtVdc.CreateNsxtFirewallGroup(ctx, secGroupDefinition)
 	check.Assert(err, IsNil)
 	openApiEndpoint = types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointFirewallGroups + createdSecGroup.NsxtFirewallGroup.ID
 	AddToCleanupListOpenApi(createdSecGroup.NsxtFirewallGroup.Name, check.TestName(), openApiEndpoint)
 
 	// Expect to see VM created in associated VM query
-	associatedVms, err := createdSecGroup.GetAssociatedVms()
+	associatedVms, err := createdSecGroup.GetAssociatedVms(ctx)
 	check.Assert(err, IsNil)
 
 	check.Assert(len(associatedVms), Equals, 2)
@@ -201,7 +201,7 @@ func createNsxtRoutedNetwork(check *C, vcd *TestVCD, vdc *Vdc, edgeGatewayId str
 		},
 	}
 
-	orgVdcNet, err := vdc.CreateOpenApiOrgVdcNetwork(orgVdcNetworkConfig)
+	orgVdcNet, err := vdc.CreateOpenApiOrgVdcNetwork(ctx, orgVdcNetworkConfig)
 	check.Assert(err, IsNil)
 	return orgVdcNet
 }
@@ -266,20 +266,20 @@ func createStandaloneVm(check *C, vcd *TestVCD, vdc *Vdc, net *OpenApiOrgVdcNetw
 		Xmlns: types.XMLNamespaceVCloud,
 	}
 
-	vm, err := vdc.CreateStandaloneVm(&params)
+	vm, err := vdc.CreateStandaloneVm(ctx, &params)
 	check.Assert(err, IsNil)
 	check.Assert(vm, NotNil)
 	return vm
 }
 
 func createVappVmAndAttachNetwork(check *C, vcd *TestVCD, vdc *Vdc, net *OpenApiOrgVdcNetwork) (*VApp, *VM) {
-	vapp, err := vdc.CreateRawVApp(check.TestName(), check.TestName()+"description")
+	vapp, err := vdc.CreateRawVApp(ctx, check.TestName(), check.TestName()+"description")
 	check.Assert(err, IsNil)
 
 	check.Assert(vapp, NotNil)
 
 	// Attach network to vApp
-	orgVdcNetworkWithHREF, err := vdc.GetOrgVdcNetworkById(net.OpenApiOrgVdcNetwork.ID, true)
+	orgVdcNetworkWithHREF, err := vdc.GetOrgVdcNetworkById(ctx, net.OpenApiOrgVdcNetwork.ID, true)
 	check.Assert(err, IsNil)
 
 	networkConfigurations := vapp.VApp.NetworkConfigSection.NetworkConfig
@@ -298,7 +298,7 @@ func createVappVmAndAttachNetwork(check *C, vcd *TestVCD, vdc *Vdc, net *OpenApi
 	networkConfigurations = append(networkConfigurations,
 		vappConfiguration)
 
-	task, err := updateNetworkConfigurations(vapp, networkConfigurations)
+	task, err := updateNetworkConfigurations(ctx, vapp, networkConfigurations)
 	check.Assert(err, IsNil)
 
 	err = task.WaitTaskCompletion(ctx)
@@ -348,13 +348,13 @@ func createVappVmAndAttachNetwork(check *C, vcd *TestVCD, vdc *Vdc, net *OpenApi
 		AllEULAsAccepted: true,
 	}
 
-	createdVm, err := vapp.AddEmptyVm(emptyVmDefinition)
+	createdVm, err := vapp.AddEmptyVm(ctx, emptyVmDefinition)
 	check.Assert(err, IsNil)
 
 	// Network could have been configured while creating VM, but on some slow systems
 	// the network is not yet found just after creating it so creating a VM without network and
 	// adding it later buys some time
-	err = createdVm.UpdateNetworkConnectionSection(desiredNetConfig)
+	err = createdVm.UpdateNetworkConnectionSection(ctx, desiredNetConfig)
 	check.Assert(err, IsNil)
 
 	check.Assert(err, IsNil)

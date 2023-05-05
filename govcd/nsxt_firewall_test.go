@@ -18,17 +18,17 @@ import (
 // Test_NsxtFirewall creates 20 firewall rules with randomized parameters
 func (vcd *TestVCD) Test_NsxtFirewall(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	// Get existing firewall rule configuration
-	fwRules, err := edge.GetNsxtFirewall()
+	fwRules, err := edge.GetNsxtFirewall(ctx)
 	check.Assert(err, IsNil)
 
 	existingDefaultRuleCount := len(fwRules.NsxtFirewallRuleContainer.DefaultRules)
@@ -42,7 +42,7 @@ func (vcd *TestVCD) Test_NsxtFirewall(check *C) {
 		dumpFirewallRulesToScreen(randomizedFwRuleDefs)
 	}
 
-	fwCreated, err := edge.UpdateNsxtFirewall(fwRules.NsxtFirewallRuleContainer)
+	fwCreated, err := edge.UpdateNsxtFirewall(ctx, fwRules.NsxtFirewallRuleContainer)
 	check.Assert(err, IsNil)
 
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + fmt.Sprintf(types.OpenApiEndpointNsxtFirewallRules, edge.EdgeGateway.ID)
@@ -80,10 +80,10 @@ func (vcd *TestVCD) Test_NsxtFirewall(check *C) {
 	// * Rule with deleted ID should not be found in list post deletion
 	// * There should be one less rule in the list
 	deleteRuleId := fwCreated.NsxtFirewallRuleContainer.UserDefinedRules[3].ID
-	err = fwCreated.DeleteRuleById(deleteRuleId)
+	err = fwCreated.DeleteRuleById(ctx, deleteRuleId)
 	check.Assert(err, IsNil)
 
-	allRulesPostDeletion, err := edge.GetNsxtFirewall()
+	allRulesPostDeletion, err := edge.GetNsxtFirewall(ctx)
 	check.Assert(err, IsNil)
 
 	check.Assert(len(allRulesPostDeletion.NsxtFirewallRuleContainer.UserDefinedRules), Equals, len(fwCreated.NsxtFirewallRuleContainer.UserDefinedRules)-1)
@@ -91,11 +91,11 @@ func (vcd *TestVCD) Test_NsxtFirewall(check *C) {
 		check.Assert(rule.ID, Not(Equals), deleteRuleId)
 	}
 
-	err = fwRules.DeleteAllRules()
+	err = fwRules.DeleteAllRules(ctx)
 	check.Assert(err, IsNil)
 
 	// Ensure no firewall rules left in user space post deletion, but the same amount of default and system rules still exist
-	postDeleteCheck, err := edge.GetNsxtFirewall()
+	postDeleteCheck, err := edge.GetNsxtFirewall(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(len(postDeleteCheck.NsxtFirewallRuleContainer.UserDefinedRules), Equals, 0)
 	check.Assert(len(postDeleteCheck.NsxtFirewallRuleContainer.DefaultRules), Equals, existingDefaultRuleCount)
@@ -163,7 +163,7 @@ func pickRandomOpenApiRefOrEmpty(in []types.OpenApiReference) types.OpenApiRefer
 
 func preCreateIpSet(check *C, vcd *TestVCD) *NsxtFirewallGroup {
 	nsxtVdc := vcd.nsxtVdc
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	ipSetDefinition := &types.NsxtFirewallGroup{
@@ -183,7 +183,7 @@ func preCreateIpSet(check *C, vcd *TestVCD) *NsxtFirewallGroup {
 	}
 
 	// Create IP Set and add to cleanup if it was created
-	createdIpSet, err := nsxtVdc.CreateNsxtFirewallGroup(ipSetDefinition)
+	createdIpSet, err := nsxtVdc.CreateNsxtFirewallGroup(ctx, ipSetDefinition)
 	check.Assert(err, IsNil)
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointFirewallGroups + createdIpSet.NsxtFirewallGroup.ID
 	AddToCleanupListOpenApi(createdIpSet.NsxtFirewallGroup.Name, check.TestName(), openApiEndpoint)
@@ -193,7 +193,7 @@ func preCreateIpSet(check *C, vcd *TestVCD) *NsxtFirewallGroup {
 
 func preCreateSecurityGroup(check *C, vcd *TestVCD) *NsxtFirewallGroup {
 	nsxtVdc := vcd.nsxtVdc
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	fwGroupDefinition := &types.NsxtFirewallGroup{
@@ -204,7 +204,7 @@ func preCreateSecurityGroup(check *C, vcd *TestVCD) *NsxtFirewallGroup {
 	}
 
 	// Create firewall group and add to cleanup if it was created
-	createdSecGroup, err := nsxtVdc.CreateNsxtFirewallGroup(fwGroupDefinition)
+	createdSecGroup, err := nsxtVdc.CreateNsxtFirewallGroup(ctx, fwGroupDefinition)
 	check.Assert(err, IsNil)
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointFirewallGroups + createdSecGroup.NsxtFirewallGroup.ID
 	AddToCleanupListOpenApi(check.TestName()+"sec-group", check.TestName(), openApiEndpoint)
@@ -213,10 +213,10 @@ func preCreateSecurityGroup(check *C, vcd *TestVCD) *NsxtFirewallGroup {
 }
 
 func getRandomListOfAppPortProfiles(check *C, vcd *TestVCD) []types.OpenApiReference {
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
-	appProfileSlice, err := org.GetAllNsxtAppPortProfiles(nil, types.ApplicationPortProfileScopeSystem)
+	appProfileSlice, err := org.GetAllNsxtAppPortProfiles(ctx, nil, types.ApplicationPortProfileScopeSystem)
 	check.Assert(err, IsNil)
 
 	openApiRefs := make([]types.OpenApiReference, len(appProfileSlice))

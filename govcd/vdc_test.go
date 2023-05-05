@@ -475,26 +475,26 @@ func (vcd *TestVCD) TestGetVdcCapabilities(check *C) {
 
 func (vcd *TestVCD) TestVdcIsNsxt(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	check.Assert(vcd.nsxtVdc.IsNsxt(), Equals, true)
+	check.Assert(vcd.nsxtVdc.IsNsxt(ctx), Equals, true)
 	if vcd.vdc != nil {
-		check.Assert(vcd.vdc.IsNsxt(), Equals, false)
+		check.Assert(vcd.vdc.IsNsxt(ctx), Equals, false)
 	}
 }
 
 func (vcd *TestVCD) TestVdcIsNsxv(check *C) {
-	check.Assert(vcd.vdc.IsNsxv(), Equals, true)
+	check.Assert(vcd.vdc.IsNsxv(ctx), Equals, true)
 	// retrieve the same VDC as AdminVdc, to test the corresponding function
 	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
-	adminVdc, err := adminOrg.GetVDCByName(vcd.vdc.Vdc.Name, false)
+	adminVdc, err := adminOrg.GetVDCByName(ctx, vcd.vdc.Vdc.Name, false)
 	check.Assert(err, IsNil)
-	check.Assert(adminVdc.IsNsxv(), Equals, true)
+	check.Assert(adminVdc.IsNsxv(ctx), Equals, true)
 	// if NSX-T is configured, we also check a NSX-T VDC
 	if vcd.nsxtVdc != nil {
-		check.Assert(vcd.nsxtVdc.IsNsxv(), Equals, false)
-		nsxtAdminVdc, err := adminOrg.GetAdminVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+		check.Assert(vcd.nsxtVdc.IsNsxv(ctx), Equals, false)
+		nsxtAdminVdc, err := adminOrg.GetAdminVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 		check.Assert(err, IsNil)
-		check.Assert(nsxtAdminVdc.IsNsxv(), Equals, false)
+		check.Assert(nsxtAdminVdc.IsNsxv(ctx), Equals, false)
 	}
 }
 
@@ -509,7 +509,7 @@ func (vcd *TestVCD) TestCreateRawVapp(check *C) {
 
 	name := check.TestName()
 	description := "test compose raw app"
-	vapp, err := vdc.CreateRawVApp(name, description)
+	vapp, err := vdc.CreateRawVApp(ctx, name, description)
 	check.Assert(err, IsNil)
 	AddToCleanupList(name, "vapp", vdc.Vdc.Name, name)
 
@@ -531,7 +531,7 @@ func (vcd *TestVCD) TestSetControlAccess(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(vdc, NotNil)
 
-	readControlAccessParams, err := vdc.SetControlAccess(true, "ReadOnly", nil, true)
+	readControlAccessParams, err := vdc.SetControlAccess(ctx, true, "ReadOnly", nil, true)
 	check.Assert(err, IsNil)
 	check.Assert(readControlAccessParams, NotNil)
 	check.Assert(readControlAccessParams.IsSharedToEveryone, Equals, true)
@@ -540,7 +540,7 @@ func (vcd *TestVCD) TestSetControlAccess(check *C) {
 
 	// Set VDC sharing to one user
 	orgUserRef := org.AdminOrg.Users.User[0]
-	user, err := org.GetUserByName(orgUserRef.Name, false)
+	user, err := org.GetUserByName(ctx, orgUserRef.Name, false)
 	check.Assert(err, IsNil)
 	check.Assert(user, NotNil)
 
@@ -555,19 +555,19 @@ func (vcd *TestVCD) TestSetControlAccess(check *C) {
 		},
 	}
 
-	readControlAccessParams, err = vdc.SetControlAccess(false, "", accessSettings, true)
+	readControlAccessParams, err = vdc.SetControlAccess(ctx, false, "", accessSettings, true)
 	check.Assert(err, IsNil)
 	check.Assert(readControlAccessParams, NotNil)
 	check.Assert(len(readControlAccessParams.AccessSettings.AccessSetting) > 0, Equals, true)
 	check.Assert(assertVDCAccessSettings(accessSettings, readControlAccessParams.AccessSettings.AccessSetting), IsNil)
 
 	// Check that fail if both isSharedToEveryone and accessSettings is passed
-	readControlAccessParams, err = vdc.SetControlAccess(true, "ReadOnly", accessSettings, true)
+	readControlAccessParams, err = vdc.SetControlAccess(ctx, true, "ReadOnly", accessSettings, true)
 	check.Assert(err, NotNil)
 	check.Assert(readControlAccessParams, IsNil)
 
 	// Check DeleteControlAccess
-	readControlAccessParams, err = vdc.DeleteControlAccess(true)
+	readControlAccessParams, err = vdc.DeleteControlAccess(ctx, true)
 	check.Assert(err, IsNil)
 	check.Assert(readControlAccessParams.IsSharedToEveryone, Equals, false)
 	check.Assert(readControlAccessParams.AccessSettings, IsNil)
@@ -635,7 +635,7 @@ func (vcd *TestVCD) TestVAppTemplateRetrieval(check *C) {
 		check.Assert(strings.Contains(vAppTemplate.VAppTemplate.Description, vcd.config.VCD.Catalog.CatalogItemDescription), Equals, true)
 	}
 
-	vAppTemplateRecord, err := vcd.client.QuerySynchronizedVAppTemplateById(vAppTemplate.VAppTemplate.ID)
+	vAppTemplateRecord, err := vcd.client.QuerySynchronizedVAppTemplateById(ctx, vAppTemplate.VAppTemplate.ID)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplateRecord.Name, Equals, vAppTemplate.VAppTemplate.Name)
 	check.Assert(vAppTemplateRecord.HREF, Equals, vAppTemplate.VAppTemplate.HREF)

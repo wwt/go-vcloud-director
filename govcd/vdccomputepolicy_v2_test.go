@@ -136,7 +136,7 @@ func (vcd *TestVCD) Test_SetAssignedComputePoliciesV2(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	adminVdc, err := org.GetAdminVDCByName(vcd.vdc.Vdc.Name, false)
+	adminVdc, err := org.GetAdminVDCByName(ctx, vcd.vdc.Vdc.Name, false)
 	check.Assert(err, IsNil)
 	check.Assert(adminVdc, NotNil)
 
@@ -232,7 +232,7 @@ func (vcd *TestVCD) Test_VdcVmPlacementPoliciesV2(check *C) {
 	}
 
 	// We need the Provider VDC URN
-	pVdc, err := vcd.client.GetProviderVdcByName(vcd.config.VCD.NsxtProviderVdc.Name)
+	pVdc, err := vcd.client.GetProviderVdcByName(ctx, vcd.config.VCD.NsxtProviderVdc.Name)
 	check.Assert(err, IsNil)
 
 	// We also need the VM Group to create a VM Placement Policy
@@ -336,7 +336,7 @@ func (vcd *TestVCD) Test_VdcDuplicatedVmPlacementPolicyGetsACleanError(check *C)
 	}
 
 	// We need the Provider VDC URN
-	pVdc, err := vcd.client.GetProviderVdcByName(vcd.config.VCD.NsxtProviderVdc.Name)
+	pVdc, err := vcd.client.GetProviderVdcByName(ctx, vcd.config.VCD.NsxtProviderVdc.Name)
 	check.Assert(err, IsNil)
 
 	// We also need the VM Group to create a VM Placement Policy

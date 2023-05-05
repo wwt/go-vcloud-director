@@ -7,6 +7,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	. "gopkg.in/check.v1"
 
@@ -28,7 +29,7 @@ func (vcd *TestVCD) TestVmMetadata(check *C) {
 		check.Skip("skipping test because no vApp is found in configuration")
 	}
 
-	vApp := vcd.findFirstVapp()
+	vApp := vcd.findFirstVapp(ctx)
 	vmType, vmName := vcd.findFirstVm(vApp)
 	if vmName == "" {
 		check.Skip("skipping test because no VM is found")
@@ -50,7 +51,7 @@ func (vcd *TestVCD) TestAdminVdcMetadata(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	adminVdc, err := org.GetAdminVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	adminVdc, err := org.GetAdminVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 	check.Assert(adminVdc, NotNil)
 
@@ -69,14 +70,14 @@ func testVdcMetadata(vcd *TestVCD, check *C, testCase metadataTest) {
 	check.Assert(vdc, NotNil)
 	check.Assert(vdc.Vdc.Name, Equals, vcd.config.VCD.Nsxt.Vdc)
 
-	metadata, err := vdc.GetMetadata()
+	metadata, err := vdc.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 	assertMetadata(check, metadata, testCase, 1)
 }
 
 func (vcd *TestVCD) TestProviderVdcMetadata(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
-	providerVdc, err := vcd.client.GetProviderVdcByName(vcd.config.VCD.NsxtProviderVdc.Name)
+	providerVdc, err := vcd.client.GetProviderVdcByName(ctx, vcd.config.VCD.NsxtProviderVdc.Name)
 	if err != nil {
 		check.Skip(fmt.Sprintf("%s: Provider VDC %s not found. Test can't proceed", check.TestName(), vcd.config.VCD.NsxtProviderVdc.Name))
 		return
@@ -130,7 +131,7 @@ func (vcd *TestVCD) TestMediaRecordMetadata(check *C) {
 	err = vcd.org.Refresh(ctx)
 	check.Assert(err, IsNil)
 
-	mediaRecord, err := catalog.QueryMedia(check.TestName())
+	mediaRecord, err := catalog.QueryMedia(ctx, check.TestName())
 	check.Assert(err, IsNil)
 	check.Assert(mediaRecord, NotNil)
 	check.Assert(mediaRecord.MediaRecord.Name, Equals, check.TestName())
@@ -176,7 +177,7 @@ func (vcd *TestVCD) TestAdminCatalogMetadata(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	adminCatalog, err := org.GetAdminCatalogByName(vcd.config.VCD.Catalog.NsxtBackedCatalogName, false)
+	adminCatalog, err := org.GetAdminCatalogByName(ctx, vcd.config.VCD.Catalog.NsxtBackedCatalogName, false)
 	check.Assert(err, IsNil)
 	check.Assert(adminCatalog, NotNil)
 	check.Assert(adminCatalog.AdminCatalog.Name, Equals, vcd.config.VCD.Catalog.NsxtBackedCatalogName)
@@ -196,7 +197,7 @@ func testCatalogMetadata(vcd *TestVCD, check *C, testCase metadataTest) {
 	check.Assert(catalog, NotNil)
 	check.Assert(catalog.Catalog.Name, Equals, vcd.config.VCD.Catalog.NsxtBackedCatalogName)
 
-	metadata, err := catalog.GetMetadata()
+	metadata, err := catalog.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 	assertMetadata(check, metadata, testCase, 1)
 }
@@ -214,11 +215,11 @@ func (vcd *TestVCD) TestAdminOrgMetadata(check *C) {
 }
 
 func testOrgMetadata(vcd *TestVCD, check *C, testCase metadataTest) {
-	org, err := vcd.client.GetOrgByName(vcd.org.Org.Name)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	metadata, err := org.GetMetadata()
+	metadata, err := org.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 	assertMetadata(check, metadata, testCase, 1)
 }
@@ -234,7 +235,7 @@ func (vcd *TestVCD) TestDiskMetadata(check *C) {
 		},
 	}
 
-	task, err := vcd.vdc.CreateDisk(diskCreateParams)
+	task, err := vcd.vdc.CreateDisk(ctx, diskCreateParams)
 	check.Assert(err, IsNil)
 
 	diskHREF := task.Task.Owner.HREF
@@ -243,7 +244,7 @@ func (vcd *TestVCD) TestDiskMetadata(check *C) {
 	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
-	disk, err := vcd.vdc.GetDiskByHref(diskHREF)
+	disk, err := vcd.vdc.GetDiskByHref(ctx, diskHREF)
 	check.Assert(err, IsNil)
 
 	testMetadataCRUDActions(disk, check, nil)
@@ -251,7 +252,7 @@ func (vcd *TestVCD) TestDiskMetadata(check *C) {
 
 func (vcd *TestVCD) TestOrgVDCNetworkMetadata(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
-	net, err := vcd.vdc.GetOrgVdcNetworkByName(vcd.config.VCD.Network.Net1, false)
+	net, err := vcd.vdc.GetOrgVdcNetworkByName(ctx, vcd.config.VCD.Network.Net1, false)
 	if err != nil {
 		check.Skip(fmt.Sprintf("network %s not found. Test can't proceed", vcd.config.VCD.Network.Net1))
 		return
@@ -278,11 +279,11 @@ func (vcd *TestVCD) TestCatalogItemMetadata(check *C) {
 
 // metadataCompatible allows centralizing and generalizing the tests for metadata compatible resources.
 type metadataCompatible interface {
-	GetMetadata() (*types.Metadata, error)
-	GetMetadataByKey(key string, isSystem bool) (*types.MetadataValue, error)
-	AddMetadataEntryWithVisibility(key, value, typedValue, visibility string, isSystem bool) error
-	MergeMetadataWithMetadataValues(metadata map[string]types.MetadataValue) error
-	DeleteMetadataEntryWithDomain(key string, isSystem bool) error
+	GetMetadata(context.Context) (*types.Metadata, error)
+	GetMetadataByKey(ctx context.Context, key string, isSystem bool) (*types.MetadataValue, error)
+	AddMetadataEntryWithVisibility(ctx context.Context, key, value, typedValue, visibility string, isSystem bool) error
+	MergeMetadataWithMetadataValues(ctx context.Context, metadata map[string]types.MetadataValue) error
+	DeleteMetadataEntryWithDomain(ctx context.Context, key string, isSystem bool) error
 }
 
 type metadataTest struct {
@@ -301,7 +302,7 @@ type metadataTest struct {
 // For example, AdminOrg and Org, where Org only has GetMetadata.
 func testMetadataCRUDActions(resource metadataCompatible, check *C, extraReadStep func(testCase metadataTest)) {
 	// Check how much metadata exists
-	metadata, err := resource.GetMetadata()
+	metadata, err := resource.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(metadata, NotNil)
 	existingMetaDataCount := len(metadata.MetadataEntry)
@@ -397,7 +398,7 @@ func testMetadataCRUDActions(resource metadataCompatible, check *C, extraReadSte
 
 	for _, testCase := range testCases {
 
-		err = resource.AddMetadataEntryWithVisibility(testCase.Key, testCase.Value, testCase.Type, testCase.Visibility, testCase.IsSystem)
+		err = resource.AddMetadataEntryWithVisibility(ctx, testCase.Key, testCase.Value, testCase.Type, testCase.Visibility, testCase.IsSystem)
 		if testCase.ExpectErrorOnFirstAdd {
 			check.Assert(err, NotNil)
 			continue
@@ -405,11 +406,11 @@ func testMetadataCRUDActions(resource metadataCompatible, check *C, extraReadSte
 		check.Assert(err, IsNil)
 
 		// Check if metadata was added correctly
-		metadata, err = resource.GetMetadata()
+		metadata, err = resource.GetMetadata(ctx)
 		check.Assert(err, IsNil)
 		assertMetadata(check, metadata, testCase, existingMetaDataCount+1)
 
-		metadataValue, err := resource.GetMetadataByKey(testCase.Key, testCase.IsSystem)
+		metadataValue, err := resource.GetMetadataByKey(ctx, testCase.Key, testCase.IsSystem)
 		check.Assert(err, IsNil)
 		check.Assert(metadataValue.TypedValue.Value, Equals, testCase.Value)
 		check.Assert(metadataValue.TypedValue.XsiType, Equals, testCase.Type)
@@ -425,7 +426,7 @@ func testMetadataCRUDActions(resource metadataCompatible, check *C, extraReadSte
 			domain = "SYSTEM"
 		}
 		// Merge updated metadata with a new entry
-		err = resource.MergeMetadataWithMetadataValues(map[string]types.MetadataValue{
+		err = resource.MergeMetadataWithMetadataValues(ctx, map[string]types.MetadataValue{
 			"mergedKey": {
 				TypedValue: &types.MetadataTypedValue{
 					Value:   "mergedValue",
@@ -446,7 +447,7 @@ func testMetadataCRUDActions(resource metadataCompatible, check *C, extraReadSte
 		check.Assert(err, IsNil)
 
 		// Check that the first key was updated and the second, created
-		metadata, err = resource.GetMetadata()
+		metadata, err = resource.GetMetadata(ctx)
 		check.Assert(err, IsNil)
 		check.Assert(metadata, NotNil)
 		check.Assert(len(metadata.MetadataEntry), Equals, existingMetaDataCount+2)
@@ -459,13 +460,13 @@ func testMetadataCRUDActions(resource metadataCompatible, check *C, extraReadSte
 			}
 		}
 
-		err = resource.DeleteMetadataEntryWithDomain("mergedKey", false)
+		err = resource.DeleteMetadataEntryWithDomain(ctx, "mergedKey", false)
 		check.Assert(err, IsNil)
-		err = resource.DeleteMetadataEntryWithDomain(testCase.Key, testCase.IsSystem)
+		err = resource.DeleteMetadataEntryWithDomain(ctx, testCase.Key, testCase.IsSystem)
 		check.Assert(err, IsNil)
 
 		// Check if metadata was deleted correctly
-		metadata, err = resource.GetMetadata()
+		metadata, err = resource.GetMetadata(ctx)
 		check.Assert(err, IsNil)
 		check.Assert(metadata, NotNil)
 		check.Assert(len(metadata.MetadataEntry), Equals, existingMetaDataCount)

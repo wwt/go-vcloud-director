@@ -17,7 +17,7 @@ func (vcd *TestVCD) Test_RoleTenantContext(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
-	clientRoles, err := adminOrg.client.GetAllRoles(nil)
+	clientRoles, err := adminOrg.client.GetAllRoles(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(clientRoles, NotNil)
 	check.Assert(len(clientRoles), Not(Equals), 0)
@@ -26,7 +26,7 @@ func (vcd *TestVCD) Test_RoleTenantContext(check *C) {
 		fmt.Println("Client roles")
 		for _, role := range clientRoles {
 			fmt.Printf("%-40s %s\n", role.Role.Name, role.Role.Description)
-			rights, err := role.GetRights(nil)
+			rights, err := role.GetRights(ctx, nil)
 			check.Assert(err, IsNil)
 			for i, right := range rights {
 				fmt.Printf("\t%3d %s\n", i+1, right.Name)
@@ -35,7 +35,7 @@ func (vcd *TestVCD) Test_RoleTenantContext(check *C) {
 		}
 	}
 
-	orgRoles, err := adminOrg.GetAllRoles(nil)
+	orgRoles, err := adminOrg.GetAllRoles(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(orgRoles, NotNil)
 	check.Assert(len(orgRoles), Not(Equals), 0)
@@ -44,7 +44,7 @@ func (vcd *TestVCD) Test_RoleTenantContext(check *C) {
 		fmt.Println("ORG roles")
 		for _, role := range orgRoles {
 			fmt.Printf("%-40s %s\n", role.Role.Name, role.Role.Description)
-			rights, err := role.GetRights(nil)
+			rights, err := role.GetRights(ctx, nil)
 			check.Assert(err, IsNil)
 			for i, right := range rights {
 				fmt.Printf("\t%3d %s\n", i+1, right.Name)
@@ -60,7 +60,7 @@ func (vcd *TestVCD) Test_Rights(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
-	allOrgRights, err := adminOrg.GetAllRights(nil)
+	allOrgRights, err := adminOrg.GetAllRights(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(allOrgRights, NotNil)
 
@@ -70,7 +70,7 @@ func (vcd *TestVCD) Test_Rights(check *C) {
 			fmt.Printf("%3d %-20s %-53s %s\n", i, oneRight.Name, oneRight.ID, oneRight.Category)
 		}
 	}
-	allExistingRights, err := adminOrg.client.GetAllRights(nil)
+	allExistingRights, err := adminOrg.client.GetAllRights(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(allExistingRights, NotNil)
 
@@ -100,20 +100,20 @@ func (vcd *TestVCD) Test_Rights(check *C) {
 		searchRight(adminOrg.client, name, "", check)
 	}
 
-	rightsCategories, err := adminOrg.client.GetAllRightsCategories(nil)
+	rightsCategories, err := adminOrg.client.GetAllRightsCategories(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(rightsCategories) > 0, Equals, true)
 }
 
 func searchRight(client *Client, name, id string, check *C) {
-	fullRightByName, err := client.GetRightByName(name)
+	fullRightByName, err := client.GetRightByName(ctx, name)
 	check.Assert(err, IsNil)
 	check.Assert(fullRightByName, NotNil)
 	if id != "" {
-		fullRightById, err := client.GetRightById(id)
+		fullRightById, err := client.GetRightById(ctx, id)
 		check.Assert(err, IsNil)
 		check.Assert(fullRightById, NotNil)
-		category, err := client.GetRightsCategoryById(fullRightById.Category)
+		category, err := client.GetRightsCategoryById(ctx, fullRightById.Category)
 		check.Assert(err, IsNil)
 		check.Assert(fullRightById.Category, Equals, category.Id)
 	}

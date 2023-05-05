@@ -30,7 +30,7 @@ func (vcd *TestVCD) Test_GetAllNsxtEdgeClusters(check *C) {
 
 	queryParams := url.Values{}
 	queryParams.Add("filter", fmt.Sprintf("orgVdcId==%s", nsxtVdc.Vdc.ID))
-	allEdgeClusters, err := vcd.client.GetAllNsxtEdgeClusters(queryParams)
+	allEdgeClusters, err := vcd.client.GetAllNsxtEdgeClusters(ctx, queryParams)
 	check.Assert(err, IsNil)
 	check.Assert(allEdgeClusters, NotNil)
 	check.Assert(len(allEdgeClusters) > 0, Equals, true)

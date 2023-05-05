@@ -214,7 +214,7 @@ func (vcd *TestVCD) Test_GetNetworkListLarge(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
 
 	defaultPagelength := 25
-	externalNetwork, err := vcd.client.GetExternalNetworkByName(vcd.config.VCD.ExternalNetwork)
+	externalNetwork, err := vcd.client.GetExternalNetworkByName(ctx, vcd.config.VCD.ExternalNetwork)
 	if err != nil {
 		check.Skip("[Test_GetNetworkListLarge] parent network not found")
 		return
@@ -242,7 +242,7 @@ func (vcd *TestVCD) Test_GetNetworkListLarge(check *C) {
 			},
 			IsShared: false,
 		}
-		task, err := vcd.vdc.CreateOrgVDCNetwork(&networkConfig)
+		task, err := vcd.vdc.CreateOrgVDCNetwork(ctx, &networkConfig)
 		check.Assert(err, IsNil)
 
 		AddToCleanupList(networkName, "network", vcd.org.Org.Name+"|"+vcd.vdc.Vdc.Name, "Test_GetNetworkListLarge")
@@ -255,7 +255,7 @@ func (vcd *TestVCD) Test_GetNetworkListLarge(check *C) {
 
 	knownNetworkName1 := fmt.Sprintf("net-%s-d", baseName)
 	knownNetworkName2 := fmt.Sprintf("net-%s-d-%d", baseName, numOfNetworks)
-	networks, err := vcd.vdc.GetNetworkList()
+	networks, err := vcd.vdc.GetNetworkList(ctx)
 	check.Assert(err, IsNil)
 	if testVerbose {
 		fmt.Printf("Number of networks: %d\n", len(networks))
@@ -279,7 +279,7 @@ func (vcd *TestVCD) Test_GetNetworkListLarge(check *C) {
 		if testVerbose {
 			fmt.Printf("Removing network %s\n", networkName)
 		}
-		network, err := vcd.vdc.GetOrgVdcNetworkByName(networkName, false)
+		network, err := vcd.vdc.GetOrgVdcNetworkByName(ctx, networkName, false)
 		check.Assert(err, IsNil)
 		_, err = network.Delete(ctx)
 		check.Assert(err, IsNil)

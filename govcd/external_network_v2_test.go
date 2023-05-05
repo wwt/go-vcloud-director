@@ -85,7 +85,7 @@ func getBackingIdByNameAndType(check *C, backingName string, backingType string,
 	var backingId string
 	switch backingType {
 	case types.ExternalNetworkBackingTypeNsxtTier0Router: // Lookup T0 router ID
-		tier0RouterVrf, err := vcd.client.GetImportableNsxtTier0RouterByName(backingName, nsxtManagerId)
+		tier0RouterVrf, err := vcd.client.GetImportableNsxtTier0RouterByName(ctx, backingName, nsxtManagerId)
 		check.Assert(err, IsNil)
 		backingId = tier0RouterVrf.NsxtTier0Router.ID
 	case types.ExternalNetworkBackingTypeNsxtSegment: // Lookup segment ID
@@ -93,7 +93,7 @@ func getBackingIdByNameAndType(check *C, backingName string, backingType string,
 		check.Assert(err, IsNil)
 		filter := map[string]string{"nsxTManager": bareNsxtManagerId}
 
-		nsxtSegment, err := vcd.client.GetFilteredNsxtImportableSwitches(filter)
+		nsxtSegment, err := vcd.client.GetFilteredNsxtImportableSwitches(ctx, filter)
 		check.Assert(err, IsNil)
 		backingId = nsxtSegment[0].NsxtImportableSwitch.ID
 	}

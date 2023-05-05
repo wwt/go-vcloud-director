@@ -15,7 +15,7 @@ func (vcd *TestVCD) Test_AlbPool(check *C) {
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
 	skipNoNsxtAlbConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointAlbEdgeGateway)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointAlbEdgeGateway)
 
 	// Setup prerequisite components
 	controller, cloud, seGroup, edge, assignment := setupAlbPoolPrerequisites(check, vcd)
@@ -127,9 +127,9 @@ func testPoolWithCertNoPrivateKey(check *C, vcd *TestVCD, edgeGatewayId string, 
 		Alias:       check.TestName(),
 		Certificate: certificate,
 	}
-	openApiEndpoint, err := getEndpointByVersion(&vcd.client.Client)
+	openApiEndpoint, err := getEndpointByVersion(ctx, &vcd.client.Client)
 	check.Assert(err, IsNil)
-	createdCertificate, err := adminOrg.AddCertificateToLibrary(certificateConfigWithoutPrivateKey)
+	createdCertificate, err := adminOrg.AddCertificateToLibrary(ctx, certificateConfigWithoutPrivateKey)
 	check.Assert(err, IsNil)
 	PrependToCleanupListOpenApi(createdCertificate.CertificateLibrary.Alias, check.TestName(), openApiEndpoint+createdCertificate.CertificateLibrary.Id)
 
@@ -161,9 +161,9 @@ func testPoolWithCertAndPrivateKey(check *C, vcd *TestVCD, edgeGatewayId string,
 		PrivateKeyPassphrase: "test",
 	}
 
-	openApiEndpoint, err := getEndpointByVersion(&vcd.client.Client)
+	openApiEndpoint, err := getEndpointByVersion(ctx, &vcd.client.Client)
 	check.Assert(err, IsNil)
-	createdCertificate, err := adminOrg.AddCertificateToLibrary(certificateConfigWithoutPrivateKey)
+	createdCertificate, err := adminOrg.AddCertificateToLibrary(ctx, certificateConfigWithoutPrivateKey)
 	check.Assert(err, IsNil)
 	PrependToCleanupListOpenApi(createdCertificate.CertificateLibrary.Alias, check.TestName(), openApiEndpoint+createdCertificate.CertificateLibrary.Id)
 
@@ -188,7 +188,7 @@ func testAlbPoolConfig(check *C, vcd *TestVCD, name string, setupConfig *types.N
 	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
-	createdPool, err := client.CreateNsxtAlbPool(setupConfig)
+	createdPool, err := client.CreateNsxtAlbPool(ctx, setupConfig)
 	check.Assert(err, IsNil)
 	check.Assert(createdPool, NotNil)
 	check.Assert(createdPool.NsxtAlbPool, NotNil)
@@ -202,26 +202,26 @@ func testAlbPoolConfig(check *C, vcd *TestVCD, name string, setupConfig *types.N
 	PrependToCleanupListOpenApi(createdPool.NsxtAlbPool.Name, check.TestName(), openApiEndpoint)
 
 	// Get By ID
-	poolById, err := client.GetAlbPoolById(createdPool.NsxtAlbPool.ID)
+	poolById, err := client.GetAlbPoolById(ctx, createdPool.NsxtAlbPool.ID)
 	check.Assert(err, IsNil)
 	check.Assert(poolById.NsxtAlbPool.ID, Equals, createdPool.NsxtAlbPool.ID)
 	check.Assert(poolById, NotNil)
 	check.Assert(poolById.NsxtAlbPool, NotNil)
 
 	// Get By Name
-	poolByName, err := client.GetAlbPoolByName(edge.EdgeGateway.ID, createdPool.NsxtAlbPool.Name)
+	poolByName, err := client.GetAlbPoolByName(ctx, edge.EdgeGateway.ID, createdPool.NsxtAlbPool.Name)
 	check.Assert(err, IsNil)
 	check.Assert(poolByName.NsxtAlbPool.ID, Equals, createdPool.NsxtAlbPool.ID)
 	check.Assert(poolByName, NotNil)
 	check.Assert(poolByName.NsxtAlbPool, NotNil)
 
 	// Get All Pool summaries
-	allPoolSummaries, err := client.GetAllAlbPoolSummaries(edge.EdgeGateway.ID, nil)
+	allPoolSummaries, err := client.GetAllAlbPoolSummaries(ctx, edge.EdgeGateway.ID, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(allPoolSummaries) > 0, Equals, true)
 
 	// Get All Pools
-	allPools, err := client.GetAllAlbPools(edge.EdgeGateway.ID, nil)
+	allPools, err := client.GetAllAlbPools(ctx, edge.EdgeGateway.ID, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(allPools) > 0, Equals, true)
 
@@ -230,7 +230,7 @@ func testAlbPoolConfig(check *C, vcd *TestVCD, name string, setupConfig *types.N
 	// Attempt an update if config is provided
 	if updateConfig != nil {
 		updateConfig.ID = createdPool.NsxtAlbPool.ID
-		updatedPool, err := createdPool.Update(updateConfig)
+		updatedPool, err := createdPool.Update(ctx, updateConfig)
 		check.Assert(err, IsNil)
 		check.Assert(createdPool.NsxtAlbPool.ID, Equals, updatedPool.NsxtAlbPool.ID)
 		check.Assert(updatedPool.NsxtAlbPool.Name, NotNil)
@@ -255,17 +255,17 @@ func setupAlbPoolPrerequisites(check *C, vcd *TestVCD) (*NsxtAlbController, *Nsx
 	}
 
 	// Field is only available when using API version v37.0 onwards
-	if vcd.client.Client.APIVCDMaxVersionIs(">= 37.0") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, ">= 37.0") {
 		albSettingsConfig.SupportedFeatureSet = "PREMIUM"
 	}
 
 	// Enable Transparent mode on VCD >= 10.4.1
-	if vcd.client.Client.APIVCDMaxVersionIs(">= 37.1") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, ">= 37.1") {
 		printVerbose("# Enabling Transparent mode on Edge Gateway (VCD 10.4.1+)\n")
 		albSettingsConfig.TransparentModeEnabled = addrOf(true)
 	}
 
-	enabledSettings, err := edge.UpdateAlbSettings(albSettingsConfig)
+	enabledSettings, err := edge.UpdateAlbSettings(ctx, albSettingsConfig)
 	if err != nil {
 		fmt.Printf("# error occured while enabling ALB on Edge Gateway. Cleaning up Service Engine Group, ALB Cloud and ALB Controller: %s", err)
 		err2 := seGroup.Delete(ctx)
@@ -292,7 +292,7 @@ func setupAlbPoolPrerequisites(check *C, vcd *TestVCD) (*NsxtAlbController, *Nsx
 		MinVirtualServices:    takeIntAddress(20),
 	}
 
-	assignment, err := vcd.client.CreateAlbServiceEngineGroupAssignment(serviceEngineGroupAssignmentConfig)
+	assignment, err := vcd.client.CreateAlbServiceEngineGroupAssignment(ctx, serviceEngineGroupAssignmentConfig)
 	check.Assert(err, IsNil)
 	check.Assert(assignment.NsxtAlbServiceEngineGroupAssignment.ID, Not(Equals), "")
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbServiceEngineGroupAssignments + assignment.NsxtAlbServiceEngineGroupAssignment.ID

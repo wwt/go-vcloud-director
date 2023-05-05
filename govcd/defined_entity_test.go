@@ -28,7 +28,7 @@ func (vcd *TestVCD) Test_RdeAndRdeType(check *C) {
 		types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntitiesResolve,
 		types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntities,
 	} {
-		skipOpenApiEndpointTest(vcd, check, endpoint)
+		skipOpenApiEndpointTest(ctx, vcd, check, endpoint)
 	}
 
 	if len(vcd.config.Tenants) == 0 {
@@ -46,12 +46,12 @@ func (vcd *TestVCD) Test_RdeAndRdeType(check *C) {
 	check.Assert(true, Equals, len(unmarshaledRdeTypeSchema) > 0)
 
 	// First, it checks how many exist already, as VCD contains some pre-defined ones.
-	allRdeTypesBySystemAdmin, err := systemAdministratorClient.GetAllRdeTypes(nil)
+	allRdeTypesBySystemAdmin, err := systemAdministratorClient.GetAllRdeTypes(ctx, nil)
 	check.Assert(err, IsNil)
 	alreadyPresentRdes := len(allRdeTypesBySystemAdmin)
 
 	// For the tenant, it returns 0 RDE Types, but no error.
-	allRdeTypesByTenant, err := tenantUserClient.GetAllRdeTypes(nil)
+	allRdeTypesByTenant, err := tenantUserClient.GetAllRdeTypes(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(allRdeTypesByTenant), Equals, 0)
 
@@ -69,7 +69,7 @@ func (vcd *TestVCD) Test_RdeAndRdeType(check *C) {
 		Vendor:      vendor,
 		Interfaces:  []string{"urn:vcloud:interface:vmware:k8s:1.0.0"},
 	}
-	createdRdeType, err := systemAdministratorClient.CreateRdeType(rdeTypeToCreate)
+	createdRdeType, err := systemAdministratorClient.CreateRdeType(ctx, rdeTypeToCreate)
 	check.Assert(err, IsNil)
 	check.Assert(createdRdeType, NotNil)
 	check.Assert(createdRdeType.DefinedEntityType.Name, Equals, rdeTypeToCreate.Name)
@@ -83,7 +83,7 @@ func (vcd *TestVCD) Test_RdeAndRdeType(check *C) {
 	AddToCleanupListOpenApi(createdRdeType.DefinedEntityType.ID, check.TestName(), types.OpenApiPathVersion1_0_0+types.OpenApiEndpointRdeEntityTypes+createdRdeType.DefinedEntityType.ID)
 
 	// Tenants can't create RDE Types
-	nilRdeType, err := tenantUserClient.CreateRdeType(&types.DefinedEntityType{
+	nilRdeType, err := tenantUserClient.CreateRdeType(ctx, &types.DefinedEntityType{
 		Name:    check.TestName(),
 		Nss:     "notworking",
 		Version: "4.5.6",
@@ -97,19 +97,19 @@ func (vcd *TestVCD) Test_RdeAndRdeType(check *C) {
 	// Assign rights to the tenant user, so it can perform following operations.
 	// We don't need to clean the rights afterwards as deleting the RDE Type deletes the associated bundle
 	// with its rights.
-	role, err := systemAdministratorClient.Client.GetGlobalRoleByName("Organization Administrator")
+	role, err := systemAdministratorClient.Client.GetGlobalRoleByName(ctx, "Organization Administrator")
 	check.Assert(err, IsNil)
 	check.Assert(role, NotNil)
 
 	rightsBundleName := fmt.Sprintf("%s:%s Entitlement", vendor, nss)
-	rightsBundle, err := systemAdministratorClient.Client.GetRightsBundleByName(rightsBundleName)
+	rightsBundle, err := systemAdministratorClient.Client.GetRightsBundleByName(ctx, rightsBundleName)
 	check.Assert(err, IsNil)
 	check.Assert(rightsBundle, NotNil)
 
-	err = rightsBundle.PublishAllTenants()
+	err = rightsBundle.PublishAllTenants(ctx)
 	check.Assert(err, IsNil)
 
-	rights, err := rightsBundle.GetRights(nil)
+	rights, err := rightsBundle.GetRights(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(rights), Not(Equals), 0)
 
@@ -125,40 +125,40 @@ func (vcd *TestVCD) Test_RdeAndRdeType(check *C) {
 	check.Assert(rightsToAdd, NotNil)
 	check.Assert(len(rightsToAdd), Not(Equals), 0)
 
-	err = role.AddRights(rightsToAdd)
+	err = role.AddRights(ctx, rightsToAdd)
 	check.Assert(err, IsNil)
 
 	// As we created a new RDE Type, we check the new count is correct in both System admin and Tenant user
-	allRdeTypesBySystemAdmin, err = systemAdministratorClient.GetAllRdeTypes(nil)
+	allRdeTypesBySystemAdmin, err = systemAdministratorClient.GetAllRdeTypes(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(allRdeTypesBySystemAdmin), Equals, alreadyPresentRdes+1)
 
 	// Count is 1 for tenant user as it can only retrieve the created type as per the assigned rights above.
-	allRdeTypesByTenant, err = tenantUserClient.GetAllRdeTypes(nil)
+	allRdeTypesByTenant, err = tenantUserClient.GetAllRdeTypes(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(allRdeTypesByTenant), Equals, 1)
 
 	// Test the multiple ways of getting a RDE Types in both users.
-	obtainedRdeTypeBySysAdmin, err := systemAdministratorClient.GetRdeTypeById(createdRdeType.DefinedEntityType.ID)
+	obtainedRdeTypeBySysAdmin, err := systemAdministratorClient.GetRdeTypeById(ctx, createdRdeType.DefinedEntityType.ID)
 	check.Assert(err, IsNil)
 	check.Assert(*obtainedRdeTypeBySysAdmin.DefinedEntityType, DeepEquals, *createdRdeType.DefinedEntityType)
 
 	// The RDE Type retrieved by the tenant should be the same as the retrieved by Sysadmin
-	obtainedRdeTypeByTenant, err := tenantUserClient.GetRdeTypeById(createdRdeType.DefinedEntityType.ID)
+	obtainedRdeTypeByTenant, err := tenantUserClient.GetRdeTypeById(ctx, createdRdeType.DefinedEntityType.ID)
 	check.Assert(err, IsNil)
 	check.Assert(*obtainedRdeTypeByTenant.DefinedEntityType, DeepEquals, *obtainedRdeTypeBySysAdmin.DefinedEntityType)
 
-	obtainedRdeTypeBySysAdmin, err = systemAdministratorClient.GetRdeType(createdRdeType.DefinedEntityType.Vendor, createdRdeType.DefinedEntityType.Nss, createdRdeType.DefinedEntityType.Version)
+	obtainedRdeTypeBySysAdmin, err = systemAdministratorClient.GetRdeType(ctx, createdRdeType.DefinedEntityType.Vendor, createdRdeType.DefinedEntityType.Nss, createdRdeType.DefinedEntityType.Version)
 	check.Assert(err, IsNil)
 	check.Assert(*obtainedRdeTypeBySysAdmin.DefinedEntityType, DeepEquals, *obtainedRdeTypeBySysAdmin.DefinedEntityType)
 
 	// The RDE Type retrieved by the tenant should be the same as the retrieved by Sysadmin
-	obtainedRdeTypeByTenant, err = tenantUserClient.GetRdeType(createdRdeType.DefinedEntityType.Vendor, createdRdeType.DefinedEntityType.Nss, createdRdeType.DefinedEntityType.Version)
+	obtainedRdeTypeByTenant, err = tenantUserClient.GetRdeType(ctx, createdRdeType.DefinedEntityType.Vendor, createdRdeType.DefinedEntityType.Nss, createdRdeType.DefinedEntityType.Version)
 	check.Assert(err, IsNil)
 	check.Assert(*obtainedRdeTypeByTenant.DefinedEntityType, DeepEquals, *obtainedRdeTypeBySysAdmin.DefinedEntityType)
 
 	// We don't want to update the name nor the schema. It should populate them from the receiver object automatically
-	err = obtainedRdeTypeBySysAdmin.Update(types.DefinedEntityType{
+	err = obtainedRdeTypeBySysAdmin.Update(ctx, types.DefinedEntityType{
 		Description: rdeTypeToCreate.Description + "UpdatedByAdmin",
 	})
 	check.Assert(err, IsNil)
@@ -173,7 +173,7 @@ func (vcd *TestVCD) Test_RdeAndRdeType(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(*createdRdeType.DefinedEntityType, DeepEquals, types.DefinedEntityType{})
 
-	_, err = systemAdministratorClient.GetRdeTypeById(deletedId)
+	_, err = systemAdministratorClient.GetRdeTypeById(ctx, deletedId)
 	check.Assert(err, NotNil)
 	check.Assert(strings.Contains(err.Error(), ErrorEntityNotFound.Error()), Equals, true)
 }
@@ -199,7 +199,7 @@ func testRdeCrudWithGivenType(check *C, rdeType *DefinedEntityType) {
 	err := json.Unmarshal(rdeEntityJson, &unmarshaledRdeEntityJson)
 	check.Assert(err, IsNil)
 
-	rde, err := rdeType.CreateRde(types.DefinedEntity{
+	rde, err := rdeType.CreateRde(ctx, types.DefinedEntity{
 		Name:       check.TestName(),
 		ExternalId: "123",
 		Entity:     unmarshaledRdeEntityJson,
@@ -214,7 +214,7 @@ func testRdeCrudWithGivenType(check *C, rdeType *DefinedEntityType) {
 	check.Assert(true, Equals, strings.Contains(err.Error(), "RDE_ENTITY_NOT_RESOLVED"))
 
 	// Resolution should fail as we missed to add a mandatory field
-	err = rde.Resolve()
+	err = rde.Resolve(ctx)
 	eTag := rde.Etag
 	check.Assert(err, IsNil)
 	// The RDE can be automatically deleted now as rde.Resolve() was called successfully
@@ -225,7 +225,7 @@ func testRdeCrudWithGivenType(check *C, rdeType *DefinedEntityType) {
 
 	// We amend it
 	unmarshaledRdeEntityJson["foo"] = map[string]interface{}{"key": "stringValue5"}
-	err = rde.Update(types.DefinedEntity{
+	err = rde.Update(ctx, types.DefinedEntity{
 		Entity: unmarshaledRdeEntityJson,
 	})
 	check.Assert(err, IsNil)
@@ -235,7 +235,7 @@ func testRdeCrudWithGivenType(check *C, rdeType *DefinedEntityType) {
 	eTag = rde.Etag
 
 	// This time it should resolve
-	err = rde.Resolve()
+	err = rde.Resolve(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(*rde.DefinedEntity.State, Equals, "RESOLVED")
 	check.Assert(rde.Etag, Not(Equals), "")
@@ -248,7 +248,7 @@ func testRdeCrudWithGivenType(check *C, rdeType *DefinedEntityType) {
 	check.Assert(*rde.DefinedEntity, DeepEquals, types.DefinedEntity{})
 
 	// RDE should not exist anymore
-	_, err = rdeType.GetRdeById(deletedId)
+	_, err = rdeType.GetRdeById(ctx, deletedId)
 	check.Assert(err, NotNil)
 	check.Assert(strings.Contains(err.Error(), ErrorEntityNotFound.Error()), Equals, true)
 }
@@ -273,7 +273,7 @@ func testRdeCrudAsTenant(check *C, vendor string, namespace string, version stri
 	err := json.Unmarshal(rdeEntityJson, &unmarshaledRdeEntityJson)
 	check.Assert(err, IsNil)
 
-	rde, err := vcdClient.CreateRde(vendor, namespace, version, types.DefinedEntity{
+	rde, err := vcdClient.CreateRde(ctx, vendor, namespace, version, types.DefinedEntity{
 		Name:       check.TestName(),
 		ExternalId: "123",
 		Entity:     unmarshaledRdeEntityJson,
@@ -288,7 +288,7 @@ func testRdeCrudAsTenant(check *C, vendor string, namespace string, version stri
 	check.Assert(true, Equals, strings.Contains(err.Error(), "RDE_ENTITY_NOT_RESOLVED"))
 
 	// Resolution should fail as we missed to add a mandatory field
-	err = rde.Resolve()
+	err = rde.Resolve(ctx)
 	eTag := rde.Etag
 	check.Assert(err, IsNil)
 	check.Assert(*rde.DefinedEntity.State, Equals, "RESOLUTION_ERROR")
@@ -296,7 +296,7 @@ func testRdeCrudAsTenant(check *C, vendor string, namespace string, version stri
 
 	// We amend it
 	unmarshaledRdeEntityJson["foo"] = map[string]interface{}{"key": "stringValue5"}
-	err = rde.Update(types.DefinedEntity{
+	err = rde.Update(ctx, types.DefinedEntity{
 		Entity: unmarshaledRdeEntityJson,
 	})
 	check.Assert(err, IsNil)
@@ -306,7 +306,7 @@ func testRdeCrudAsTenant(check *C, vendor string, namespace string, version stri
 	eTag = rde.Etag
 
 	// This time it should resolve
-	err = rde.Resolve()
+	err = rde.Resolve(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(*rde.DefinedEntity.State, Equals, "RESOLVED")
 	check.Assert(rde.Etag, Not(Equals), "")
@@ -317,13 +317,13 @@ func testRdeCrudAsTenant(check *C, vendor string, namespace string, version stri
 
 	// Delete the RDE instance now that it's resolved
 	deletedId := rde.DefinedEntity.ID
-	err = rde.Delete()
+	err = rde.Delete(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(*rde.DefinedEntity, DeepEquals, types.DefinedEntity{})
 	check.Assert(rde.Etag, Equals, "")
 
 	// RDE should not exist anymore
-	_, err = vcdClient.GetRdeById(deletedId)
+	_, err = vcdClient.GetRdeById(ctx, deletedId)
 	check.Assert(err, NotNil)
 	check.Assert(strings.Contains(err.Error(), ErrorEntityNotFound.Error()), Equals, true)
 }

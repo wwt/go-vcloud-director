@@ -26,7 +26,7 @@ func (vcd *TestVCD) Test_NsxvDistributedFirewall(check *C) {
 			fmt.Println("Testing attempted access to NSX-T VDC")
 		}
 		// Retrieve a NSX-T VDC
-		nsxtVdc, err := org.GetAdminVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+		nsxtVdc, err := org.GetAdminVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 		check.Assert(err, IsNil)
 
 		notWorkingDfw := NewNsxvDistributedFirewall(nsxtVdc.client, nsxtVdc.AdminVdc.ID)
@@ -36,21 +36,21 @@ func (vcd *TestVCD) Test_NsxvDistributedFirewall(check *C) {
 		check.Assert(err, IsNil)
 		check.Assert(isEnabled, Equals, false)
 
-		err = notWorkingDfw.Enable()
+		err = notWorkingDfw.Enable(ctx)
 		// NSX-T VDCs don't support NSX-V distributed firewalls. We expect an error here.
 		check.Assert(err, NotNil)
 		check.Assert(strings.Contains(err.Error(), "Forbidden"), Equals, true)
 		if testVerbose {
 			fmt.Printf("notWorkingDfw: %s\n", err)
 		}
-		config, err := notWorkingDfw.GetConfiguration()
+		config, err := notWorkingDfw.GetConfiguration(ctx)
 		// Also this operation should fail
 		check.Assert(err, NotNil)
 		check.Assert(config, IsNil)
 	}
 
 	// Retrieve a NSX-V VDC
-	vdc, err := org.GetAdminVDCByName(vcd.config.VCD.Vdc, false)
+	vdc, err := org.GetAdminVDCByName(ctx, vcd.config.VCD.Vdc, false)
 	check.Assert(err, IsNil)
 	check.Assert(vdc, NotNil)
 
@@ -59,14 +59,14 @@ func (vcd *TestVCD) Test_NsxvDistributedFirewall(check *C) {
 
 	// dfw.Enable is an idempotent operation. It can be repeated on an already enabled DFW
 	// without errors.
-	err = dfw.Enable()
+	err = dfw.Enable(ctx)
 	check.Assert(err, IsNil)
 
 	enabled, err := dfw.IsEnabled(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(enabled, Equals, true)
 
-	config, err := dfw.GetConfiguration()
+	config, err := dfw.GetConfiguration(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(config, NotNil)
 	if testVerbose {
@@ -74,7 +74,7 @@ func (vcd *TestVCD) Test_NsxvDistributedFirewall(check *C) {
 	}
 
 	// Repeat enable operation
-	err = dfw.Enable()
+	err = dfw.Enable(ctx)
 	check.Assert(err, IsNil)
 
 	enabled, err = dfw.IsEnabled(ctx)
@@ -104,7 +104,7 @@ func (vcd *TestVCD) Test_NsxvDistributedFirewallUpdate(check *C) {
 	check.Assert(org, NotNil)
 
 	// Retrieve a NSX-V VDC
-	adminVdc, err := org.GetAdminVDCByName(vcd.config.VCD.Vdc, false)
+	adminVdc, err := org.GetAdminVDCByName(ctx, vcd.config.VCD.Vdc, false)
 	check.Assert(err, IsNil)
 	check.Assert(adminVdc, NotNil)
 	vdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Vdc, false)
@@ -119,7 +119,7 @@ func (vcd *TestVCD) Test_NsxvDistributedFirewallUpdate(check *C) {
 		check.Skip(fmt.Sprintf("VDC %s already contains a distributed firewall - skipping", vcd.config.VCD.Vdc))
 	}
 
-	vms, err := vdc.QueryVmList(types.VmQueryFilterOnlyDeployed)
+	vms, err := vdc.QueryVmList(ctx, types.VmQueryFilterOnlyDeployed)
 	check.Assert(err, IsNil)
 
 	sampleDestination := &types.Destinations{}
@@ -133,15 +133,15 @@ func (vcd *TestVCD) Test_NsxvDistributedFirewallUpdate(check *C) {
 			},
 		}
 	}
-	err = dfw.Enable()
+	err = dfw.Enable(ctx)
 	check.Assert(err, IsNil)
 
-	dnsService, err := dfw.GetServiceByName("DNS")
+	dnsService, err := dfw.GetServiceByName(ctx, "DNS")
 	check.Assert(err, IsNil)
-	integrationServiceGroup, err := dfw.GetServiceGroupByName("MSSQL Integration Services")
+	integrationServiceGroup, err := dfw.GetServiceGroupByName(ctx, "MSSQL Integration Services")
 	check.Assert(err, IsNil)
 
-	network, err := vdc.GetOrgVdcNetworkByName(vcd.config.VCD.Network.Net1, false)
+	network, err := vdc.GetOrgVdcNetworkByName(ctx, vcd.config.VCD.Network.Net1, false)
 	check.Assert(err, IsNil)
 	AddToCleanupList(vcd.config.VCD.Vdc, "nsxv_dfw", vcd.config.VCD.Org, check.TestName())
 	rules := []types.NsxvDistributedFirewallRule{
@@ -225,7 +225,7 @@ func (vcd *TestVCD) Test_NsxvDistributedFirewallUpdate(check *C) {
 		},
 	}
 
-	updatedRules, err := dfw.UpdateConfiguration(rules)
+	updatedRules, err := dfw.UpdateConfiguration(ctx, rules)
 	check.Assert(err, IsNil)
 	check.Assert(updatedRules, NotNil)
 
@@ -242,14 +242,14 @@ func (vcd *TestVCD) Test_NsxvServices(check *C) {
 	check.Assert(org, NotNil)
 
 	// Retrieve a NSX-V VDC
-	vdc, err := org.GetAdminVDCByName(vcd.config.VCD.Vdc, false)
+	vdc, err := org.GetAdminVDCByName(ctx, vcd.config.VCD.Vdc, false)
 	check.Assert(err, IsNil)
 	check.Assert(vdc, NotNil)
 
 	dfw := NewNsxvDistributedFirewall(vdc.client, vdc.AdminVdc.ID)
 	check.Assert(dfw, NotNil)
 
-	services, err := dfw.GetServices(false)
+	services, err := dfw.GetServices(ctx, false)
 	check.Assert(err, IsNil)
 	check.Assert(services, NotNil)
 	check.Assert(len(services) > 0, Equals, true)
@@ -260,32 +260,32 @@ func (vcd *TestVCD) Test_NsxvServices(check *C) {
 	}
 
 	serviceName := "PostgreSQL"
-	serviceByName, err := dfw.GetServiceByName(serviceName)
+	serviceByName, err := dfw.GetServiceByName(ctx, serviceName)
 
 	check.Assert(err, IsNil)
 	check.Assert(serviceByName, NotNil)
 	check.Assert(serviceByName.Name, Equals, serviceName)
 
-	serviceById, err := dfw.GetServiceById(serviceByName.ObjectID)
+	serviceById, err := dfw.GetServiceById(ctx, serviceByName.ObjectID)
 	check.Assert(err, IsNil)
 	check.Assert(serviceById.Name, Equals, serviceName)
 
 	searchRegex := "M.SQL" // Finds, among others, names containing "MySQL" or "MSSQL"
-	servicesByRegex, err := dfw.GetServicesByRegex(searchRegex)
+	servicesByRegex, err := dfw.GetServicesByRegex(ctx, searchRegex)
 	check.Assert(err, IsNil)
 	check.Assert(len(servicesByRegex) > 1, Equals, true)
 
 	searchRegex = "." // Finds all services
-	servicesByRegex, err = dfw.GetServicesByRegex(searchRegex)
+	servicesByRegex, err = dfw.GetServicesByRegex(ctx, searchRegex)
 	check.Assert(err, IsNil)
 	check.Assert(len(servicesByRegex), Equals, len(services))
 
 	searchRegex = "^####--no-such-service--####$" // Finds no services
-	servicesByRegex, err = dfw.GetServicesByRegex(searchRegex)
+	servicesByRegex, err = dfw.GetServicesByRegex(ctx, searchRegex)
 	check.Assert(err, IsNil)
 	check.Assert(len(servicesByRegex), Equals, 0)
 
-	serviceGroups, err := dfw.GetServiceGroups(false)
+	serviceGroups, err := dfw.GetServiceGroups(ctx, false)
 	check.Assert(err, IsNil)
 	check.Assert(serviceGroups, NotNil)
 	check.Assert(len(serviceGroups) > 0, Equals, true)
@@ -294,28 +294,28 @@ func (vcd *TestVCD) Test_NsxvServices(check *C) {
 		fmt.Printf("%# v\n", pretty.Formatter(serviceGroups[0]))
 	}
 	serviceGroupName := "Orchestrator"
-	serviceGroupByName, err := dfw.GetServiceGroupByName(serviceGroupName)
+	serviceGroupByName, err := dfw.GetServiceGroupByName(ctx, serviceGroupName)
 	check.Assert(err, IsNil)
 	check.Assert(serviceGroupByName, NotNil)
 	check.Assert(serviceGroupByName.Name, Equals, serviceGroupName)
 
-	serviceGroupById, err := dfw.GetServiceGroupById(serviceGroupByName.ObjectID)
+	serviceGroupById, err := dfw.GetServiceGroupById(ctx, serviceGroupByName.ObjectID)
 	check.Assert(err, IsNil)
 	check.Assert(serviceGroupById, NotNil)
 	check.Assert(serviceGroupById.Name, Equals, serviceGroupName)
 
 	searchRegex = "Oracle"
-	serviceGroupsByRegex, err := dfw.GetServiceGroupsByRegex(searchRegex)
+	serviceGroupsByRegex, err := dfw.GetServiceGroupsByRegex(ctx, searchRegex)
 	check.Assert(err, IsNil)
 	check.Assert(len(serviceGroupsByRegex) > 1, Equals, true)
 
 	searchRegex = "."
-	serviceGroupsByRegex, err = dfw.GetServiceGroupsByRegex(searchRegex)
+	serviceGroupsByRegex, err = dfw.GetServiceGroupsByRegex(ctx, searchRegex)
 	check.Assert(err, IsNil)
 	check.Assert(len(serviceGroupsByRegex), Equals, len(serviceGroups))
 
 	searchRegex = "^####--no-such-service-group--####$"
-	serviceGroupsByRegex, err = dfw.GetServiceGroupsByRegex(searchRegex)
+	serviceGroupsByRegex, err = dfw.GetServiceGroupsByRegex(ctx, searchRegex)
 	check.Assert(err, IsNil)
 	check.Assert(len(serviceGroupsByRegex), Equals, 0)
 }

@@ -51,7 +51,7 @@ func (vcd *TestVCD) Test_GetRoleReference(check *C) {
 		OrgUserRoleConsoleAccessOnly,
 	}
 	for _, roleName := range Roles {
-		roleReference, err := adminOrg.GetRoleReference(roleName)
+		roleReference, err := adminOrg.GetRoleReference(ctx, roleName)
 		check.Assert(err, IsNil)
 		check.Assert(roleReference, NotNil)
 		check.Assert(roleReference.Name, Equals, roleName)
@@ -191,7 +191,7 @@ func (vcd *TestVCD) Test_UserCRUD(check *C) {
 		check.Assert(err, IsNil)
 
 		// Get the user from API again
-		user, err = adminOrg.GetUserByHref(user.User.Href)
+		user, err = adminOrg.GetUserByHref(ctx, user.User.Href)
 		check.Assert(err, IsNil)
 		check.Assert(user.User.DeployedVmQuota, Equals, 0)
 		check.Assert(user.User.StoredVmQuota, Equals, 0)

@@ -13,12 +13,12 @@ import (
 // Security Group.
 func (vcd *TestVCD) Test_NsxtDynamicSecurityGroup(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
 	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
-	vdcGroup, err := adminOrg.GetVdcGroupByName(vcd.config.VCD.Nsxt.VdcGroup)
+	vdcGroup, err := adminOrg.GetVdcGroupByName(ctx, vcd.config.VCD.Nsxt.VdcGroup)
 	check.Assert(err, IsNil)
 
 	dynamicSecGroupDefinition := &types.NsxtFirewallGroup{
@@ -68,7 +68,7 @@ func (vcd *TestVCD) Test_NsxtDynamicSecurityGroup(check *C) {
 		},
 	}
 
-	createdDynamicGroup, err := vdcGroup.CreateNsxtFirewallGroup(dynamicSecGroupDefinition)
+	createdDynamicGroup, err := vdcGroup.CreateNsxtFirewallGroup(ctx, dynamicSecGroupDefinition)
 	check.Assert(err, IsNil)
 	check.Assert(createdDynamicGroup, NotNil)
 
@@ -83,7 +83,7 @@ func (vcd *TestVCD) Test_NsxtDynamicSecurityGroup(check *C) {
 	createdDynamicGroup.NsxtFirewallGroup.Description = "updated-description"
 	createdDynamicGroup.NsxtFirewallGroup.Name = check.TestName() + "-updated"
 
-	updatedDynamicGroup, err := createdDynamicGroup.Update(createdDynamicGroup.NsxtFirewallGroup)
+	updatedDynamicGroup, err := createdDynamicGroup.Update(ctx, createdDynamicGroup.NsxtFirewallGroup)
 	check.Assert(err, IsNil)
 	check.Assert(updatedDynamicGroup, NotNil)
 	check.Assert(updatedDynamicGroup.NsxtFirewallGroup, DeepEquals, createdDynamicGroup.NsxtFirewallGroup)

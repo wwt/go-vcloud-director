@@ -68,7 +68,7 @@ func (vcd *TestVCD) Test_Roles(check *C) {
 	check.Assert(createdRole.Role, DeepEquals, newR)
 
 	// Check that the new role is found in the Organization structure
-	roleRef, err := adminOrg.GetRoleReference(createdRole.Role.Name)
+	roleRef, err := adminOrg.GetRoleReference(ctx, createdRole.Role.Name)
 	check.Assert(err, IsNil)
 	check.Assert(roleRef, NotNil)
 
@@ -85,26 +85,26 @@ func (vcd *TestVCD) Test_Roles(check *C) {
 	rightSet, err := getRightsSet(adminOrg.client, rightNames)
 	check.Assert(err, IsNil)
 
-	err = updatedRole.AddRights(rightSet)
+	err = updatedRole.AddRights(ctx, rightSet)
 	check.Assert(err, IsNil)
 
-	rights, err := updatedRole.GetRights(nil)
+	rights, err := updatedRole.GetRights(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(rights), Equals, len(rightSet))
 
 	// Step 6 - remove 1 right from role
 
-	err = updatedRole.RemoveRights([]types.OpenApiReference{rightSet[0]})
+	err = updatedRole.RemoveRights(ctx, []types.OpenApiReference{rightSet[0]})
 	check.Assert(err, IsNil)
-	rights, err = updatedRole.GetRights(nil)
+	rights, err = updatedRole.GetRights(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(rights), Equals, len(rightSet)-1)
 
 	// Step 7 - remove all rights from role
-	err = updatedRole.RemoveAllRights()
+	err = updatedRole.RemoveAllRights(ctx)
 	check.Assert(err, IsNil)
 
-	rights, err = updatedRole.GetRights(nil)
+	rights, err = updatedRole.GetRights(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(rights), Equals, 0)
 

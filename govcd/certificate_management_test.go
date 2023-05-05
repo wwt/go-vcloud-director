@@ -19,7 +19,7 @@ func (vcd *TestVCD) Test_CertificateInLibrary(check *C) {
 	if vcd.skipAdminTests {
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointSSLCertificateLibrary)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointSSLCertificateLibrary)
 
 	alias := "Test_CertificateInLibrary"
 
@@ -27,9 +27,9 @@ func (vcd *TestVCD) Test_CertificateInLibrary(check *C) {
 		Alias:       alias,
 		Certificate: certificate,
 	}
-	createdCertificate, err := vcd.client.Client.AddCertificateToLibrary(certificateConfig)
+	createdCertificate, err := vcd.client.Client.AddCertificateToLibrary(ctx, certificateConfig)
 	check.Assert(err, IsNil)
-	openApiEndpoint, err := getEndpointByVersion(&vcd.client.Client)
+	openApiEndpoint, err := getEndpointByVersion(ctx, &vcd.client.Client)
 	check.Assert(err, IsNil)
 	check.Assert(openApiEndpoint, NotNil)
 	PrependToCleanupListOpenApi(createdCertificate.CertificateLibrary.Alias, check.TestName(), openApiEndpoint+createdCertificate.CertificateLibrary.Id)
@@ -39,7 +39,7 @@ func (vcd *TestVCD) Test_CertificateInLibrary(check *C) {
 	check.Assert(createdCertificate.CertificateLibrary.Alias, Equals, alias)
 	check.Assert(createdCertificate.CertificateLibrary.Certificate, Equals, certificate)
 
-	fetchedCertificate, err := vcd.client.Client.GetCertificateFromLibraryById(createdCertificate.CertificateLibrary.Id)
+	fetchedCertificate, err := vcd.client.Client.GetCertificateFromLibraryById(ctx, createdCertificate.CertificateLibrary.Id)
 	check.Assert(err, IsNil)
 	check.Assert(fetchedCertificate, NotNil)
 	check.Assert(fetchedCertificate.CertificateLibrary.Alias, Equals, alias)
@@ -61,9 +61,9 @@ func (vcd *TestVCD) Test_CertificateInLibrary(check *C) {
 		PrivateKey:           privateKey,
 		PrivateKeyPassphrase: privateKeyPassphrase,
 	}
-	createdCertificateWithPrivateKeyConfig, err := adminOrg.AddCertificateToLibrary(certificateWithPrivateKeyConfig)
+	createdCertificateWithPrivateKeyConfig, err := adminOrg.AddCertificateToLibrary(ctx, certificateWithPrivateKeyConfig)
 	check.Assert(err, IsNil)
-	openApiEndpoint, err = getEndpointByVersion(&vcd.client.Client)
+	openApiEndpoint, err = getEndpointByVersion(ctx, &vcd.client.Client)
 	check.Assert(err, IsNil)
 	check.Assert(openApiEndpoint, NotNil)
 	PrependToCleanupListOpenApi(createdCertificateWithPrivateKeyConfig.CertificateLibrary.Alias, check.TestName(),
@@ -74,14 +74,14 @@ func (vcd *TestVCD) Test_CertificateInLibrary(check *C) {
 	check.Assert(createdCertificateWithPrivateKeyConfig.CertificateLibrary.Alias, Equals, aliasForPrivateKey)
 	check.Assert(createdCertificateWithPrivateKeyConfig.CertificateLibrary.Certificate, Equals, certificate)
 
-	fetchedCertificateWithPrivateKey, err := vcd.client.Client.GetCertificateFromLibraryById(createdCertificateWithPrivateKeyConfig.CertificateLibrary.Id)
+	fetchedCertificateWithPrivateKey, err := vcd.client.Client.GetCertificateFromLibraryById(ctx, createdCertificateWithPrivateKeyConfig.CertificateLibrary.Id)
 	check.Assert(err, IsNil)
 	check.Assert(fetchedCertificateWithPrivateKey, NotNil)
 	check.Assert(fetchedCertificateWithPrivateKey.CertificateLibrary.Alias, Equals, aliasForPrivateKey)
 	check.Assert(fetchedCertificateWithPrivateKey.CertificateLibrary.Certificate, Equals, certificate)
 
 	// check fetching all certificates
-	allOrgCertificates, err := adminOrg.GetAllCertificatesFromLibrary(nil)
+	allOrgCertificates, err := adminOrg.GetAllCertificatesFromLibrary(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(allOrgCertificates, NotNil)
 
@@ -92,7 +92,7 @@ func (vcd *TestVCD) Test_CertificateInLibrary(check *C) {
 				oneCertificate.CertificateLibrary.Id, oneCertificate.CertificateLibrary.Description)
 		}
 	}
-	allExistingCertificates, err := adminOrg.client.GetAllCertificatesFromLibrary(nil)
+	allExistingCertificates, err := adminOrg.client.GetAllCertificatesFromLibrary(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(allExistingCertificates, NotNil)
 
@@ -105,12 +105,12 @@ func (vcd *TestVCD) Test_CertificateInLibrary(check *C) {
 	}
 
 	// check fetching certificate by Name
-	foundCertificate, err := vcd.client.Client.GetCertificateFromLibraryByName(alias)
+	foundCertificate, err := vcd.client.Client.GetCertificateFromLibraryByName(ctx, alias)
 	check.Assert(err, IsNil)
 	check.Assert(foundCertificate, NotNil)
 	check.Assert(foundCertificate.CertificateLibrary.Alias, Equals, alias)
 
-	foundCertificateWithPrivateKey, err := adminOrg.GetCertificateFromLibraryByName(aliasForPrivateKey)
+	foundCertificateWithPrivateKey, err := adminOrg.GetCertificateFromLibraryByName(ctx, aliasForPrivateKey)
 	check.Assert(err, IsNil)
 	check.Assert(foundCertificateWithPrivateKey, NotNil)
 	check.Assert(foundCertificateWithPrivateKey.CertificateLibrary.Alias, Equals, aliasForPrivateKey)
@@ -145,13 +145,13 @@ func (vcd *TestVCD) Test_CertificateInLibrary(check *C) {
 	//delete certificate
 	err = updateCertificateWithPrivateKey.Delete(ctx)
 	check.Assert(err, IsNil)
-	deletedCertificate, err := vcd.client.Client.GetCertificateFromLibraryById(updateCertificateWithPrivateKey.CertificateLibrary.Id)
+	deletedCertificate, err := vcd.client.Client.GetCertificateFromLibraryById(ctx, updateCertificateWithPrivateKey.CertificateLibrary.Id)
 	check.Assert(ContainsNotFound(err), Equals, true)
 	check.Assert(deletedCertificate, IsNil)
 
 	err = updateCertificate.Delete(ctx)
 	check.Assert(err, IsNil)
-	deletedCertificate, err = adminOrg.client.GetCertificateFromLibraryById(updateCertificate.CertificateLibrary.Id)
+	deletedCertificate, err = adminOrg.client.GetCertificateFromLibraryById(ctx, updateCertificate.CertificateLibrary.Id)
 	check.Assert(ContainsNotFound(err), Equals, true)
 	check.Assert(deletedCertificate, IsNil)
 
@@ -161,7 +161,7 @@ func (vcd *TestVCD) Test_GetCertificateFromLibraryByName_ValidatesSymbolsInName(
 	if vcd.skipAdminTests {
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointSSLCertificateLibrary)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointSSLCertificateLibrary)
 
 	// When alias contains commas, semicolons, stars, or plus signs, the encoding may reject by the API when we try to Query it
 	// Also, spaces present their own issues
@@ -173,9 +173,9 @@ func (vcd *TestVCD) Test_GetCertificateFromLibraryByName_ValidatesSymbolsInName(
 			Alias:       alias,
 			Certificate: certificate,
 		}
-		createdCertificate, err := vcd.client.Client.AddCertificateToLibrary(certificateConfig)
+		createdCertificate, err := vcd.client.Client.AddCertificateToLibrary(ctx, certificateConfig)
 		check.Assert(err, IsNil)
-		openApiEndpoint, err := getEndpointByVersion(&vcd.client.Client)
+		openApiEndpoint, err := getEndpointByVersion(ctx, &vcd.client.Client)
 		check.Assert(err, IsNil)
 		check.Assert(openApiEndpoint, NotNil)
 		PrependToCleanupListOpenApi(createdCertificate.CertificateLibrary.Alias, check.TestName(),
@@ -186,7 +186,7 @@ func (vcd *TestVCD) Test_GetCertificateFromLibraryByName_ValidatesSymbolsInName(
 		check.Assert(createdCertificate.CertificateLibrary.Alias, Equals, alias)
 		check.Assert(createdCertificate.CertificateLibrary.Certificate, Equals, certificate)
 
-		foundCertificate, err := vcd.client.Client.GetCertificateFromLibraryByName(alias)
+		foundCertificate, err := vcd.client.Client.GetCertificateFromLibraryByName(ctx, alias)
 		check.Assert(err, IsNil)
 		check.Assert(foundCertificate, NotNil)
 		check.Assert(foundCertificate.CertificateLibrary.Alias, Equals, alias)

@@ -11,15 +11,15 @@ import (
 
 func (vcd *TestVCD) Test_NsxtIpSecVpn(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	ipSecDef := &types.NsxtIpSecVpnTunnel{
@@ -46,15 +46,15 @@ func (vcd *TestVCD) Test_NsxtIpSecVpn(check *C) {
 
 func (vcd *TestVCD) Test_NsxtIpSecVpnCustomSecurityProfile(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	ipSecDef := &types.NsxtIpSecVpnTunnel{
@@ -76,7 +76,7 @@ func (vcd *TestVCD) Test_NsxtIpSecVpnCustomSecurityProfile(check *C) {
 		Logging:      false,
 	}
 
-	createdIpSecVpn, err := edge.CreateIpSecVpnTunnel(ipSecDef)
+	createdIpSecVpn, err := edge.CreateIpSecVpnTunnel(ctx, ipSecDef)
 	check.Assert(err, IsNil)
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + fmt.Sprintf(types.OpenApiEndpointIpSecVpnTunnel, createdIpSecVpn.edgeGatewayId) + createdIpSecVpn.NsxtIpSecVpn.ID
 	AddToCleanupListOpenApi(createdIpSecVpn.NsxtIpSecVpn.Name, check.TestName(), openApiEndpoint)
@@ -101,22 +101,22 @@ func (vcd *TestVCD) Test_NsxtIpSecVpnCustomSecurityProfile(check *C) {
 		},
 		DpdConfiguration: types.NsxtIpSecVpnTunnelProfileDpdConfiguration{ProbeInterval: 3},
 	}
-	setSecProfile, err := createdIpSecVpn.UpdateTunnelConnectionProperties(secProfile)
+	setSecProfile, err := createdIpSecVpn.UpdateTunnelConnectionProperties(ctx, secProfile)
 	check.Assert(err, IsNil)
 	check.Assert(setSecProfile, DeepEquals, secProfile)
 
 	// Check if status endpoint works properly, but cannot rely on returned status as it is not immediately returned and
 	// it can hold on for a long time before available. At least validate that this function does not return error.
-	_, err = createdIpSecVpn.GetStatus()
+	_, err = createdIpSecVpn.GetStatus(ctx)
 	check.Assert(err, IsNil)
 
 	//Latest Version
-	latestSecProfile, err := edge.GetIpSecVpnTunnelById(createdIpSecVpn.NsxtIpSecVpn.ID)
+	latestSecProfile, err := edge.GetIpSecVpnTunnelById(ctx, createdIpSecVpn.NsxtIpSecVpn.ID)
 	check.Assert(err, IsNil)
 
 	// Reset security profile to default
 	latestSecProfile.NsxtIpSecVpn.SecurityType = "DEFAULT"
-	updatedIpSecVpn, err := createdIpSecVpn.Update(latestSecProfile.NsxtIpSecVpn)
+	updatedIpSecVpn, err := createdIpSecVpn.Update(ctx, latestSecProfile.NsxtIpSecVpn)
 	check.Assert(err, IsNil)
 	// All fields should be the same, except version
 	latestSecProfile.NsxtIpSecVpn.Version = updatedIpSecVpn.NsxtIpSecVpn.Version
@@ -132,15 +132,15 @@ func (vcd *TestVCD) Test_NsxtIpSecVpnCustomSecurityProfile(check *C) {
 // fields clashing.
 func (vcd *TestVCD) Test_NsxtIpSecVpnUniqueness(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	ipSecDef := &types.NsxtIpSecVpnTunnel{
@@ -162,7 +162,7 @@ func (vcd *TestVCD) Test_NsxtIpSecVpnUniqueness(check *C) {
 	}
 
 	// Create first IPsec VPN Tunnel
-	createdIpSecVpn, err := edge.CreateIpSecVpnTunnel(ipSecDef)
+	createdIpSecVpn, err := edge.CreateIpSecVpnTunnel(ctx, ipSecDef)
 	check.Assert(err, IsNil)
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + fmt.Sprintf(types.OpenApiEndpointIpSecVpnTunnel, createdIpSecVpn.edgeGatewayId) + createdIpSecVpn.NsxtIpSecVpn.ID
 	AddToCleanupListOpenApi(createdIpSecVpn.NsxtIpSecVpn.Name, check.TestName(), openApiEndpoint)
@@ -189,7 +189,7 @@ func (vcd *TestVCD) Test_NsxtIpSecVpnUniqueness(check *C) {
 	// Ensure that the IsEqual matches those definitions as equal ones
 	check.Assert(createdIpSecVpn.IsEqualTo(ipSecDef2), Equals, true)
 
-	createdIpSecVpn2, err := edge.CreateIpSecVpnTunnel(ipSecDef2)
+	createdIpSecVpn2, err := edge.CreateIpSecVpnTunnel(ctx, ipSecDef2)
 	check.Assert(err.Error(), Matches, ".*IPSec VPN Tunnel with local address .* and remote address .* is already in use.*")
 	check.Assert(createdIpSecVpn2, IsNil)
 
@@ -199,16 +199,16 @@ func (vcd *TestVCD) Test_NsxtIpSecVpnUniqueness(check *C) {
 }
 
 func runIpSecVpnTests(check *C, edge *NsxtEdgeGateway, ipSecDef *types.NsxtIpSecVpnTunnel) {
-	createdIpSecVpn, err := edge.CreateIpSecVpnTunnel(ipSecDef)
+	createdIpSecVpn, err := edge.CreateIpSecVpnTunnel(ctx, ipSecDef)
 	check.Assert(err, IsNil)
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + fmt.Sprintf(types.OpenApiEndpointIpSecVpnTunnel, createdIpSecVpn.edgeGatewayId) + createdIpSecVpn.NsxtIpSecVpn.ID
 	AddToCleanupListOpenApi(createdIpSecVpn.NsxtIpSecVpn.Name, check.TestName(), openApiEndpoint)
 
-	foundIpSecVpnById, err := edge.GetIpSecVpnTunnelById(createdIpSecVpn.NsxtIpSecVpn.ID)
+	foundIpSecVpnById, err := edge.GetIpSecVpnTunnelById(ctx, createdIpSecVpn.NsxtIpSecVpn.ID)
 	check.Assert(err, IsNil)
 	check.Assert(foundIpSecVpnById.NsxtIpSecVpn, DeepEquals, createdIpSecVpn.NsxtIpSecVpn)
 
-	foundIpSecVpnByName, err := edge.GetIpSecVpnTunnelByName(createdIpSecVpn.NsxtIpSecVpn.Name)
+	foundIpSecVpnByName, err := edge.GetIpSecVpnTunnelByName(ctx, createdIpSecVpn.NsxtIpSecVpn.Name)
 	check.Assert(err, IsNil)
 	check.Assert(foundIpSecVpnByName.NsxtIpSecVpn, DeepEquals, createdIpSecVpn.NsxtIpSecVpn)
 	check.Assert(foundIpSecVpnByName.NsxtIpSecVpn, DeepEquals, foundIpSecVpnById.NsxtIpSecVpn)
@@ -219,7 +219,7 @@ func runIpSecVpnTests(check *C, edge *NsxtEdgeGateway, ipSecDef *types.NsxtIpSec
 	ipSecDef.RemoteEndpoint.RemoteAddress = "192.168.40.1"
 	ipSecDef.ID = createdIpSecVpn.NsxtIpSecVpn.ID
 
-	updatedIpSecVpn, err := createdIpSecVpn.Update(ipSecDef)
+	updatedIpSecVpn, err := createdIpSecVpn.Update(ctx, ipSecDef)
 	check.Assert(err, IsNil)
 	check.Assert(updatedIpSecVpn.NsxtIpSecVpn.Name, Equals, ipSecDef.Name)
 	check.Assert(updatedIpSecVpn.NsxtIpSecVpn.ID, Equals, ipSecDef.ID)
@@ -229,7 +229,7 @@ func runIpSecVpnTests(check *C, edge *NsxtEdgeGateway, ipSecDef *types.NsxtIpSec
 	check.Assert(err, IsNil)
 
 	// Ensure rule does not exist in the list
-	allVpnConfigs, err := edge.GetAllIpSecVpnTunnels(nil)
+	allVpnConfigs, err := edge.GetAllIpSecVpnTunnels(ctx, nil)
 	check.Assert(err, IsNil)
 	for _, vpnConfig := range allVpnConfigs {
 		check.Assert(vpnConfig.IsEqualTo(updatedIpSecVpn.NsxtIpSecVpn), Equals, false)
@@ -238,9 +238,9 @@ func runIpSecVpnTests(check *C, edge *NsxtEdgeGateway, ipSecDef *types.NsxtIpSec
 
 func (vcd *TestVCD) Test_NsxtIpSecVpnCertificateAuth(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
@@ -249,7 +249,7 @@ func (vcd *TestVCD) Test_NsxtIpSecVpnCertificateAuth(check *C) {
 	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	// Upload Certificates to use in the test
@@ -262,9 +262,9 @@ func (vcd *TestVCD) Test_NsxtIpSecVpnCertificateAuth(check *C) {
 		PrivateKeyPassphrase: privateKeyPassphrase,
 	}
 
-	certWithKey, err := adminOrg.AddCertificateToLibrary(certificateWithPrivateKeyConfig)
+	certWithKey, err := adminOrg.AddCertificateToLibrary(ctx, certificateWithPrivateKeyConfig)
 	check.Assert(err, IsNil)
-	openApiEndpoint, err := getEndpointByVersion(&vcd.client.Client)
+	openApiEndpoint, err := getEndpointByVersion(ctx, &vcd.client.Client)
 	check.Assert(err, IsNil)
 	check.Assert(openApiEndpoint, NotNil)
 	PrependToCleanupListOpenApi(certWithKey.CertificateLibrary.Alias, check.TestName(),
@@ -277,7 +277,7 @@ func (vcd *TestVCD) Test_NsxtIpSecVpnCertificateAuth(check *C) {
 		Certificate: rootCaCertificate,
 	}
 
-	caCert, err := adminOrg.AddCertificateToLibrary(caCertificateConfig)
+	caCert, err := adminOrg.AddCertificateToLibrary(ctx, caCertificateConfig)
 	check.Assert(err, IsNil)
 	PrependToCleanupListOpenApi(caCert.CertificateLibrary.Alias, check.TestName(),
 		openApiEndpoint+caCert.CertificateLibrary.Id)

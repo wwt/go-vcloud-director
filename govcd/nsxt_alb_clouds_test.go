@@ -20,7 +20,7 @@ func (vcd *TestVCD) Test_AlbClouds(check *C) {
 	albController := spawnAlbController(vcd, check)
 	check.Assert(albController, NotNil)
 
-	importableCloud, err := albController.GetAlbImportableCloudByName(vcd.config.VCD.Nsxt.NsxtAlbImportableCloud)
+	importableCloud, err := albController.GetAlbImportableCloudByName(ctx, vcd.config.VCD.Nsxt.NsxtAlbImportableCloud)
 	check.Assert(err, IsNil)
 
 	albCloudConfig := &types.NsxtAlbCloud{
@@ -38,13 +38,13 @@ func (vcd *TestVCD) Test_AlbClouds(check *C) {
 		},
 	}
 
-	createdAlbCloud, err := vcd.client.CreateAlbCloud(albCloudConfig)
+	createdAlbCloud, err := vcd.client.CreateAlbCloud(ctx, albCloudConfig)
 	check.Assert(err, IsNil)
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbCloud + createdAlbCloud.NsxtAlbCloud.ID
 	AddToCleanupListOpenApi(createdAlbCloud.NsxtAlbCloud.Name, check.TestName(), openApiEndpoint)
 
 	// Get all clouds and ensure the needed one is found
-	allClouds, err := vcd.client.GetAllAlbClouds(nil)
+	allClouds, err := vcd.client.GetAllAlbClouds(ctx, nil)
 	check.Assert(err, IsNil)
 	var foundCreatedCloud bool
 	for cloudIndex := range allClouds {
@@ -58,18 +58,18 @@ func (vcd *TestVCD) Test_AlbClouds(check *C) {
 	// Filter lookup by name
 	filter := url.Values{}
 	filter.Add("filter", "name=="+createdAlbCloud.NsxtAlbCloud.Name)
-	allCloudsFiltered, err := vcd.client.GetAllAlbClouds(filter)
+	allCloudsFiltered, err := vcd.client.GetAllAlbClouds(ctx, filter)
 	check.Assert(err, IsNil)
 	check.Assert(len(allCloudsFiltered), Equals, 1)
 	check.Assert(allCloudsFiltered[0].NsxtAlbCloud.ID, Equals, createdAlbCloud.NsxtAlbCloud.ID)
 
 	// Get by Name
-	albCloudByName, err := vcd.client.GetAlbCloudByName(createdAlbCloud.NsxtAlbCloud.Name)
+	albCloudByName, err := vcd.client.GetAlbCloudByName(ctx, createdAlbCloud.NsxtAlbCloud.Name)
 	check.Assert(err, IsNil)
 	check.Assert(albCloudByName.NsxtAlbCloud.Name, Equals, createdAlbCloud.NsxtAlbCloud.Name)
 
 	// Get by ID
-	albCloudById, err := vcd.client.GetAlbCloudById(createdAlbCloud.NsxtAlbCloud.ID)
+	albCloudById, err := vcd.client.GetAlbCloudById(ctx, createdAlbCloud.NsxtAlbCloud.ID)
 	check.Assert(err, IsNil)
 	check.Assert(albCloudById.NsxtAlbCloud.Name, Equals, createdAlbCloud.NsxtAlbCloud.Name)
 
@@ -77,7 +77,7 @@ func (vcd *TestVCD) Test_AlbClouds(check *C) {
 	err = createdAlbCloud.Delete(ctx)
 	check.Assert(err, IsNil)
 
-	_, err = vcd.client.GetAlbCloudByName(createdAlbCloud.NsxtAlbCloud.Name)
+	_, err = vcd.client.GetAlbCloudByName(ctx, createdAlbCloud.NsxtAlbCloud.Name)
 	check.Assert(ContainsNotFound(err), Equals, true)
 
 	err = albController.Delete(ctx)
@@ -92,7 +92,7 @@ func spawnAlbControllerAndCloud(vcd *TestVCD, check *C) (*NsxtAlbController, *Ns
 	albController := spawnAlbController(vcd, check)
 	check.Assert(albController, NotNil)
 
-	importableCloud, err := albController.GetAlbImportableCloudByName(vcd.config.VCD.Nsxt.NsxtAlbImportableCloud)
+	importableCloud, err := albController.GetAlbImportableCloudByName(ctx, vcd.config.VCD.Nsxt.NsxtAlbImportableCloud)
 	check.Assert(err, IsNil)
 
 	albCloudConfig := &types.NsxtAlbCloud{
@@ -110,7 +110,7 @@ func spawnAlbControllerAndCloud(vcd *TestVCD, check *C) (*NsxtAlbController, *Ns
 		},
 	}
 
-	createdAlbCloud, err := vcd.client.CreateAlbCloud(albCloudConfig)
+	createdAlbCloud, err := vcd.client.CreateAlbCloud(ctx, albCloudConfig)
 	check.Assert(err, IsNil)
 
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbCloud + createdAlbCloud.NsxtAlbCloud.ID

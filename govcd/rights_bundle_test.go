@@ -21,7 +21,7 @@ func (vcd *TestVCD) Test_RightsBundle(check *C) {
 	vcd.checkSkipWhenApiToken(check)
 
 	// Step 1 - Get all rights bundles
-	allExistingRightsBundle, err := client.GetAllRightsBundles(nil)
+	allExistingRightsBundle, err := client.GetAllRightsBundles(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(allExistingRightsBundle, NotNil)
 
@@ -32,12 +32,12 @@ func (vcd *TestVCD) Test_RightsBundle(check *C) {
 		queryParams := url.Values{}
 		queryParams.Add("filter", "id=="+oneRightsBundle.RightsBundle.Id)
 
-		expectOneRightsBundleResultById, err := client.GetAllRightsBundles(queryParams)
+		expectOneRightsBundleResultById, err := client.GetAllRightsBundles(ctx, queryParams)
 		check.Assert(err, IsNil)
 		check.Assert(len(expectOneRightsBundleResultById) == 1, Equals, true)
 
 		// Step 2.2 - retrieve specific rights bundle by using endpoint
-		exactItem, err := client.GetRightsBundleById(oneRightsBundle.RightsBundle.Id)
+		exactItem, err := client.GetRightsBundleById(ctx, oneRightsBundle.RightsBundle.Id)
 		check.Assert(err, IsNil)
 
 		check.Assert(err, IsNil)
@@ -58,7 +58,7 @@ func (vcd *TestVCD) Test_RightsBundle(check *C) {
 		ReadOnly:  false,
 	}
 
-	createdRightsBundle, err := client.CreateRightsBundle(newGR)
+	createdRightsBundle, err := client.CreateRightsBundle(ctx, newGR)
 	check.Assert(err, IsNil)
 	AddToCleanupListOpenApi(createdRightsBundle.RightsBundle.Name, check.TestName(),
 		types.OpenApiPathVersion1_0_0+types.OpenApiEndpointRightsBundles+createdRightsBundle.RightsBundle.Id)
@@ -81,28 +81,28 @@ func (vcd *TestVCD) Test_RightsBundle(check *C) {
 	rightSet, err := getRightsSet(&client, rightNames)
 	check.Assert(err, IsNil)
 
-	err = updatedRightsBundle.AddRights(rightSet)
+	err = updatedRightsBundle.AddRights(ctx, rightSet)
 	check.Assert(err, IsNil)
 
-	rights, err := updatedRightsBundle.GetRights(nil)
+	rights, err := updatedRightsBundle.GetRights(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(rights), Equals, len(rightSet))
 
 	// Step 6 - remove 1 right from rights bundle
 
-	err = updatedRightsBundle.RemoveRights([]types.OpenApiReference{rightSet[0]})
+	err = updatedRightsBundle.RemoveRights(ctx, []types.OpenApiReference{rightSet[0]})
 	check.Assert(err, IsNil)
-	rights, err = updatedRightsBundle.GetRights(nil)
+	rights, err = updatedRightsBundle.GetRights(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(rights), Equals, len(rightSet)-1)
 
 	testRightsContainerTenants(vcd, check, updatedRightsBundle)
 
 	// Step 7 - remove all rights from rights bundle
-	err = updatedRightsBundle.RemoveAllRights()
+	err = updatedRightsBundle.RemoveAllRights(ctx)
 	check.Assert(err, IsNil)
 
-	rights, err = updatedRightsBundle.GetRights(nil)
+	rights, err = updatedRightsBundle.GetRights(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(rights), Equals, 0)
 
@@ -113,7 +113,7 @@ func (vcd *TestVCD) Test_RightsBundle(check *C) {
 	// Step 9 - try to read deleted rights bundle and expect error to contain 'ErrorEntityNotFound'
 	// Read is tricky - it throws an error ACCESS_TO_RESOURCE_IS_FORBIDDEN when the resource with ID does not
 	// exist therefore one cannot know what kind of error occurred.
-	deletedRightsBundle, err := client.GetRightsBundleById(createdRightsBundle.RightsBundle.Id)
+	deletedRightsBundle, err := client.GetRightsBundleById(ctx, createdRightsBundle.RightsBundle.Id)
 	check.Assert(ContainsNotFound(err), Equals, true)
 	check.Assert(deletedRightsBundle, IsNil)
 }

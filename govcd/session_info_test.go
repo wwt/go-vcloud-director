@@ -14,7 +14,7 @@ import (
 )
 
 func (vcd *TestVCD) Test_GetSessionInfo(check *C) {
-	info, err := vcd.client.Client.GetSessionInfo()
+	info, err := vcd.client.Client.GetSessionInfo(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(info, NotNil)
 
@@ -23,13 +23,13 @@ func (vcd *TestVCD) Test_GetSessionInfo(check *C) {
 		data, err = json.MarshalIndent(info, " ", " ")
 		check.Assert(err, IsNil)
 		fmt.Printf("%s\n", data)
-		org, err := vcd.client.GetAdminOrgById(info.Org.ID)
+		org, err := vcd.client.GetAdminOrgById(ctx, info.Org.ID)
 		check.Assert(err, IsNil)
 		for _, roleRef := range info.RoleRefs {
-			role, err := org.GetRoleById(roleRef.ID)
+			role, err := org.GetRoleById(ctx, roleRef.ID)
 			check.Assert(err, IsNil)
 			fmt.Printf("%s\n", role.Role.Name)
-			rights, err := role.GetRights(nil)
+			rights, err := role.GetRights(ctx, nil)
 			check.Assert(err, IsNil)
 			for i, right := range rights {
 				fmt.Printf("\t%3d %s\n", i, right.Name)
@@ -46,7 +46,7 @@ func (vcd *TestVCD) Test_GetSessionInfo(check *C) {
 }
 
 func (vcd *TestVCD) Test_GetExtendedSessionInfo(check *C) {
-	info, err := vcd.client.GetExtendedSessionInfo()
+	info, err := vcd.client.GetExtendedSessionInfo(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(info, NotNil)
 	if testVerbose {

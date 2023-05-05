@@ -316,28 +316,28 @@ func (vcd *TestVCD) Test_SearchOrgVdc(check *C) {
 	}
 	client := vcd.client
 	// Fetching organization and VDC
-	org, err := client.GetOrgByName(vcd.org.Org.Name)
+	org, err := client.GetOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
 	anotherVdc := spawnTestVdc(vcd, check, vcd.org.Org.Name)
 	// Add some metadata to the newly created VDC
-	_, err = anotherVdc.AddMetadata("key1", "value1")
+	_, err = anotherVdc.AddMetadata(ctx, "key1", "value1")
 	check.Assert(err, IsNil)
-	_, err = anotherVdc.AddMetadata("key2", "value2")
+	_, err = anotherVdc.AddMetadata(ctx, "key2", "value2")
 	check.Assert(err, IsNil)
-	_, err = anotherVdc.AddMetadata("key3", "value3")
+	_, err = anotherVdc.AddMetadata(ctx, "key3", "value3")
 	check.Assert(err, IsNil)
 
 	// Get existing vdc, and create sample filters to retrieve them
-	filters, err := HelperMakeFiltersFromOrgVdc(org)
+	filters, err := HelperMakeFiltersFromOrgVdc(ctx, org)
 	check.Assert(err, IsNil)
 	check.Assert(filters, NotNil)
 
 	queryType := client.Client.GetQueryType(types.QtOrgVdc)
 
 	for _, fm := range filters {
-		queryItems, explanation, err := org.SearchByFilter(queryType, fm.Criteria)
+		queryItems, explanation, err := org.SearchByFilter(ctx, queryType, fm.Criteria)
 		check.Assert(err, IsNil)
 		printVerbose("%s\n", explanation)
 		check.Assert(len(queryItems), Equals, 1)

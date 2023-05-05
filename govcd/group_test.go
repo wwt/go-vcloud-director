@@ -73,7 +73,7 @@ func (vcd *TestVCD) test_GroupCRUD(check *C) {
 
 	for _, gd := range groupData {
 
-		role, err := adminOrg.GetRoleReference(gd.roleName)
+		role, err := adminOrg.GetRoleReference(ctx, gd.roleName)
 		check.Assert(err, IsNil)
 
 		groupDefinition := types.Group{
@@ -98,7 +98,7 @@ func (vcd *TestVCD) test_GroupCRUD(check *C) {
 		check.Assert(foundGroup.Group.Name, Equals, createdGroup.Group.Name)
 
 		// Setup for update
-		secondRole, err := adminOrg.GetRoleReference(gd.secondRole)
+		secondRole, err := adminOrg.GetRoleReference(ctx, gd.secondRole)
 		check.Assert(err, IsNil)
 		createdGroup.Group.Role = secondRole
 
@@ -133,7 +133,7 @@ func (vcd *TestVCD) test_GroupFinderGetGenericEntity(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
-	role, err := adminOrg.GetRoleReference(OrgUserRoleOrganizationAdministrator)
+	role, err := adminOrg.GetRoleReference(ctx, OrgUserRoleOrganizationAdministrator)
 	check.Assert(err, IsNil)
 
 	group := NewGroup(adminOrg.client, adminOrg)
@@ -187,7 +187,7 @@ func (vcd *TestVCD) test_GroupUserListIsPopulated(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
-	roleRef, err := adminOrg.GetRoleReference(OrgUserRoleOrganizationAdministrator)
+	roleRef, err := adminOrg.GetRoleReference(ctx, OrgUserRoleOrganizationAdministrator)
 	check.Assert(err, IsNil)
 
 	group := NewGroup(adminOrg.client, adminOrg)
@@ -198,7 +198,7 @@ func (vcd *TestVCD) test_GroupUserListIsPopulated(check *C) {
 		ProviderType: OrgUserProviderIntegrated,
 	}
 
-	_, err = adminOrg.CreateGroup(group.Group)
+	_, err = adminOrg.CreateGroup(ctx, group.Group)
 	check.Assert(err, IsNil)
 	AddToCleanupList(groupName, "group", group.AdminOrg.AdminOrg.Name, check.TestName())
 
@@ -212,11 +212,11 @@ func (vcd *TestVCD) test_GroupUserListIsPopulated(check *C) {
 		IsEnabled:    true,
 		ProviderType: OrgUserProviderIntegrated,
 	}
-	_, err = adminOrg.CreateUser(user.User)
+	_, err = adminOrg.CreateUser(ctx, user.User)
 	check.Assert(err, IsNil)
 	AddToCleanupList(userName, "user", group.AdminOrg.AdminOrg.Name, check.TestName())
 
-	grp, err := adminOrg.GetGroupByName(group.Group.Name, true)
+	grp, err := adminOrg.GetGroupByName(ctx, group.Group.Name, true)
 	check.Assert(err, IsNil)
 	check.Assert(grp.Group.UsersList, NotNil)
 	check.Assert(grp.Group.UsersList.UserReference[0], NotNil)
@@ -225,7 +225,7 @@ func (vcd *TestVCD) test_GroupUserListIsPopulated(check *C) {
 	err = grp.Update(ctx)
 	check.Assert(err, IsNil)
 
-	user, err = adminOrg.GetUserByHref(grp.Group.UsersList.UserReference[0].HREF)
+	user, err = adminOrg.GetUserByHref(ctx, grp.Group.UsersList.UserReference[0].HREF)
 	check.Assert(err, IsNil)
 	check.Assert(user.User.Name, Equals, userName)
 	check.Assert(len(user.User.GroupReferences.GroupReference), Equals, 1)
@@ -239,7 +239,7 @@ func (vcd *TestVCD) test_GroupUserListIsPopulated(check *C) {
 	check.Assert(err, IsNil)
 
 	// Cleanup
-	err = user.Delete(false)
+	err = user.Delete(ctx, false)
 	check.Assert(err, IsNil)
 	err = grp.Delete(ctx)
 	check.Assert(err, IsNil)

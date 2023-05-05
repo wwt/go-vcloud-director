@@ -59,7 +59,7 @@ func (vcd *TestVCD) Test_CreateDisk(check *C) {
 	check.Assert(disk.Disk.Name, Equals, diskCreateParamsDisk.Name)
 	check.Assert(disk.Disk.SizeMb, Equals, diskCreateParamsDisk.SizeMb)
 	check.Assert(disk.Disk.Description, Equals, diskCreateParamsDisk.Description)
-	if vcd.client.Client.APIVCDMaxVersionIs(">= 36") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, ">= 36") {
 		check.Assert(disk.Disk.UUID, Not(Equals), "")
 		check.Assert(disk.Disk.SharingType, Equals, "None")
 		check.Assert(disk.Disk.Encrypted, Equals, false)
@@ -302,7 +302,7 @@ func (vcd *TestVCD) Test_AttachedVMDisk(check *C) {
 	check.Assert(vmRef.Name, Equals, vm.VM.Name)
 
 	// Get attached VM
-	vmHrefs, err := disk.GetAttachedVmsHrefs()
+	vmHrefs, err := disk.GetAttachedVmsHrefs(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(vmHrefs, NotNil)
 	check.Assert(len(vmHrefs), Equals, 1)
@@ -594,7 +594,7 @@ func (vcd *TestVCD) Test_QueryDisks(check *C) {
 	check.Assert(len(*diskRecords), Equals, 2)
 	check.Assert((*diskRecords)[0].Name, Equals, diskCreateParamsDisk.Name)
 	check.Assert((*diskRecords)[0].SizeMb, Equals, int64(diskCreateParamsDisk.SizeMb))
-	if vcd.client.Client.APIVCDMaxVersionIs(">= 36") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, ">= 36") {
 		check.Assert((*diskRecords)[0].UUID, Not(Equals), "")
 		check.Assert((*diskRecords)[0].SharingType, Equals, "None")
 		check.Assert((*diskRecords)[0].Encrypted, Equals, false)

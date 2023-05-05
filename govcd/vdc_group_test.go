@@ -23,7 +23,7 @@ func (vcd *TestVCD) Test_CreateVdcGroup(check *C) {
 	if vcd.config.VCD.Nsxt.Vdc == "" {
 		check.Skip("Missing NSX-T config: No NSX-T VDC specified")
 	}
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointVdcGroups)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointVdcGroups)
 
 	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
@@ -41,7 +41,7 @@ func (vcd *TestVCD) Test_NsxtVdcGroup(check *C) {
 	if vcd.config.VCD.Nsxt.Vdc == "" {
 		check.Skip("Missing NSX-T config: No NSX-T VDC specified")
 	}
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointVdcGroups)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointVdcGroups)
 
 	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
@@ -52,10 +52,10 @@ func (vcd *TestVCD) Test_NsxtVdcGroup(check *C) {
 func test_NsxtVdcGroup(check *C, adminOrg *AdminOrg, vcd *TestVCD) {
 	description := "vdc group created by test"
 
-	_, err := adminOrg.CreateNsxtVdcGroup(check.TestName(), description, vcd.nsxtVdc.vdcId(), []string{vcd.vdc.vdcId()})
+	_, err := adminOrg.CreateNsxtVdcGroup(ctx, check.TestName(), description, vcd.nsxtVdc.vdcId(), []string{vcd.vdc.vdcId()})
 	check.Assert(err, NotNil)
 
-	vdcGroup, err := adminOrg.CreateNsxtVdcGroup(check.TestName(), description, vcd.nsxtVdc.vdcId(), []string{vcd.nsxtVdc.vdcId()})
+	vdcGroup, err := adminOrg.CreateNsxtVdcGroup(ctx, check.TestName(), description, vcd.nsxtVdc.vdcId(), []string{vcd.nsxtVdc.vdcId()})
 	check.Assert(err, IsNil)
 	check.Assert(vdcGroup, NotNil)
 
@@ -73,7 +73,7 @@ func test_NsxtVdcGroup(check *C, adminOrg *AdminOrg, vcd *TestVCD) {
 	check.Assert(vdcGroup.VdcGroup.Type, Equals, "LOCAL")
 
 	// check fetching by ID
-	foundVdcGroup, err := adminOrg.GetVdcGroupById(vdcGroup.VdcGroup.Id)
+	foundVdcGroup, err := adminOrg.GetVdcGroupById(ctx, vdcGroup.VdcGroup.Id)
 	check.Assert(err, IsNil)
 	check.Assert(foundVdcGroup, NotNil)
 	check.Assert(foundVdcGroup.VdcGroup.Name, Equals, vdcGroup.VdcGroup.Name)
@@ -81,7 +81,7 @@ func test_NsxtVdcGroup(check *C, adminOrg *AdminOrg, vcd *TestVCD) {
 	check.Assert(len(foundVdcGroup.VdcGroup.ParticipatingOrgVdcs), Equals, len(vdcGroup.VdcGroup.ParticipatingOrgVdcs))
 
 	// check fetching all VDC groups
-	allVdcGroups, err := adminOrg.GetAllVdcGroups(nil)
+	allVdcGroups, err := adminOrg.GetAllVdcGroups(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(allVdcGroups, NotNil)
 
@@ -98,7 +98,7 @@ func test_NsxtVdcGroup(check *C, adminOrg *AdminOrg, vcd *TestVCD) {
 	check.Assert(err, IsNil)
 	check.Assert(createdVdc, NotNil)
 
-	foundVdcGroup, err = adminOrg.GetVdcGroupByName(check.TestName())
+	foundVdcGroup, err = adminOrg.GetVdcGroupByName(ctx, check.TestName())
 	check.Assert(err, IsNil)
 	check.Assert(foundVdcGroup, NotNil)
 	check.Assert(foundVdcGroup.VdcGroup.Name, Equals, check.TestName())
@@ -106,7 +106,7 @@ func test_NsxtVdcGroup(check *C, adminOrg *AdminOrg, vcd *TestVCD) {
 	// check update
 	newDescription := "newDescription"
 	newName := check.TestName() + "newName"
-	updatedVdcGroup, err := foundVdcGroup.Update(newName, newDescription, []string{createdVdc.vdcId()})
+	updatedVdcGroup, err := foundVdcGroup.Update(ctx, newName, newDescription, []string{createdVdc.vdcId()})
 	check.Assert(err, IsNil)
 	check.Assert(updatedVdcGroup, NotNil)
 	check.Assert(updatedVdcGroup.VdcGroup.Name, Equals, newName)
@@ -115,35 +115,35 @@ func test_NsxtVdcGroup(check *C, adminOrg *AdminOrg, vcd *TestVCD) {
 	check.Assert(len(updatedVdcGroup.VdcGroup.ParticipatingOrgVdcs), Equals, 1)
 
 	// activate and deactivate DFW
-	enabledVdcGroup, err := updatedVdcGroup.ActivateDfw()
+	enabledVdcGroup, err := updatedVdcGroup.ActivateDfw(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(enabledVdcGroup, NotNil)
 	check.Assert(enabledVdcGroup.VdcGroup.DfwEnabled, Equals, true)
 
 	// disable default policy, otherwise deactivation of Dfw fails
-	_, err = enabledVdcGroup.DisableDefaultPolicy()
+	_, err = enabledVdcGroup.DisableDefaultPolicy(ctx)
 	check.Assert(err, IsNil)
-	defaultPolicy, err := enabledVdcGroup.GetDfwPolicies()
+	defaultPolicy, err := enabledVdcGroup.GetDfwPolicies(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(defaultPolicy, NotNil)
 	check.Assert(*defaultPolicy.DefaultPolicy.Enabled, Equals, false)
 
 	// also validate enable default policy
-	_, err = enabledVdcGroup.EnableDefaultPolicy()
+	_, err = enabledVdcGroup.EnableDefaultPolicy(ctx)
 	check.Assert(err, IsNil)
-	defaultPolicy, err = enabledVdcGroup.GetDfwPolicies()
+	defaultPolicy, err = enabledVdcGroup.GetDfwPolicies(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(defaultPolicy, NotNil)
 	check.Assert(*defaultPolicy.DefaultPolicy.Enabled, Equals, true)
 
-	_, err = enabledVdcGroup.DisableDefaultPolicy()
+	_, err = enabledVdcGroup.DisableDefaultPolicy(ctx)
 	check.Assert(err, IsNil)
-	defaultPolicy, err = enabledVdcGroup.GetDfwPolicies()
+	defaultPolicy, err = enabledVdcGroup.GetDfwPolicies(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(defaultPolicy, NotNil)
 	check.Assert(*defaultPolicy.DefaultPolicy.Enabled, Equals, false)
 
-	disabledVdcGroup, err := updatedVdcGroup.DeactivateDfw()
+	disabledVdcGroup, err := updatedVdcGroup.DeactivateDfw(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(disabledVdcGroup, NotNil)
 	check.Assert(disabledVdcGroup.VdcGroup.DfwEnabled, Equals, false)
@@ -158,7 +158,7 @@ func (vcd *TestVCD) Test_GetVdcGroupByName_ValidatesSymbolsInName(check *C) {
 	if vcd.config.VCD.Nsxt.Vdc == "" {
 		check.Skip("Missing NSX-T config: No NSX-T VDC specified")
 	}
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointVdcGroups)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointVdcGroups)
 
 	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
@@ -173,7 +173,7 @@ func test_GetVdcGroupByName_ValidatesSymbolsInName(check *C, adminOrg *AdminOrg,
 
 		name := fmt.Sprintf("Test%sVdcGroup", symbol)
 
-		createdVdcGroup, err := adminOrg.CreateNsxtVdcGroup(name, "", vdcId, []string{vdcId})
+		createdVdcGroup, err := adminOrg.CreateNsxtVdcGroup(ctx, name, "", vdcId, []string{vdcId})
 		check.Assert(err, IsNil)
 		check.Assert(createdVdcGroup, NotNil)
 
@@ -185,7 +185,7 @@ func test_GetVdcGroupByName_ValidatesSymbolsInName(check *C, adminOrg *AdminOrg,
 		check.Assert(createdVdcGroup.VdcGroup.Name, Equals, name)
 		check.Assert(len(createdVdcGroup.VdcGroup.ParticipatingOrgVdcs), Equals, 1)
 
-		foundVdcGroup, err := adminOrg.GetVdcGroupByName(name)
+		foundVdcGroup, err := adminOrg.GetVdcGroupByName(ctx, name)
 		check.Assert(err, IsNil)
 		check.Assert(foundVdcGroup, NotNil)
 		check.Assert(foundVdcGroup.VdcGroup.Name, Equals, name)
@@ -205,7 +205,7 @@ func (vcd *TestVCD) Test_NsxtVdcGroupWithOrgAdmin(check *C) {
 	if vcd.config.VCD.Nsxt.Vdc == "" {
 		check.Skip("Missing NSX-T config: No NSX-T VDC specified")
 	}
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointVdcGroups)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointVdcGroups)
 
 	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
@@ -216,7 +216,7 @@ func (vcd *TestVCD) Test_NsxtVdcGroupWithOrgAdmin(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(orgAdminClient, NotNil)
 
-	orgAsOrgAdminUser, err := orgAdminClient.GetAdminOrgByName(vcd.org.Org.Name)
+	orgAsOrgAdminUser, err := orgAdminClient.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(orgAsOrgAdminUser, NotNil)
 
@@ -229,14 +229,14 @@ func (vcd *TestVCD) Test_NsxtVdcGroupWithOrgAdmin(check *C) {
 
 // skipIfNeededRightsMissing checks if needed rights are configured
 func skipIfNeededRightsMissing(check *C, adminOrg *AdminOrg) {
-	defaultRightsBundle, err := adminOrg.client.GetRightsBundleByName("Default Rights Bundle")
+	defaultRightsBundle, err := adminOrg.client.GetRightsBundleByName(ctx, "Default Rights Bundle")
 	check.Assert(err, IsNil)
 	check.Assert(defaultRightsBundle, NotNil)
 
 	// add new rights to bundle
 	var missingRights []string
 
-	rightsBeforeChange, err := defaultRightsBundle.GetRights(nil)
+	rightsBeforeChange, err := defaultRightsBundle.GetRights(ctx, nil)
 	check.Assert(err, IsNil)
 	for _, rightName := range []string{
 		"vDC Group: Configure",
@@ -245,7 +245,7 @@ func skipIfNeededRightsMissing(check *C, adminOrg *AdminOrg) {
 		"Organization vDC Distributed Firewall: Enable/Disable",
 		//"Security Tag Edit", 10.2 doesn't have it and for this kind testing not needed
 	} {
-		newRight, err := adminOrg.client.GetRightByName(rightName)
+		newRight, err := adminOrg.client.GetRightByName(ctx, rightName)
 		check.Assert(err, IsNil)
 		check.Assert(newRight, NotNil)
 		foundRight := false

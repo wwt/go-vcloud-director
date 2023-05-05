@@ -18,13 +18,13 @@ func (vcd *TestVCD) Test_GetProviderVdc(check *C) {
 	}
 
 	var providerVdcs []*ProviderVdc
-	providerVdc, err := vcd.client.GetProviderVdcByName(vcd.config.VCD.NsxtProviderVdc.Name)
+	providerVdc, err := vcd.client.GetProviderVdcByName(ctx, vcd.config.VCD.NsxtProviderVdc.Name)
 	check.Assert(err, IsNil)
 	providerVdcs = append(providerVdcs, providerVdc)
-	providerVdc, err = vcd.client.GetProviderVdcById(providerVdc.ProviderVdc.ID)
+	providerVdc, err = vcd.client.GetProviderVdcById(ctx, providerVdc.ProviderVdc.ID)
 	check.Assert(err, IsNil)
 	providerVdcs = append(providerVdcs, providerVdc)
-	providerVdc, err = vcd.client.GetProviderVdcByHref(providerVdc.ProviderVdc.HREF)
+	providerVdc, err = vcd.client.GetProviderVdcByHref(ctx, providerVdc.ProviderVdc.HREF)
 	check.Assert(err, IsNil)
 	providerVdcs = append(providerVdcs, providerVdc)
 
@@ -61,13 +61,13 @@ func (vcd *TestVCD) Test_GetProviderVdcExtended(check *C) {
 	}
 
 	var providerVdcsExtended []*ProviderVdcExtended
-	providerVdcExtended, err := vcd.client.GetProviderVdcExtendedByName(vcd.config.VCD.NsxtProviderVdc.Name)
+	providerVdcExtended, err := vcd.client.GetProviderVdcExtendedByName(ctx, vcd.config.VCD.NsxtProviderVdc.Name)
 	check.Assert(err, IsNil)
 	providerVdcsExtended = append(providerVdcsExtended, providerVdcExtended)
-	providerVdcExtended, err = vcd.client.GetProviderVdcExtendedById(providerVdcExtended.VMWProviderVdc.ID)
+	providerVdcExtended, err = vcd.client.GetProviderVdcExtendedById(ctx, providerVdcExtended.VMWProviderVdc.ID)
 	check.Assert(err, IsNil)
 	providerVdcsExtended = append(providerVdcsExtended, providerVdcExtended)
-	providerVdcExtended, err = vcd.client.GetProviderVdcExtendedByHref(providerVdcExtended.VMWProviderVdc.HREF)
+	providerVdcExtended, err = vcd.client.GetProviderVdcExtendedByHref(ctx, providerVdcExtended.VMWProviderVdc.HREF)
 	check.Assert(err, IsNil)
 	providerVdcsExtended = append(providerVdcsExtended, providerVdcExtended)
 
@@ -113,22 +113,22 @@ func (vcd *TestVCD) Test_GetNonExistentProviderVdc(check *C) {
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
 
-	providerVdcExtended, err := vcd.client.GetProviderVdcExtendedByName("non-existent-pvdc")
+	providerVdcExtended, err := vcd.client.GetProviderVdcExtendedByName(ctx, "non-existent-pvdc")
 	check.Assert(providerVdcExtended, IsNil)
 	check.Assert(err, NotNil)
-	providerVdcExtended, err = vcd.client.GetProviderVdcExtendedById("non-existent-pvdc")
+	providerVdcExtended, err = vcd.client.GetProviderVdcExtendedById(ctx, "non-existent-pvdc")
 	check.Assert(providerVdcExtended, IsNil)
 	check.Assert(err, NotNil)
-	providerVdcExtended, err = vcd.client.GetProviderVdcExtendedByHref("non-existent-pvdc")
+	providerVdcExtended, err = vcd.client.GetProviderVdcExtendedByHref(ctx, "non-existent-pvdc")
 	check.Assert(providerVdcExtended, IsNil)
 	check.Assert(err, NotNil)
-	providerVdc, err := vcd.client.GetProviderVdcByName("non-existent-pvdc")
+	providerVdc, err := vcd.client.GetProviderVdcByName(ctx, "non-existent-pvdc")
 	check.Assert(providerVdc, IsNil)
 	check.Assert(err, NotNil)
-	providerVdc, err = vcd.client.GetProviderVdcById("non-existent-pvdc")
+	providerVdc, err = vcd.client.GetProviderVdcById(ctx, "non-existent-pvdc")
 	check.Assert(providerVdc, IsNil)
 	check.Assert(err, NotNil)
-	providerVdc, err = vcd.client.GetProviderVdcByHref("non-existent-pvdc")
+	providerVdc, err = vcd.client.GetProviderVdcByHref(ctx, "non-existent-pvdc")
 	check.Assert(providerVdc, IsNil)
 	check.Assert(err, NotNil)
 }
@@ -138,9 +138,9 @@ func (vcd *TestVCD) Test_GetProviderVdcConvertFromExtendedToNormal(check *C) {
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
 
-	providerVdcExtended, err := vcd.client.GetProviderVdcExtendedByName(vcd.config.VCD.NsxtProviderVdc.Name)
+	providerVdcExtended, err := vcd.client.GetProviderVdcExtendedByName(ctx, vcd.config.VCD.NsxtProviderVdc.Name)
 	check.Assert(err, IsNil)
-	providerVdc, err := providerVdcExtended.ToProviderVdc()
+	providerVdc, err := providerVdcExtended.ToProviderVdc(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(providerVdc.ProviderVdc.Name, Equals, vcd.config.VCD.NsxtProviderVdc.Name)
 	foundStorageProfile := false

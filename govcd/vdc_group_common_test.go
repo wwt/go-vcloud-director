@@ -16,17 +16,17 @@ import (
 
 func (vcd *TestVCD) Test_NsxtVdcGroupOrgNetworks(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointEdgeGateways)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointEdgeGateways)
 
 	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(adminOrg, NotNil)
 	check.Assert(err, IsNil)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(org, NotNil)
 	check.Assert(err, IsNil)
 
-	nsxtExternalNetwork, err := GetExternalNetworkV2ByName(vcd.client, vcd.config.VCD.Nsxt.ExternalNetwork)
+	nsxtExternalNetwork, err := GetExternalNetworkV2ByName(ctx, vcd.client, vcd.config.VCD.Nsxt.ExternalNetwork)
 	check.Assert(nsxtExternalNetwork, NotNil)
 	check.Assert(err, IsNil)
 
@@ -53,7 +53,7 @@ func (vcd *TestVCD) Test_NsxtVdcGroupOrgNetworks(check *C) {
 	}
 
 	// Create Edge Gateway in VDC
-	createdEdge, err := adminOrg.CreateNsxtEdgeGateway(egwDefinition)
+	createdEdge, err := adminOrg.CreateNsxtEdgeGateway(ctx, egwDefinition)
 	check.Assert(err, IsNil)
 	check.Assert(createdEdge, NotNil)
 	check.Assert(createdEdge.EdgeGateway.OwnerRef.ID, Matches, `^urn:vcloud:vdc:.*`)
@@ -61,7 +61,7 @@ func (vcd *TestVCD) Test_NsxtVdcGroupOrgNetworks(check *C) {
 	PrependToCleanupListOpenApi(createdEdge.EdgeGateway.Name, check.TestName(), openApiEndpoint)
 
 	// Move Edge Gateway to VDC Group
-	movedGateway, err := createdEdge.MoveToVdcOrVdcGroup(vdcGroup.VdcGroup.Id)
+	movedGateway, err := createdEdge.MoveToVdcOrVdcGroup(ctx, vdcGroup.VdcGroup.Id)
 	check.Assert(err, IsNil)
 	check.Assert(movedGateway, NotNil)
 	check.Assert(movedGateway.EdgeGateway.OwnerRef.ID, Equals, vdcGroup.VdcGroup.Id)
@@ -74,7 +74,7 @@ func (vcd *TestVCD) Test_NsxtVdcGroupOrgNetworks(check *C) {
 
 	sliceOfCreatedNetworkConfigs := make(map[string]*OpenApiOrgVdcNetwork, 3)
 	for index, orgVdcNetworkConfig := range mapOfNetworkConfigs {
-		orgVdcNet, err := org.CreateOpenApiOrgVdcNetwork(orgVdcNetworkConfig)
+		orgVdcNet, err := org.CreateOpenApiOrgVdcNetwork(ctx, orgVdcNetworkConfig)
 		check.Assert(err, IsNil)
 		check.Assert(orgVdcNet, NotNil)
 		check.Assert(orgVdcNet.OpenApiOrgVdcNetwork.OwnerRef.ID, Equals, vdcGroup.VdcGroup.Id)
@@ -89,7 +89,7 @@ func (vcd *TestVCD) Test_NsxtVdcGroupOrgNetworks(check *C) {
 	}
 
 	// Move Edge Gateway back to VDC
-	movedBackToVdcEdge, err := movedGateway.MoveToVdcOrVdcGroup(vdc.Vdc.ID)
+	movedBackToVdcEdge, err := movedGateway.MoveToVdcOrVdcGroup(ctx, vdc.Vdc.ID)
 	check.Assert(err, IsNil)
 	check.Assert(movedBackToVdcEdge, NotNil)
 	check.Assert(movedBackToVdcEdge.EdgeGateway.OwnerRef.ID, Matches, `^urn:vcloud:vdc:.*`)
@@ -97,7 +97,7 @@ func (vcd *TestVCD) Test_NsxtVdcGroupOrgNetworks(check *C) {
 	// Routed networks migrate to/from VDC Groups together with Edge Gateway therefore we need to
 	// check that routed network owner ID is the same as Edge Gateway. Routed network must be
 	// retrieved again so that it reflects latest information.
-	routedOrgNetwork, err := org.GetOpenApiOrgVdcNetworkById(sliceOfCreatedNetworkConfigs["routed"].OpenApiOrgVdcNetwork.ID)
+	routedOrgNetwork, err := org.GetOpenApiOrgVdcNetworkById(ctx, sliceOfCreatedNetworkConfigs["routed"].OpenApiOrgVdcNetwork.ID)
 	check.Assert(err, IsNil)
 	check.Assert(routedOrgNetwork, NotNil)
 	check.Assert(routedOrgNetwork.OpenApiOrgVdcNetwork.OwnerRef.ID, Equals, movedBackToVdcEdge.EdgeGateway.OwnerRef.ID)
@@ -154,7 +154,7 @@ func buildIsolatedOrgVdcNetworkConfig(check *C, vcd *TestVCD, ownerId string) *t
 }
 
 func buildImportedOrgVdcNetworkConfig(check *C, vcd *TestVCD, ownerId string) *types.OpenApiOrgVdcNetwork {
-	logicalSwitch, err := vcd.nsxtVdc.GetNsxtImportableSwitchByName(vcd.config.VCD.Nsxt.NsxtImportSegment)
+	logicalSwitch, err := vcd.nsxtVdc.GetNsxtImportableSwitchByName(ctx, vcd.config.VCD.Nsxt.NsxtImportSegment)
 	check.Assert(err, IsNil)
 
 	importedOrgVdcNetworkConfig := &types.OpenApiOrgVdcNetwork{
@@ -250,13 +250,13 @@ func buildRoutedOrgVdcNetworkConfig(check *C, vcd *TestVCD, edgeGateway *NsxtEdg
 func test_CreateVdcGroup(check *C, adminOrg *AdminOrg, vcd *TestVCD) (*Vdc, *VdcGroup) {
 	createdVdc := createNewVdc(vcd, check, check.TestName())
 
-	createdVdcAsCandidate, err := adminOrg.GetAllNsxtVdcGroupCandidates(createdVdc.vdcId(),
+	createdVdcAsCandidate, err := adminOrg.GetAllNsxtVdcGroupCandidates(ctx, createdVdc.vdcId(),
 		map[string][]string{"filter": []string{fmt.Sprintf("name==%s", url.QueryEscape(createdVdc.vdcName()))}})
 	check.Assert(err, IsNil)
 	check.Assert(createdVdcAsCandidate, NotNil)
 	check.Assert(len(createdVdcAsCandidate) == 1, Equals, true)
 
-	existingVdcAsCandidate, err := adminOrg.GetAllNsxtVdcGroupCandidates(createdVdc.vdcId(),
+	existingVdcAsCandidate, err := adminOrg.GetAllNsxtVdcGroupCandidates(ctx, createdVdc.vdcId(),
 		map[string][]string{"filter": []string{fmt.Sprintf("name==%s", url.QueryEscape(vcd.nsxtVdc.vdcName()))}})
 	check.Assert(err, IsNil)
 	check.Assert(existingVdcAsCandidate, NotNil)
@@ -288,10 +288,10 @@ func test_CreateVdcGroup(check *C, adminOrg *AdminOrg, vcd *TestVCD) (*Vdc, *Vdc
 		//DfwEnabled: true, // ignored by API
 	}
 
-	vdcGroup, err := adminOrg.CreateVdcGroup(vdcGroupConfig)
+	vdcGroup, err := adminOrg.CreateVdcGroup(ctx, vdcGroupConfig)
 	check.Assert(err, IsNil)
 	check.Assert(vdcGroup, NotNil)
-	check.Assert(vdcGroup.IsNsxt(), Equals, true)
+	check.Assert(vdcGroup.IsNsxt(ctx), Equals, true)
 
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVdcGroups + vdcGroup.VdcGroup.Id
 	PrependToCleanupListOpenApi(vdcGroup.VdcGroup.Name, check.TestName(), openApiEndpoint)
@@ -304,19 +304,19 @@ func createNewVdc(vcd *TestVCD, check *C, vdcName string) *Vdc {
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
-	pVdcs, err := QueryProviderVdcByName(vcd.client, vcd.config.VCD.NsxtProviderVdc.Name)
+	pVdcs, err := QueryProviderVdcByName(ctx, vcd.client, vcd.config.VCD.NsxtProviderVdc.Name)
 	check.Assert(err, IsNil)
 
 	if len(pVdcs) == 0 {
 		check.Skip(fmt.Sprintf("No NSX-T Provider VDC found with name '%s'", vcd.config.VCD.NsxtProviderVdc.Name))
 	}
 	providerVdcHref := pVdcs[0].HREF
-	pvdcStorageProfile, err := vcd.client.QueryProviderVdcStorageProfileByName(vcd.config.VCD.NsxtProviderVdc.StorageProfile, providerVdcHref)
+	pvdcStorageProfile, err := vcd.client.QueryProviderVdcStorageProfileByName(ctx, vcd.config.VCD.NsxtProviderVdc.StorageProfile, providerVdcHref)
 	check.Assert(err, IsNil)
 	check.Assert(pvdcStorageProfile, NotNil)
 	providerVdcStorageProfileHref := pvdcStorageProfile.HREF
 
-	networkPools, err := QueryNetworkPoolByName(vcd.client, vcd.config.VCD.NsxtProviderVdc.NetworkPool)
+	networkPools, err := QueryNetworkPoolByName(ctx, vcd.client, vcd.config.VCD.NsxtProviderVdc.NetworkPool)
 	check.Assert(err, IsNil)
 	if len(networkPools) == 0 {
 		check.Skip(fmt.Sprintf("No network pool found with name '%s'", vcd.config.VCD.NsxtProviderVdc.NetworkPool))
@@ -365,7 +365,7 @@ func createNewVdc(vcd *TestVCD, check *C, vdcName string) *Vdc {
 		IncludeMemoryOverhead: &trueValue,
 	}
 
-	vdc, err := adminOrg.CreateOrgVdc(vdcConfiguration)
+	vdc, err := adminOrg.CreateOrgVdc(ctx, vdcConfiguration)
 	check.Assert(err, IsNil)
 	check.Assert(vdc, NotNil)
 

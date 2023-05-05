@@ -21,13 +21,13 @@ import (
 // * Org Admin user
 func (vcd *TestVCD) Test_NsxtDistributedFirewallRules(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointEdgeGateways)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointEdgeGateways)
 
 	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(adminOrg, NotNil)
 	check.Assert(err, IsNil)
 
-	nsxtExternalNetwork, err := GetExternalNetworkV2ByName(vcd.client, vcd.config.VCD.Nsxt.ExternalNetwork)
+	nsxtExternalNetwork, err := GetExternalNetworkV2ByName(ctx, vcd.client, vcd.config.VCD.Nsxt.ExternalNetwork)
 	check.Assert(nsxtExternalNetwork, NotNil)
 	check.Assert(err, IsNil)
 
@@ -44,32 +44,32 @@ func (vcd *TestVCD) Test_NsxtDistributedFirewallRules(check *C) {
 	fmt.Printf("# Running Distributed Firewall tests as Org Admin user '%s'\n", userName)
 	orgUserVcdClient, _, err := newOrgUserConnection(adminOrg, userName, "CHANGE-ME", vcd.config.Provider.Url, true)
 	check.Assert(err, IsNil)
-	orgUserOrgAdmin, err := orgUserVcdClient.GetAdminOrgById(adminOrg.AdminOrg.ID)
+	orgUserOrgAdmin, err := orgUserVcdClient.GetAdminOrgById(ctx, adminOrg.AdminOrg.ID)
 	check.Assert(err, IsNil)
-	orgUserVdc, err := orgUserOrgAdmin.GetVDCById(vdc.Vdc.ID, false)
+	orgUserVdc, err := orgUserOrgAdmin.GetVDCById(ctx, vdc.Vdc.ID, false)
 	check.Assert(err, IsNil)
 	test_NsxtDistributedFirewallRules(vcd, check, vdcGroup.VdcGroup.Id, orgUserVcdClient, orgUserVdc)
 
 	// Cleanup
 	err = vdcGroup.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = vdc.DeleteWait(true, true)
+	err = vdc.DeleteWait(ctx, true, true)
 	check.Assert(err, IsNil)
 }
 
 func test_NsxtDistributedFirewallRules(vcd *TestVCD, check *C, vdcGroupId string, vcdClient *VCDClient, vdc *Vdc) {
-	adminOrg, err := vcdClient.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcdClient.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(adminOrg, NotNil)
 	check.Assert(err, IsNil)
 
-	vdcGroup, err := adminOrg.GetVdcGroupById(vdcGroupId)
+	vdcGroup, err := adminOrg.GetVdcGroupById(ctx, vdcGroupId)
 	check.Assert(err, IsNil)
 
-	_, err = vdcGroup.ActivateDfw()
+	_, err = vdcGroup.ActivateDfw(ctx)
 	check.Assert(err, IsNil)
 
 	// Get existing firewall rule configuration
-	fwRules, err := vdcGroup.GetDistributedFirewall()
+	fwRules, err := vdcGroup.GetDistributedFirewall(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(fwRules.DistributedFirewallRuleContainer.Values, NotNil)
 
@@ -82,7 +82,7 @@ func test_NsxtDistributedFirewallRules(vcd *TestVCD, check *C, vdcGroupId string
 		dumpDistributedFirewallRulesToScreen(randomizedFwRuleDefs)
 	}
 
-	fwUpdated, err := vdcGroup.UpdateDistributedFirewall(fwRules.DistributedFirewallRuleContainer)
+	fwUpdated, err := vdcGroup.UpdateDistributedFirewall(ctx, fwRules.DistributedFirewallRuleContainer)
 	check.Assert(err, IsNil)
 	check.Assert(fwUpdated, Not(IsNil))
 
@@ -121,17 +121,17 @@ func test_NsxtDistributedFirewallRules(vcd *TestVCD, check *C, vdcGroupId string
 	}
 
 	// Cleanup
-	err = fwRules.DeleteAllRules()
+	err = fwRules.DeleteAllRules(ctx)
 	check.Assert(err, IsNil)
 	// Check that rules were removed
-	newRules, err := vdcGroup.GetDistributedFirewall()
+	newRules, err := vdcGroup.GetDistributedFirewall(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(len(newRules.DistributedFirewallRuleContainer.Values) == 0, Equals, true)
 
 	// Cleanup remaining setup
-	_, err = vdcGroup.DisableDefaultPolicy()
+	_, err = vdcGroup.DisableDefaultPolicy(ctx)
 	check.Assert(err, IsNil)
-	_, err = vdcGroup.DeactivateDfw()
+	_, err = vdcGroup.DeactivateDfw(ctx)
 	check.Assert(err, IsNil)
 	err = ipSet.Delete(ctx)
 	check.Assert(err, IsNil)
@@ -197,7 +197,7 @@ func createDistributedFirewallDefinitions(check *C, vcd *TestVCD, vdcGroupId str
 		}
 
 		// API V36.2 introduced new field Comment which is shown in UI
-		if vcd.client.Client.APIVCDMaxVersionIs(">= 36.2") {
+		if vcd.client.Client.APIVCDMaxVersionIs(ctx, ">= 36.2") {
 			firewallRules[a].Comments = "Comment Rule"
 		}
 
@@ -224,7 +224,7 @@ func preCreateVdcGroupIpSet(check *C, vcd *TestVCD, ownerId string, nsxtVdc *Vdc
 	}
 
 	// Create IP Set and add to cleanup if it was created
-	createdIpSet, err := nsxtVdc.CreateNsxtFirewallGroup(ipSetDefinition)
+	createdIpSet, err := nsxtVdc.CreateNsxtFirewallGroup(ctx, ipSetDefinition)
 	check.Assert(err, IsNil)
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointFirewallGroups + createdIpSet.NsxtFirewallGroup.ID
 	PrependToCleanupListOpenApi(createdIpSet.NsxtFirewallGroup.Name, check.TestName(), openApiEndpoint)
@@ -241,7 +241,7 @@ func preCreateVdcGroupSecurityGroup(check *C, vcd *TestVCD, ownerId string, nsxt
 	}
 
 	// Create firewall group and add to cleanup if it was created
-	createdSecGroup, err := nsxtVdc.CreateNsxtFirewallGroup(fwGroupDefinition)
+	createdSecGroup, err := nsxtVdc.CreateNsxtFirewallGroup(ctx, fwGroupDefinition)
 	check.Assert(err, IsNil)
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointFirewallGroups + createdSecGroup.NsxtFirewallGroup.ID
 	PrependToCleanupListOpenApi(createdSecGroup.NsxtFirewallGroup.Name, check.TestName(), openApiEndpoint)
@@ -250,7 +250,7 @@ func preCreateVdcGroupSecurityGroup(check *C, vcd *TestVCD, ownerId string, nsxt
 }
 
 func getRandomListOfNetworkContextProfiles(check *C, vcd *TestVCD, vdcClient *VCDClient) []types.OpenApiReference {
-	networkContextProfiles, err := GetAllNetworkContextProfiles(&vcd.client.Client, nil)
+	networkContextProfiles, err := GetAllNetworkContextProfiles(ctx, &vcd.client.Client, nil)
 	check.Assert(err, IsNil)
 	openApiRefs := make([]types.OpenApiReference, 1)
 	for _, networkContextProfile := range networkContextProfiles {

@@ -11,18 +11,18 @@ import (
 
 func (vcd *TestVCD) Test_NsxtNatDnat(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
-	appPortProfiles, err := org.GetAllNsxtAppPortProfiles(nil, types.ApplicationPortProfileScopeSystem)
+	appPortProfiles, err := org.GetAllNsxtAppPortProfiles(ctx, nil, types.ApplicationPortProfileScopeSystem)
 	check.Assert(err, IsNil)
 
 	edgeGatewayPrimaryIp := ""
@@ -51,18 +51,18 @@ func (vcd *TestVCD) Test_NsxtNatDnat(check *C) {
 
 func (vcd *TestVCD) Test_NsxtNatDnatExternalPortPort(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
-	appPortProfiles, err := org.GetAllNsxtAppPortProfiles(nil, types.ApplicationPortProfileScopeSystem)
+	appPortProfiles, err := org.GetAllNsxtAppPortProfiles(ctx, nil, types.ApplicationPortProfileScopeSystem)
 	check.Assert(err, IsNil)
 
 	edgeGatewayPrimaryIp := ""
@@ -91,18 +91,18 @@ func (vcd *TestVCD) Test_NsxtNatDnatExternalPortPort(check *C) {
 
 func (vcd *TestVCD) Test_NsxtNatDnatFirewallMatchPriority(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
-	appPortProfiles, err := org.GetAllNsxtAppPortProfiles(nil, types.ApplicationPortProfileScopeSystem)
+	appPortProfiles, err := org.GetAllNsxtAppPortProfiles(ctx, nil, types.ApplicationPortProfileScopeSystem)
 	check.Assert(err, IsNil)
 
 	edgeGatewayPrimaryIp := ""
@@ -132,15 +132,15 @@ func (vcd *TestVCD) Test_NsxtNatDnatFirewallMatchPriority(check *C) {
 
 func (vcd *TestVCD) Test_NsxtNatNoDnat(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	edgeGatewayPrimaryIp := ""
@@ -162,18 +162,18 @@ func (vcd *TestVCD) Test_NsxtNatNoDnat(check *C) {
 
 func (vcd *TestVCD) Test_NsxtNatSnat(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
-	appPortProfiles, err := org.GetAllNsxtAppPortProfiles(nil, types.ApplicationPortProfileScopeSystem)
+	appPortProfiles, err := org.GetAllNsxtAppPortProfiles(ctx, nil, types.ApplicationPortProfileScopeSystem)
 	check.Assert(err, IsNil)
 
 	edgeGatewayPrimaryIp := ""
@@ -200,15 +200,15 @@ func (vcd *TestVCD) Test_NsxtNatSnat(check *C) {
 
 func (vcd *TestVCD) Test_NsxtNatNoSnat(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	natRuleDefinition := &types.NsxtNatRule{
@@ -225,15 +225,15 @@ func (vcd *TestVCD) Test_NsxtNatNoSnat(check *C) {
 
 func (vcd *TestVCD) Test_NsxtNatPriorityAndFirewallMatch(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	edgeGatewayPrimaryIp := ""
@@ -262,15 +262,15 @@ func (vcd *TestVCD) Test_NsxtNatPriorityAndFirewallMatch(check *C) {
 // Test_NsxtNatReflexive tests out REFLEXIVE rule type. This is only available in VCD 10.3 (API V36.0)
 func (vcd *TestVCD) Test_NsxtNatReflexive(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	edgeGatewayPrimaryIp := ""
@@ -295,7 +295,7 @@ func (vcd *TestVCD) Test_NsxtNatReflexive(check *C) {
 }
 
 func nsxtNatRuleChecks(natRuleDefinition *types.NsxtNatRule, edge *NsxtEdgeGateway, check *C, vcd *TestVCD) {
-	createdNatRule, err := edge.CreateNatRule(natRuleDefinition)
+	createdNatRule, err := edge.CreateNatRule(ctx, natRuleDefinition)
 	check.Assert(err, IsNil)
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + fmt.Sprintf(types.OpenApiEndpointNsxtNatRules, edge.EdgeGateway.ID) + createdNatRule.NsxtNatRule.ID
 	AddToCleanupListOpenApi(createdNatRule.NsxtNatRule.Name, check.TestName(), openApiEndpoint)
@@ -313,9 +313,9 @@ func nsxtNatRuleChecks(natRuleDefinition *types.NsxtNatRule, edge *NsxtEdgeGatew
 	check.Assert(createdNatRule.NsxtNatRule, DeepEquals, natRuleDefinition)
 
 	// Try to get NAT rules by name and by ID
-	natRuleById, err := edge.GetNatRuleById(createdNatRule.NsxtNatRule.ID)
+	natRuleById, err := edge.GetNatRuleById(ctx, createdNatRule.NsxtNatRule.ID)
 	check.Assert(err, IsNil)
-	natRuleByName, err := edge.GetNatRuleByName(createdNatRule.NsxtNatRule.Name)
+	natRuleByName, err := edge.GetNatRuleByName(ctx, createdNatRule.NsxtNatRule.Name)
 	check.Assert(err, IsNil)
 
 	check.Assert(natRuleById.NsxtNatRule, DeepEquals, natRuleDefinition)
@@ -323,7 +323,7 @@ func nsxtNatRuleChecks(natRuleDefinition *types.NsxtNatRule, edge *NsxtEdgeGatew
 
 	// Try to update value
 	createdNatRule.NsxtNatRule.Name = check.TestName() + "updated"
-	updatedNatRule, err := createdNatRule.Update(createdNatRule.NsxtNatRule)
+	updatedNatRule, err := createdNatRule.Update(ctx, createdNatRule.NsxtNatRule)
 	check.Assert(err, IsNil)
 
 	// validate that supplied values are new, but ID stays the same
@@ -333,6 +333,6 @@ func nsxtNatRuleChecks(natRuleDefinition *types.NsxtNatRule, edge *NsxtEdgeGatew
 	err = createdNatRule.Delete(ctx)
 	check.Assert(err, IsNil)
 
-	_, err = edge.GetNatRuleById(createdNatRule.NsxtNatRule.ID)
+	_, err = edge.GetNatRuleById(ctx, createdNatRule.NsxtNatRule.ID)
 	check.Assert(ContainsNotFound(err), Equals, true)
 }

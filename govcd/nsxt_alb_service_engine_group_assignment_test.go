@@ -15,7 +15,7 @@ func (vcd *TestVCD) Test_GetAllEdgeAlbServiceEngineGroupAssignmentsDedicated(che
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
 	skipNoNsxtAlbConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointAlbEdgeGateway)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointAlbEdgeGateway)
 
 	controller, cloud, seGroup := spawnAlbControllerCloudServiceEngineGroup(vcd, check, "DEDICATED")
 	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
@@ -25,7 +25,7 @@ func (vcd *TestVCD) Test_GetAllEdgeAlbServiceEngineGroupAssignmentsDedicated(che
 	albSettingsConfig := &types.NsxtAlbConfig{
 		Enabled: true,
 	}
-	enabledSettings, err := edge.UpdateAlbSettings(albSettingsConfig)
+	enabledSettings, err := edge.UpdateAlbSettings(ctx, albSettingsConfig)
 	check.Assert(err, IsNil)
 	check.Assert(enabledSettings.Enabled, Equals, true)
 	PrependToCleanupList("OpenApiEntityAlbSettingsDisable", "OpenApiEntityAlbSettingsDisable", edge.EdgeGateway.Name, check.TestName())
@@ -34,31 +34,31 @@ func (vcd *TestVCD) Test_GetAllEdgeAlbServiceEngineGroupAssignmentsDedicated(che
 		GatewayRef:            &types.OpenApiReference{ID: edge.EdgeGateway.ID},
 		ServiceEngineGroupRef: &types.OpenApiReference{ID: seGroup.NsxtAlbServiceEngineGroup.ID},
 	}
-	assignment, err := vcd.client.CreateAlbServiceEngineGroupAssignment(serviceEngineGroupAssignmentConfig)
+	assignment, err := vcd.client.CreateAlbServiceEngineGroupAssignment(ctx, serviceEngineGroupAssignmentConfig)
 	check.Assert(err, IsNil)
 	check.Assert(assignment.NsxtAlbServiceEngineGroupAssignment.ID, Not(Equals), "")
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbServiceEngineGroupAssignments + assignment.NsxtAlbServiceEngineGroupAssignment.ID
 	PrependToCleanupListOpenApi(assignment.NsxtAlbServiceEngineGroupAssignment.ServiceEngineGroupRef.Name, check.TestName(), openApiEndpoint)
 
 	// Get By ID
-	assignmentById, err := vcd.client.GetAlbServiceEngineGroupAssignmentById(assignment.NsxtAlbServiceEngineGroupAssignment.ID)
+	assignmentById, err := vcd.client.GetAlbServiceEngineGroupAssignmentById(ctx, assignment.NsxtAlbServiceEngineGroupAssignment.ID)
 	check.Assert(err, IsNil)
 	check.Assert(assignmentById.NsxtAlbServiceEngineGroupAssignment, DeepEquals, assignment.NsxtAlbServiceEngineGroupAssignment)
 
 	// Get By Name
-	assignmentByName, err := vcd.client.GetAlbServiceEngineGroupAssignmentByName(assignment.NsxtAlbServiceEngineGroupAssignment.ServiceEngineGroupRef.Name)
+	assignmentByName, err := vcd.client.GetAlbServiceEngineGroupAssignmentByName(ctx, assignment.NsxtAlbServiceEngineGroupAssignment.ServiceEngineGroupRef.Name)
 	check.Assert(err, IsNil)
 	check.Assert(assignmentByName.NsxtAlbServiceEngineGroupAssignment, DeepEquals, assignment.NsxtAlbServiceEngineGroupAssignment)
 
 	// Filtered by name and Edge Gateway ID
 	queryParams := url.Values{}
 	queryParams.Add("filter", fmt.Sprintf("gatewayRef.id==%s", edge.EdgeGateway.ID))
-	filteredAssignmentByName, err := vcd.client.GetFilteredAlbServiceEngineGroupAssignmentByName(assignment.NsxtAlbServiceEngineGroupAssignment.ServiceEngineGroupRef.Name, queryParams)
+	filteredAssignmentByName, err := vcd.client.GetFilteredAlbServiceEngineGroupAssignmentByName(ctx, assignment.NsxtAlbServiceEngineGroupAssignment.ServiceEngineGroupRef.Name, queryParams)
 	check.Assert(err, IsNil)
 	check.Assert(filteredAssignmentByName.NsxtAlbServiceEngineGroupAssignment, DeepEquals, filteredAssignmentByName.NsxtAlbServiceEngineGroupAssignment)
 
 	// Get all
-	allAssignments, err := vcd.client.GetAllAlbServiceEngineGroupAssignments(nil)
+	allAssignments, err := vcd.client.GetAllAlbServiceEngineGroupAssignments(ctx, nil)
 	check.Assert(err, IsNil)
 	var foundAssignment bool
 	for i := range allAssignments {
@@ -71,7 +71,7 @@ func (vcd *TestVCD) Test_GetAllEdgeAlbServiceEngineGroupAssignmentsDedicated(che
 	assignment.NsxtAlbServiceEngineGroupAssignment.MaxVirtualServices = takeIntAddress(50)
 	assignment.NsxtAlbServiceEngineGroupAssignment.MinVirtualServices = takeIntAddress(30)
 	// Expect an error because "DEDICATED" service engine group does not support specifying virtual services
-	updatedAssignment, err := assignment.Update(assignment.NsxtAlbServiceEngineGroupAssignment)
+	updatedAssignment, err := assignment.Update(ctx, assignment.NsxtAlbServiceEngineGroupAssignment)
 	check.Assert(err, NotNil)
 	check.Assert(updatedAssignment, IsNil)
 
@@ -93,7 +93,7 @@ func (vcd *TestVCD) Test_GetAllEdgeAlbServiceEngineGroupAssignmentsShared(check 
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
 	skipNoNsxtAlbConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointAlbEdgeGateway)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointAlbEdgeGateway)
 
 	controller, cloud, seGroup := spawnAlbControllerCloudServiceEngineGroup(vcd, check, "SHARED")
 	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
@@ -103,7 +103,7 @@ func (vcd *TestVCD) Test_GetAllEdgeAlbServiceEngineGroupAssignmentsShared(check 
 	albSettingsConfig := &types.NsxtAlbConfig{
 		Enabled: true,
 	}
-	enabledSettings, err := edge.UpdateAlbSettings(albSettingsConfig)
+	enabledSettings, err := edge.UpdateAlbSettings(ctx, albSettingsConfig)
 	check.Assert(err, IsNil)
 	check.Assert(enabledSettings.Enabled, Equals, true)
 	PrependToCleanupList(check.TestName()+"-ALB-settings", "OpenApiEntityAlbSettingsDisable", edge.EdgeGateway.Name, check.TestName())
@@ -114,31 +114,31 @@ func (vcd *TestVCD) Test_GetAllEdgeAlbServiceEngineGroupAssignmentsShared(check 
 		MaxVirtualServices:    takeIntAddress(89),
 		MinVirtualServices:    takeIntAddress(20),
 	}
-	assignment, err := vcd.client.CreateAlbServiceEngineGroupAssignment(serviceEngineGroupAssignmentConfig)
+	assignment, err := vcd.client.CreateAlbServiceEngineGroupAssignment(ctx, serviceEngineGroupAssignmentConfig)
 	check.Assert(err, IsNil)
 	check.Assert(assignment.NsxtAlbServiceEngineGroupAssignment.ID, Not(Equals), "")
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbServiceEngineGroupAssignments + assignment.NsxtAlbServiceEngineGroupAssignment.ID
 	PrependToCleanupListOpenApi(assignment.NsxtAlbServiceEngineGroupAssignment.ServiceEngineGroupRef.Name, check.TestName(), openApiEndpoint)
 
 	// Get By ID
-	assignmentById, err := vcd.client.GetAlbServiceEngineGroupAssignmentById(assignment.NsxtAlbServiceEngineGroupAssignment.ID)
+	assignmentById, err := vcd.client.GetAlbServiceEngineGroupAssignmentById(ctx, assignment.NsxtAlbServiceEngineGroupAssignment.ID)
 	check.Assert(err, IsNil)
 	check.Assert(assignmentById.NsxtAlbServiceEngineGroupAssignment, DeepEquals, assignment.NsxtAlbServiceEngineGroupAssignment)
 
 	// Get By Name
-	assignmentByName, err := vcd.client.GetAlbServiceEngineGroupAssignmentByName(assignment.NsxtAlbServiceEngineGroupAssignment.ServiceEngineGroupRef.Name)
+	assignmentByName, err := vcd.client.GetAlbServiceEngineGroupAssignmentByName(ctx, assignment.NsxtAlbServiceEngineGroupAssignment.ServiceEngineGroupRef.Name)
 	check.Assert(err, IsNil)
 	check.Assert(assignmentByName.NsxtAlbServiceEngineGroupAssignment, DeepEquals, assignment.NsxtAlbServiceEngineGroupAssignment)
 
 	// Filtered by name and Edge Gateway ID
 	queryParams := url.Values{}
 	queryParams.Add("filter", fmt.Sprintf("gatewayRef.id==%s", edge.EdgeGateway.ID))
-	filteredAssignmentByName, err := vcd.client.GetFilteredAlbServiceEngineGroupAssignmentByName(assignment.NsxtAlbServiceEngineGroupAssignment.ServiceEngineGroupRef.Name, queryParams)
+	filteredAssignmentByName, err := vcd.client.GetFilteredAlbServiceEngineGroupAssignmentByName(ctx, assignment.NsxtAlbServiceEngineGroupAssignment.ServiceEngineGroupRef.Name, queryParams)
 	check.Assert(err, IsNil)
 	check.Assert(filteredAssignmentByName.NsxtAlbServiceEngineGroupAssignment, DeepEquals, filteredAssignmentByName.NsxtAlbServiceEngineGroupAssignment)
 
 	// Get all
-	allAssignments, err := vcd.client.GetAllAlbServiceEngineGroupAssignments(nil)
+	allAssignments, err := vcd.client.GetAllAlbServiceEngineGroupAssignments(ctx, nil)
 	check.Assert(err, IsNil)
 	var foundAssignment bool
 	for i := range allAssignments {
@@ -151,7 +151,7 @@ func (vcd *TestVCD) Test_GetAllEdgeAlbServiceEngineGroupAssignmentsShared(check 
 	assignment.NsxtAlbServiceEngineGroupAssignment.MaxVirtualServices = takeIntAddress(50)
 	assignment.NsxtAlbServiceEngineGroupAssignment.MinVirtualServices = takeIntAddress(30)
 
-	updatedAssignment, err := assignment.Update(assignment.NsxtAlbServiceEngineGroupAssignment)
+	updatedAssignment, err := assignment.Update(ctx, assignment.NsxtAlbServiceEngineGroupAssignment)
 	check.Assert(err, IsNil)
 	check.Assert(updatedAssignment, NotNil)
 

@@ -725,7 +725,7 @@ func (vcd *TestVCD) Test_VmShutdown(check *C) {
 	if vcd.skipVappTests {
 		check.Skip("Skipping test because vapp was not successfully created at setup")
 	}
-	vapp := vcd.findFirstVapp()
+	vapp := vcd.findFirstVapp(ctx)
 	existingVm, vmName := vcd.findFirstVm(vapp)
 	if vmName == "" {
 		check.Skip("skipping test because no VM is found")
@@ -737,12 +737,12 @@ func (vcd *TestVCD) Test_VmShutdown(check *C) {
 	check.Assert(err, IsNil)
 
 	// Ensure VM is not powered on
-	vmStatus, err := vm.GetStatus()
+	vmStatus, err := vm.GetStatus(ctx)
 	check.Assert(err, IsNil)
 	fmt.Println("VM status: ", vmStatus)
 
 	if vmStatus != "POWERED_ON" {
-		task, err := vm.PowerOn()
+		task, err := vm.PowerOn(ctx)
 		check.Assert(err, IsNil)
 		err = task.WaitTaskCompletion(ctx)
 		check.Assert(err, IsNil)
@@ -773,13 +773,13 @@ func (vcd *TestVCD) Test_VmShutdown(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
-	newStatus, err := vm.GetStatus()
+	newStatus, err := vm.GetStatus(ctx)
 	check.Assert(err, IsNil)
 	printVerbose("New VM status: %s\n", newStatus)
 	check.Assert(newStatus, Equals, "POWERED_OFF")
 
 	// End of test - power on the VM to leave it running
-	task, err = vm.PowerOn()
+	task, err = vm.PowerOn(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
@@ -1746,7 +1746,7 @@ func (vcd *TestVCD) Test_VMUpdateStorageProfile(check *C) {
 
 func (vcd *TestVCD) Test_VMUpdateComputePolicies(check *C) {
 
-	providerVdc, err := vcd.client.GetProviderVdcByName(vcd.config.VCD.NsxtProviderVdc.Name)
+	providerVdc, err := vcd.client.GetProviderVdcByName(ctx, vcd.config.VCD.NsxtProviderVdc.Name)
 	check.Assert(err, IsNil)
 	check.Assert(providerVdc, NotNil)
 
@@ -1758,7 +1758,7 @@ func (vcd *TestVCD) Test_VMUpdateComputePolicies(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
-	adminVdc, err := adminOrg.GetAdminVDCByName(vcd.nsxtVdc.Vdc.Name, false)
+	adminVdc, err := adminOrg.GetAdminVDCByName(ctx, vcd.nsxtVdc.Vdc.Name, false)
 	if adminVdc == nil || err != nil {
 		vcd.infoCleanup(notFoundMsg, "vdc", vcd.nsxtVdc.Vdc.Name)
 	}
@@ -1876,7 +1876,7 @@ func (vcd *TestVCD) Test_VMUpdateComputePolicies(check *C) {
 	check.Assert(true, Equals, strings.Contains(err.Error(), "either sizing policy ID or placement policy ID is needed"))
 
 	// Clean VM
-	task, err := vapp.Undeploy()
+	task, err := vapp.Undeploy(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(task, Not(Equals), Task{})
 
@@ -2089,7 +2089,7 @@ func (vcd *TestVCD) Test_VMChangeCPU(check *C) {
 		check.Skip("Skipping test because vapp was not successfully created at setup")
 	}
 
-	vapp := vcd.findFirstVapp()
+	vapp := vcd.findFirstVapp(ctx)
 	existingVm, vmName := vcd.findFirstVm(vapp)
 	if vmName == "" {
 		check.Skip("skipping test because no VM is found")
@@ -2123,7 +2123,7 @@ func (vcd *TestVCD) Test_VMChangeCPUAndCoreCount(check *C) {
 		check.Skip("Skipping test because vApp was not successfully created at setup")
 	}
 
-	vapp := vcd.findFirstVapp()
+	vapp := vcd.findFirstVapp(ctx)
 	existingVm, vmName := vcd.findFirstVm(vapp)
 	if vmName == "" {
 		check.Skip("skipping test because no VM is found")
@@ -2173,7 +2173,7 @@ func (vcd *TestVCD) Test_VMChangeMemory(check *C) {
 		check.Skip("Skipping test because vapp was not successfully created at setup")
 	}
 
-	vapp := vcd.findFirstVapp()
+	vapp := vcd.findFirstVapp(ctx)
 	existingVm, vmName := vcd.findFirstVm(vapp)
 	if vmName == "" {
 		check.Skip("skipping test because no VM is found")
@@ -2203,19 +2203,19 @@ func (vcd *TestVCD) Test_AddRawVm(check *C) {
 	check.Assert(vm, NotNil)
 
 	// Check that vApp did not lose its state
-	vappStatus, err := vapp.GetStatus()
+	vappStatus, err := vapp.GetStatus(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(vappStatus, Equals, "MIXED") //vApp is powered on, but the VM within is powered off
 	check.Assert(vapp.VApp.Name, Equals, check.TestName())
 	check.Assert(vapp.VApp.Description, Equals, check.TestName())
 
 	// Check that VM is not powered on
-	vmStatus, err := vm.GetStatus()
+	vmStatus, err := vm.GetStatus(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(vmStatus, Equals, "POWERED_OFF")
 
 	// Cleanup
-	task, err := vapp.Undeploy()
+	task, err := vapp.Undeploy(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(task, Not(Equals), Task{})
 
@@ -2243,24 +2243,24 @@ func createNsxtVAppAndVm(vcd *TestVCD, check *C) (*VApp, *VM) {
 	check.Assert(err, IsNil)
 	check.Assert(vapptemplate.VAppTemplate.Children.VM[0].HREF, NotNil)
 
-	vapp, err := vcd.nsxtVdc.CreateRawVApp(check.TestName(), check.TestName())
+	vapp, err := vcd.nsxtVdc.CreateRawVApp(ctx, check.TestName(), check.TestName())
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
 	// After a successful creation, the entity is added to the cleanup list.
 	AddToCleanupList(vapp.VApp.Name, "vapp", vcd.nsxtVdc.Vdc.Name, check.TestName())
 
 	// Check that vApp is powered-off
-	vappStatus, err := vapp.GetStatus()
+	vappStatus, err := vapp.GetStatus(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(vappStatus, Equals, "RESOLVED")
 
-	task, err := vapp.PowerOn()
+	task, err := vapp.PowerOn(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(task, NotNil)
 	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
-	vappStatus, err = vapp.GetStatus()
+	vappStatus, err = vapp.GetStatus(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(vappStatus, Equals, "POWERED_ON")
 
@@ -2307,7 +2307,7 @@ func (vcd *TestVCD) Test_GetOvfEnvironment(check *C) {
 	if vcd.skipVappTests {
 		check.Skip("Skipping test because vapp was not successfully created at setup")
 	}
-	vapp := vcd.findFirstVapp()
+	vapp := vcd.findFirstVapp(ctx)
 	existingVm, vmName := vcd.findFirstVm(vapp)
 	if vmName == "" {
 		check.Skip("skipping test because no VM is found")
@@ -2315,10 +2315,10 @@ func (vcd *TestVCD) Test_GetOvfEnvironment(check *C) {
 	vm, err := vcd.client.Client.GetVMByHref(existingVm.HREF)
 	check.Assert(err, IsNil)
 
-	vmStatus, err := vm.GetStatus()
+	vmStatus, err := vm.GetStatus(ctx)
 	check.Assert(err, IsNil)
 	if vmStatus != "POWERED_ON" {
-		task, err := vm.PowerOn()
+		task, err := vm.PowerOn(ctx)
 		check.Assert(err, IsNil)
 		err = task.WaitTaskCompletion(ctx)
 		check.Assert(err, IsNil)
@@ -2362,7 +2362,7 @@ func (vcd *TestVCD) Test_GetOvfEnvironment(check *C) {
 
 	// Leave things as they were
 	if vmStatus != "POWERED_OFF" {
-		task, err := vm.PowerOn()
+		task, err := vm.PowerOn(ctx)
 		check.Assert(err, IsNil)
 		err = task.WaitTaskCompletion(ctx)
 		check.Assert(err, IsNil)

@@ -15,7 +15,7 @@ func (vcd *TestVCD) Test_AlbVirtualService(check *C) {
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
 	skipNoNsxtAlbConfiguration(vcd, check)
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointAlbEdgeGateway)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointAlbEdgeGateway)
 
 	// Setup prerequisite components
 	controller, cloud, seGroup, edge, seGroupAssignment, albPool := setupAlbVirtualServicePrerequisites(check, vcd)
@@ -41,7 +41,7 @@ func (vcd *TestVCD) Test_AlbVirtualService(check *C) {
 	testMinimalVirtualServiceConfigL4TLS(check, edge, albPool, seGroup, vcd, orgUserVcdClient)
 
 	// Test 10.4.1 Transparent mode on VCD >= 10.4.1
-	if vcd.client.Client.APIVCDMaxVersionIs(">= 37.1") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, ">= 37.1") {
 		printVerbose("# Running 10.4.1+ tests as Sysadmin user\n")
 
 		printVerbose("## Creating ALB Pool with Member Group (VCD 10.4.1+) as Sysadmin\n")
@@ -256,9 +256,9 @@ func testMinimalVirtualServiceConfigL4TLS(check *C, edge *NsxtEdgeGateway, pool 
 		PrivateKey:           privateKey,
 		PrivateKeyPassphrase: "test",
 	}
-	openApiEndpoint, err := getEndpointByVersion(&vcd.client.Client)
+	openApiEndpoint, err := getEndpointByVersion(ctx, &vcd.client.Client)
 	check.Assert(err, IsNil)
-	createdCertificate, err := adminOrg.AddCertificateToLibrary(certificateConfigWithPrivateKey)
+	createdCertificate, err := adminOrg.AddCertificateToLibrary(ctx, certificateConfigWithPrivateKey)
 	check.Assert(err, IsNil)
 	PrependToCleanupListOpenApi(createdCertificate.CertificateLibrary.Alias, check.TestName(), openApiEndpoint+createdCertificate.CertificateLibrary.Id)
 
@@ -310,7 +310,7 @@ func testMinimalVirtualServiceConfigL4TLS(check *C, edge *NsxtEdgeGateway, pool 
 
 	testAlbVirtualServiceConfig(check, vcd, "L4-TLS", virtualServiceConfig, virtualServiceConfigUpdated, client)
 
-	err = createdCertificate.Delete()
+	err = createdCertificate.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -326,9 +326,9 @@ func testVirtualServiceConfigWithCertHTTPS(check *C, edge *NsxtEdgeGateway, pool
 		PrivateKeyPassphrase: "test",
 	}
 
-	openApiEndpoint, err := getEndpointByVersion(&vcd.client.Client)
+	openApiEndpoint, err := getEndpointByVersion(ctx, &vcd.client.Client)
 	check.Assert(err, IsNil)
-	createdCertificate, err := adminOrg.AddCertificateToLibrary(certificateConfigWithPrivateKey)
+	createdCertificate, err := adminOrg.AddCertificateToLibrary(ctx, certificateConfigWithPrivateKey)
 	check.Assert(err, IsNil)
 	PrependToCleanupListOpenApi(createdCertificate.CertificateLibrary.Alias, check.TestName(), openApiEndpoint+createdCertificate.CertificateLibrary.Id)
 
@@ -374,7 +374,7 @@ func testVirtualServiceConfigWithCertHTTPS(check *C, edge *NsxtEdgeGateway, pool
 
 	testAlbVirtualServiceConfig(check, vcd, "WithCertHTTPS", virtualServiceConfig, virtualServiceConfigUpdated, client)
 
-	err = createdCertificate.Delete()
+	err = createdCertificate.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -384,7 +384,7 @@ func testAlbVirtualServiceConfig(check *C, vcd *TestVCD, name string, setupConfi
 	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
-	createdVirtualService, err := client.CreateNsxtAlbVirtualService(setupConfig)
+	createdVirtualService, err := client.CreateNsxtAlbVirtualService(ctx, setupConfig)
 	check.Assert(err, IsNil)
 
 	// Verify mandatory fields
@@ -396,22 +396,22 @@ func testAlbVirtualServiceConfig(check *C, vcd *TestVCD, name string, setupConfi
 	PrependToCleanupListOpenApi(createdVirtualService.NsxtAlbVirtualService.Name, check.TestName(), openApiEndpoint)
 
 	// Get By ID
-	virtualServiceById, err := client.GetAlbVirtualServiceById(createdVirtualService.NsxtAlbVirtualService.ID)
+	virtualServiceById, err := client.GetAlbVirtualServiceById(ctx, createdVirtualService.NsxtAlbVirtualService.ID)
 	check.Assert(err, IsNil)
 	check.Assert(virtualServiceById.NsxtAlbVirtualService.ID, Equals, createdVirtualService.NsxtAlbVirtualService.ID)
 
 	// Get By Name
-	virtualServiceByName, err := client.GetAlbVirtualServiceByName(edge.EdgeGateway.ID, createdVirtualService.NsxtAlbVirtualService.Name)
+	virtualServiceByName, err := client.GetAlbVirtualServiceByName(ctx, edge.EdgeGateway.ID, createdVirtualService.NsxtAlbVirtualService.Name)
 	check.Assert(err, IsNil)
 	check.Assert(virtualServiceByName.NsxtAlbVirtualService.ID, Equals, createdVirtualService.NsxtAlbVirtualService.ID)
 
 	//Get All Virtual Service summaries
-	allVirtualServiceSummaries, err := client.GetAllAlbVirtualServiceSummaries(edge.EdgeGateway.ID, nil)
+	allVirtualServiceSummaries, err := client.GetAllAlbVirtualServiceSummaries(ctx, edge.EdgeGateway.ID, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(allVirtualServiceSummaries) > 0, Equals, true)
 
 	// Get All Pools
-	allVirtualServices, err := client.GetAllAlbVirtualServices(edge.EdgeGateway.ID, nil)
+	allVirtualServices, err := client.GetAllAlbVirtualServices(ctx, edge.EdgeGateway.ID, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(allVirtualServices) > 0, Equals, true)
 
@@ -420,14 +420,14 @@ func testAlbVirtualServiceConfig(check *C, vcd *TestVCD, name string, setupConfi
 	// Attempt an update if config is provided
 	if updateConfig != nil {
 		updateConfig.ID = createdVirtualService.NsxtAlbVirtualService.ID
-		updatedPool, err := createdVirtualService.Update(updateConfig)
+		updatedPool, err := createdVirtualService.Update(ctx, updateConfig)
 		check.Assert(err, IsNil)
 		check.Assert(createdVirtualService.NsxtAlbVirtualService.ID, Equals, updatedPool.NsxtAlbVirtualService.ID)
 		check.Assert(updatedPool.NsxtAlbVirtualService.Name, NotNil)
 		check.Assert(updatedPool.NsxtAlbVirtualService.GatewayRef.ID, NotNil)
 	}
 
-	err = createdVirtualService.Delete()
+	err = createdVirtualService.Delete(ctx)
 	check.Assert(err, IsNil)
 	fmt.Printf("Done.\n")
 }
@@ -441,7 +441,7 @@ func setupAlbVirtualServicePrerequisites(check *C, vcd *TestVCD) (*NsxtAlbContro
 		GatewayRef: types.OpenApiReference{ID: edge.EdgeGateway.ID},
 	}
 
-	albPool, err := vcd.client.CreateNsxtAlbPool(poolConfig)
+	albPool, err := vcd.client.CreateNsxtAlbPool(ctx, poolConfig)
 	check.Assert(err, IsNil)
 
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbPools + albPool.NsxtAlbPool.ID
@@ -460,7 +460,7 @@ func setupAlbPoolFirewallGroupMembers(check *C, vcd *TestVCD, edge *NsxtEdgeGate
 		IpAddresses: []string{"1.1.1.1"},
 	}
 
-	ipSet, err := vcd.nsxtVdc.CreateNsxtFirewallGroup(ipSetConfig)
+	ipSet, err := vcd.nsxtVdc.CreateNsxtFirewallGroup(ctx, ipSetConfig)
 	check.Assert(err, IsNil)
 
 	// add ip set to cleanup list
@@ -476,7 +476,7 @@ func setupAlbPoolFirewallGroupMembers(check *C, vcd *TestVCD, edge *NsxtEdgeGate
 		},
 	}
 
-	albPool, err := vcd.client.CreateNsxtAlbPool(poolConfig)
+	albPool, err := vcd.client.CreateNsxtAlbPool(ctx, poolConfig)
 	check.Assert(err, IsNil)
 
 	openApiEndpoint = types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbPools + albPool.NsxtAlbPool.ID
@@ -486,16 +486,16 @@ func setupAlbPoolFirewallGroupMembers(check *C, vcd *TestVCD, edge *NsxtEdgeGate
 }
 
 func tearDownAlbVirtualServicePrerequisites(check *C, albPool *NsxtAlbPool, assignment *NsxtAlbServiceEngineGroupAssignment, edge *NsxtEdgeGateway, seGroup *NsxtAlbServiceEngineGroup, cloud *NsxtAlbCloud, controller *NsxtAlbController) {
-	err := albPool.Delete()
+	err := albPool.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = assignment.Delete()
+	err = assignment.Delete(ctx)
 	check.Assert(err, IsNil)
 	err = edge.DisableAlb(ctx)
 	check.Assert(err, IsNil)
-	err = seGroup.Delete()
+	err = seGroup.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = cloud.Delete()
+	err = cloud.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = controller.Delete()
+	err = controller.Delete(ctx)
 	check.Assert(err, IsNil)
 }

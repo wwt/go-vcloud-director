@@ -51,7 +51,7 @@ func (vcd *TestVCD) Test_GetFilteredNsxtImportableSwitches(check *C) {
 
 	// Check that nil filter returns error. This will work as a safeguard to also detect if future versions start accepting
 	// empty filter value
-	results, err := vcd.client.GetFilteredNsxtImportableSwitches(nil)
+	results, err := vcd.client.GetFilteredNsxtImportableSwitches(ctx, nil)
 	check.Assert(err, Not(IsNil))
 	check.Assert(results, IsNil)
 
@@ -59,21 +59,21 @@ func (vcd *TestVCD) Test_GetFilteredNsxtImportableSwitches(check *C) {
 	bareVdcId, err := getBareEntityUuid(vcd.nsxtVdc.Vdc.ID)
 	check.Assert(err, IsNil)
 	filter := map[string]string{"orgVdc": bareVdcId}
-	results, err = vcd.client.GetFilteredNsxtImportableSwitches(filter)
+	results, err = vcd.client.GetFilteredNsxtImportableSwitches(ctx, filter)
 	check.Assert(err, IsNil)
 	check.Assert(len(results) > 0, Equals, true)
 
-	nsxtManagers, err := vcd.client.QueryNsxtManagerByName(vcd.config.VCD.Nsxt.Manager)
+	nsxtManagers, err := vcd.client.QueryNsxtManagerByName(ctx, vcd.config.VCD.Nsxt.Manager)
 	check.Assert(err, IsNil)
 	check.Assert(len(nsxtManagers) > 0, Equals, true)
 
 	uuid := extractUuid(nsxtManagers[0].HREF)
 	filter = map[string]string{"nsxTManager": uuid}
-	results, err = vcd.client.GetFilteredNsxtImportableSwitches(filter)
+	results, err = vcd.client.GetFilteredNsxtImportableSwitches(ctx, filter)
 	check.Assert(err, IsNil)
 	check.Assert(len(results) > 0, Equals, true)
 
-	switchByName, err := vcd.client.GetFilteredNsxtImportableSwitchesByName(filter, vcd.config.VCD.Nsxt.NsxtImportSegment)
+	switchByName, err := vcd.client.GetFilteredNsxtImportableSwitchesByName(ctx, filter, vcd.config.VCD.Nsxt.NsxtImportSegment)
 	check.Assert(err, IsNil)
 	check.Assert(switchByName.NsxtImportableSwitch.Name, Equals, vcd.config.VCD.Nsxt.NsxtImportSegment)
 

@@ -17,14 +17,14 @@ func (vcd *TestVCD) Test_NsxtEdgeGatewayQosProfiles(check *C) {
 	if vcd.skipAdminTests {
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
-	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointQosProfiles)
+	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointQosProfiles)
 
 	skipNoNsxtConfiguration(vcd, check)
 	if vcd.config.VCD.Nsxt.GatewayQosProfile == "" {
 		check.Skip("No NSX-T Edge Gateway QoS Profile configured")
 	}
 
-	nsxtManagers, err := vcd.client.QueryNsxtManagerByName(vcd.config.VCD.Nsxt.Manager)
+	nsxtManagers, err := vcd.client.QueryNsxtManagerByName(ctx, vcd.config.VCD.Nsxt.Manager)
 	check.Assert(err, IsNil)
 	check.Assert(len(nsxtManagers), Equals, 1)
 
@@ -34,14 +34,14 @@ func (vcd *TestVCD) Test_NsxtEdgeGatewayQosProfiles(check *C) {
 	check.Assert(err, IsNil)
 
 	// Fetch all profiles
-	allQosProfiles, err := vcd.client.GetAllNsxtEdgeGatewayQosProfiles(urn, nil)
+	allQosProfiles, err := vcd.client.GetAllNsxtEdgeGatewayQosProfiles(ctx, urn, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(allQosProfiles) > 0, Equals, true)
 
 	// Fetch one by one based on DisplayName
 	for _, profile := range allQosProfiles {
 		printVerbose("# Fetching QoS profile '%s' by Name\n", profile.NsxtEdgeGatewayQosProfile.DisplayName)
-		qosProfile, err := vcd.client.GetNsxtEdgeGatewayQosProfileByDisplayName(urn, profile.NsxtEdgeGatewayQosProfile.DisplayName)
+		qosProfile, err := vcd.client.GetNsxtEdgeGatewayQosProfileByDisplayName(ctx, urn, profile.NsxtEdgeGatewayQosProfile.DisplayName)
 		check.Assert(err, IsNil)
 		check.Assert(qosProfile, NotNil)
 		check.Assert(qosProfile.NsxtEdgeGatewayQosProfile.ID, Equals, profile.NsxtEdgeGatewayQosProfile.ID)

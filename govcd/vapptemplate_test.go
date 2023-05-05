@@ -73,11 +73,11 @@ func (vcd *TestVCD) Test_GetInformationFromVAppTemplate(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplate, NotNil)
 
-	catalogName, err := vAppTemplate.GetCatalogName()
+	catalogName, err := vAppTemplate.GetCatalogName(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(catalogName, Equals, catalog.Catalog.Name)
 
-	vdcId, err := vAppTemplate.GetVdcName()
+	vdcId, err := vAppTemplate.GetVdcName(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(vdcId, Equals, vcd.vdc.Vdc.Name)
 }
@@ -96,7 +96,7 @@ func testUploadAndDeleteVAppTemplate(vcd *TestVCD, check *C, isOvfLink bool) {
 	description := "upload from test"
 
 	if isOvfLink {
-		uploadTask, err := catalog.UploadOvfByLink(vcd.config.OVA.OvfUrl, itemName, description)
+		uploadTask, err := catalog.UploadOvfByLink(ctx, vcd.config.OVA.OvfUrl, itemName, description)
 		check.Assert(err, IsNil)
 		err = uploadTask.WaitTaskCompletion(ctx)
 		check.Assert(err, IsNil)

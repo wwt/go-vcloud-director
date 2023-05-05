@@ -211,7 +211,7 @@ func testCheckLoadBalancerConfig(ctx context.Context, beforeLb *types.LbGeneralP
 // deployVappForTest aims to replace createVappForTest
 func deployVappForTest(ctx context.Context, vcd *TestVCD, vappName string) (*VApp, error) {
 	// Populate OrgVDCNetwork
-	net, err := vcd.vdc.GetOrgVdcNetworkByName(vcd.config.VCD.Network.Net1, false)
+	net, err := vcd.vdc.GetOrgVdcNetworkByName(ctx, vcd.config.VCD.Network.Net1, false)
 	if err != nil {
 		return nil, fmt.Errorf("error finding network : %s", err)
 	}
@@ -238,7 +238,7 @@ func deployVappForTest(ctx context.Context, vcd *TestVCD, vappName string) (*VAp
 	}
 
 	// Create empty vApp
-	vapp, err := vcd.vdc.CreateRawVApp(vappName, "description")
+	vapp, err := vcd.vdc.CreateRawVApp(ctx, vappName, "description")
 	if err != nil {
 		return nil, fmt.Errorf("error creating vapp: %s", err)
 	}
@@ -248,7 +248,7 @@ func deployVappForTest(ctx context.Context, vcd *TestVCD, vappName string) (*VAp
 	AddToCleanupList(vappName, "vapp", "", "createTestVapp")
 
 	// Create vApp networking
-	vAppNetworkConfig, err := vapp.AddOrgNetwork(&VappNetworkSettings{}, net.OrgVDCNetwork, false)
+	vAppNetworkConfig, err := vapp.AddOrgNetwork(ctx, &VappNetworkSettings{}, net.OrgVDCNetwork, false)
 	if err != nil {
 		return nil, fmt.Errorf("error creating vApp network. %s", err)
 	}
@@ -267,7 +267,7 @@ func deployVappForTest(ctx context.Context, vcd *TestVCD, vappName string) (*VAp
 
 	networkConnectionSection.NetworkConnection = append(networkConnectionSection.NetworkConnection, netConn)
 
-	task, err := vapp.AddNewVMWithStorageProfile("test_vm", vAppTemplate, networkConnectionSection, &storageProfileRef, true)
+	task, err := vapp.AddNewVMWithStorageProfile(ctx, "test_vm", vAppTemplate, networkConnectionSection, &storageProfileRef, true)
 	if err != nil {
 		return nil, fmt.Errorf("error creating the VM: %s", err)
 	}
@@ -706,7 +706,7 @@ func spawnTestVdc(vcd *TestVCD, check *C, adminOrgName string) *Vdc {
 	check.Assert(err, IsNil)
 
 	providerVdcHref := getVdcProviderVdcHref(vcd, check)
-	storageProfile, err := vcd.client.QueryProviderVdcStorageProfileByName(vcd.config.VCD.ProviderVdc.StorageProfile, providerVdcHref)
+	storageProfile, err := vcd.client.QueryProviderVdcStorageProfileByName(ctx, vcd.config.VCD.ProviderVdc.StorageProfile, providerVdcHref)
 	check.Assert(err, IsNil)
 	networkPoolHref := getVdcNetworkPoolHref(vcd, check)
 
@@ -751,7 +751,7 @@ func spawnTestVdc(vcd *TestVCD, check *C, adminOrgName string) *Vdc {
 		IncludeMemoryOverhead: takeBoolPointer(true),
 	}
 
-	vdc, err := adminOrg.CreateOrgVdc(vdcConfiguration)
+	vdc, err := adminOrg.CreateOrgVdc(ctx, vdcConfiguration)
 	check.Assert(err, IsNil)
 	check.Assert(vdc, NotNil)
 
@@ -765,7 +765,7 @@ func spawnTestOrg(vcd *TestVCD, check *C, nameSuffix string) string {
 	newOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	newOrgName := check.TestName() + "-" + nameSuffix
-	task, err := CreateOrg(vcd.client, newOrgName, newOrgName, newOrgName, newOrg.AdminOrg.OrgSettings, true)
+	task, err := CreateOrg(ctx, vcd.client, newOrgName, newOrgName, newOrgName, newOrg.AdminOrg.OrgSettings, true)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
@@ -775,7 +775,7 @@ func spawnTestOrg(vcd *TestVCD, check *C, nameSuffix string) string {
 }
 
 func getVdcProviderVdcHref(vcd *TestVCD, check *C) string {
-	results, err := vcd.client.QueryWithNotEncodedParams(nil, map[string]string{
+	results, err := vcd.client.QueryWithNotEncodedParams(ctx, nil, map[string]string{
 		"type":   "providerVdc",
 		"filter": fmt.Sprintf("name==%s", vcd.config.VCD.ProviderVdc.Name),
 	})
@@ -789,7 +789,7 @@ func getVdcProviderVdcHref(vcd *TestVCD, check *C) string {
 }
 
 func getVdcNetworkPoolHref(vcd *TestVCD, check *C) string {
-	results, err := vcd.client.QueryWithNotEncodedParams(nil, map[string]string{
+	results, err := vcd.client.QueryWithNotEncodedParams(ctx, nil, map[string]string{
 		"type":   "networkPool",
 		"filter": fmt.Sprintf("name==%s", vcd.config.VCD.ProviderVdc.NetworkPool),
 	})
@@ -828,37 +828,4 @@ func (vcd *TestVCD) checkSkipWhenApiToken(check *C) {
 	if vcd.client.Client.UsingAccessToken {
 		check.Skip("This test can't run on API token")
 	}
-}
-
-func isTcpPortOpen(host, port string, timeout int) bool {
-	retryTimeout := timeout
-	// due to the VMs taking long time to boot it needs to be at least 5 minutes
-	// may be even more in slower environments
-	if timeout < 5*60 { // 5 minutes
-		retryTimeout = 5 * 60 // 5 minutes
-	}
-	timeOutAfterInterval := time.Duration(retryTimeout) * time.Second
-	timeoutAfter := time.After(timeOutAfterInterval)
-	tick := time.NewTicker(time.Duration(8) * time.Second)
-
-	for {
-		select {
-		case <-timeoutAfter:
-			fmt.Printf(" Failed\n")
-			return false
-		case <-tick.C:
-			timeout := time.Second * 3
-			conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, port), timeout)
-			if err != nil {
-				fmt.Printf(".")
-			}
-			// Connection established - the port is open
-			if conn != nil {
-				defer conn.Close()
-				fmt.Printf(" Done\n")
-				return true
-			}
-		}
-	}
-
 }

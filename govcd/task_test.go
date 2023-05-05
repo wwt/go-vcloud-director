@@ -22,10 +22,10 @@ func (vcd *TestVCD) Test_QueryTaskList(check *C) {
 
 	catalog, err := adminOrg.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	check.Assert(err, IsNil)
-	adminCatalog, err := adminOrg.GetAdminCatalogByName(vcd.config.VCD.Catalog.Name, false)
+	adminCatalog, err := adminOrg.GetAdminCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	check.Assert(err, IsNil)
 	startQuery := time.Now()
-	allTasks, err := vcd.client.Client.QueryTaskList(map[string]string{
+	allTasks, err := vcd.client.Client.QueryTaskList(ctx, map[string]string{
 		"status": "running,preRunning,queued",
 	})
 	check.Assert(err, IsNil)
@@ -33,19 +33,19 @@ func (vcd *TestVCD) Test_QueryTaskList(check *C) {
 		fmt.Printf("%# v\n%s\n", pretty.Formatter(allTasks), time.Since(startQuery))
 	}
 	// search using a client, giving the org and catalog names
-	resultByClient, err := vcd.client.Client.QueryTaskList(map[string]string{
+	resultByClient, err := vcd.client.Client.QueryTaskList(ctx, map[string]string{
 		"orgName":    vcd.config.VCD.Org,
 		"objectName": adminCatalog.AdminCatalog.Name,
 		"name":       "catalogCreateCatalog"})
 	check.Assert(err, IsNil)
 
 	// search using an admin catalog, which will search by its HREF
-	resultByAdminCatalog, err := adminCatalog.QueryTaskList(map[string]string{
+	resultByAdminCatalog, err := adminCatalog.QueryTaskList(ctx, map[string]string{
 		"name": "catalogCreateCatalog",
 	})
 	check.Assert(err, IsNil)
 	// search using a catalog, which will search by its HREF
-	resultByCatalog, err := catalog.QueryTaskList(map[string]string{
+	resultByCatalog, err := catalog.QueryTaskList(ctx, map[string]string{
 		"name": "catalogCreateCatalog",
 	})
 	check.Assert(err, IsNil)

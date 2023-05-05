@@ -808,12 +808,12 @@ func (vcd *TestVCD) Test_GetCatalogByIdSharedCatalog(check *C) {
 	newOrg1, vdc, sharedCatalog := createSharedCatalogInNewOrg(vcd, check, check.TestName())
 
 	// Try to find the sharedCatalog inside Org which owns it - newOrg1
-	catalogById, err := newOrg1.GetCatalogById(sharedCatalog.Catalog.ID, true)
+	catalogById, err := newOrg1.GetCatalogById(ctx, sharedCatalog.Catalog.ID, true)
 	check.Assert(err, IsNil)
 	check.Assert(catalogById.Catalog.Name, Equals, sharedCatalog.Catalog.Name)
 
 	// Try to find the sharedCatalog in another Org with which this sharedCatalog is shared (vcd.Org)
-	sharedCatalogById, err := vcd.org.GetCatalogById(sharedCatalog.Catalog.ID, false)
+	sharedCatalogById, err := vcd.org.GetCatalogById(ctx, sharedCatalog.Catalog.ID, false)
 	check.Assert(err, IsNil)
 	check.Assert(sharedCatalogById.Catalog.Name, Equals, sharedCatalog.Catalog.Name)
 
@@ -876,7 +876,7 @@ func (vcd *TestVCD) Test_GetCatalogByXSharedCatalogOrgUser(check *C) {
 	check.Assert(err, IsNil)
 	orgAdminClient, _, err := newOrgUserConnection(adminOrg, "test-user", "CHANGE-ME", vcd.config.Provider.Url, true)
 	check.Assert(err, IsNil)
-	orgAsOrgUser, err := orgAdminClient.GetOrgByName(vcd.config.VCD.Org)
+	orgAsOrgUser, err := orgAdminClient.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	// Find a catalog in the same Org using Org Admin user
@@ -884,7 +884,7 @@ func (vcd *TestVCD) Test_GetCatalogByXSharedCatalogOrgUser(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(orgAdminCatalogByNameSameOrg.Catalog.Name, Equals, vcd.config.VCD.Catalog.Name)
 
-	orgAdminCatalogByIdSameOrg, err := orgAsOrgUser.GetCatalogById(orgAdminCatalogByNameSameOrg.Catalog.ID, false)
+	orgAdminCatalogByIdSameOrg, err := orgAsOrgUser.GetCatalogById(ctx, orgAdminCatalogByNameSameOrg.Catalog.ID, false)
 	check.Assert(err, IsNil)
 	check.Assert(orgAdminCatalogByIdSameOrg.Catalog.Name, Equals, orgAdminCatalogByNameSameOrg.Catalog.Name)
 	check.Assert(orgAdminCatalogByIdSameOrg.Catalog.ID, Equals, orgAdminCatalogByNameSameOrg.Catalog.ID)
@@ -895,7 +895,7 @@ func (vcd *TestVCD) Test_GetCatalogByXSharedCatalogOrgUser(check *C) {
 	check.Assert(orgAdminCatalogByName.Catalog.Name, Equals, sharedCatalog.Catalog.Name)
 	check.Assert(orgAdminCatalogByName.Catalog.ID, Equals, sharedCatalog.Catalog.ID)
 
-	orgAdminCatalogById, err := orgAsOrgUser.GetCatalogById(sharedCatalog.Catalog.ID, false)
+	orgAdminCatalogById, err := orgAsOrgUser.GetCatalogById(ctx, sharedCatalog.Catalog.ID, false)
 	check.Assert(err, IsNil)
 	check.Assert(orgAdminCatalogById.Catalog.Name, Equals, sharedCatalog.Catalog.Name)
 	check.Assert(orgAdminCatalogById.Catalog.ID, Equals, sharedCatalog.Catalog.ID)
@@ -904,7 +904,7 @@ func (vcd *TestVCD) Test_GetCatalogByXSharedCatalogOrgUser(check *C) {
 	_, err = orgAsOrgUser.GetCatalogByName(ctx, unsharedCatalog.Catalog.Name, true)
 	check.Assert(ContainsNotFound(err), Equals, true)
 
-	_, err = orgAsOrgUser.GetCatalogById(unsharedCatalog.Catalog.ID, true)
+	_, err = orgAsOrgUser.GetCatalogById(ctx, unsharedCatalog.Catalog.ID, true)
 	check.Assert(ContainsNotFound(err), Equals, true)
 
 	// Cleanup
@@ -917,7 +917,7 @@ func (vcd *TestVCD) Test_GetCatalogByXSharedCatalogOrgUser(check *C) {
 func createSharedCatalogInNewOrg(vcd *TestVCD, check *C, newCatalogName string) (*Org, *Vdc, Catalog) {
 	newOrgName1 := spawnTestOrg(vcd, check, "org")
 
-	newOrg1, err := vcd.client.GetOrgByName(newOrgName1)
+	newOrg1, err := vcd.client.GetOrgByName(ctx, newOrgName1)
 	check.Assert(err, IsNil)
 
 	// Spawn a VDC inside newly created Org so that there is storage to create new catalog
@@ -943,7 +943,7 @@ func createSharedCatalogInNewOrg(vcd *TestVCD, check *C, newCatalogName string) 
 			}},
 		},
 	}
-	err = catalog.SetAccessControl(accessControl, false)
+	err = catalog.SetAccessControl(ctx, accessControl, false)
 	check.Assert(err, IsNil)
 
 	return newOrg1, vdc, catalog
@@ -954,7 +954,7 @@ func cleanupCatalogOrgVdc(check *C, sharedCatalog Catalog, vdc *Vdc, vcd *TestVC
 	err := sharedCatalog.Delete(ctx, true, true)
 	check.Assert(err, IsNil)
 
-	err = vdc.DeleteWait(true, true)
+	err = vdc.DeleteWait(ctx, true, true)
 	check.Assert(err, IsNil)
 
 	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, newOrg1.Org.Name)
@@ -1009,7 +1009,7 @@ func (vcd *TestVCD) Test_PublishToExternalOrganizations(check *C) {
 	check.Assert(err, IsNil)
 
 	// test with Catalog
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
@@ -1061,12 +1061,12 @@ func (vcd *TestVCD) Test_UploadOvfByLink_progress_works(check *C) {
 
 	catalog, org := findCatalog(ctx, vcd, check, vcd.config.VCD.Catalog.Name)
 
-	uploadTask, err := catalog.UploadOvfByLink(vcd.config.OVA.OvfUrl, itemName, "upload from test")
+	uploadTask, err := catalog.UploadOvfByLink(ctx, vcd.config.OVA.OvfUrl, itemName, "upload from test")
 	check.Assert(err, IsNil)
 	check.Assert(uploadTask, NotNil)
 
 	for {
-		if value, err := uploadTask.GetTaskProgress(); value == "100" || err != nil {
+		if value, err := uploadTask.GetTaskProgress(ctx); value == "100" || err != nil {
 			check.Assert(err, IsNil)
 			break
 		} else {
@@ -1153,7 +1153,7 @@ func (vcd *TestVCD) Test_GetAdminCatalogById(check *C) {
 	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
-	adminCatalog, err := org.GetAdminCatalogByName(vcd.config.VCD.Catalog.Name, false)
+	adminCatalog, err := org.GetAdminCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	check.Assert(err, IsNil)
 
 	// 2. retrieve that same catalog from the client alone using HREF
@@ -1162,7 +1162,7 @@ func (vcd *TestVCD) Test_GetAdminCatalogById(check *C) {
 	check.Assert(adminCatalogByHref.AdminCatalog.HREF, Equals, adminCatalog.AdminCatalog.HREF)
 
 	// 3. retrieve the same catalog again, using ID
-	adminCatalogById, err := vcd.client.Client.GetAdminCatalogById(adminCatalog.AdminCatalog.ID)
+	adminCatalogById, err := vcd.client.Client.GetAdminCatalogById(ctx, adminCatalog.AdminCatalog.ID)
 	check.Assert(err, IsNil)
 	check.Assert(adminCatalogById.AdminCatalog.HREF, Equals, adminCatalog.AdminCatalog.HREF)
 }
@@ -1183,11 +1183,11 @@ func (vcd *TestVCD) Test_CatalogAccessAsOrgUsers(check *C) {
 	user2Name := vcd.config.Tenants[1].User
 	password2 := vcd.config.Tenants[1].Password
 
-	org1AsSystem, err := vcd.client.GetAdminOrgByName(org1Name)
+	org1AsSystem, err := vcd.client.GetAdminOrgByName(ctx, org1Name)
 	check.Assert(err, IsNil)
 	check.Assert(org1AsSystem, NotNil)
 
-	org2AsSystem, err := vcd.client.GetAdminOrgByName(org2Name)
+	org2AsSystem, err := vcd.client.GetAdminOrgByName(ctx, org2Name)
 	if err != nil {
 		if ContainsNotFound(err) {
 			check.Skip(fmt.Sprintf("organization %s not found", org2Name))
@@ -1203,9 +1203,9 @@ func (vcd *TestVCD) Test_CatalogAccessAsOrgUsers(check *C) {
 	err = vcdClient2.Authenticate(ctx, user2Name, password2, org2Name)
 	check.Assert(err, IsNil)
 
-	org1, err := vcdClient1.GetOrgByName(org1Name)
+	org1, err := vcdClient1.GetOrgByName(ctx, org1Name)
 	check.Assert(err, IsNil)
-	org2, err := vcdClient2.GetOrgByName(org2Name)
+	org2, err := vcdClient2.GetOrgByName(ctx, org2Name)
 	check.Assert(err, IsNil)
 	check.Assert(org2, NotNil)
 	catalogName := check.TestName() + "-cat"
@@ -1216,7 +1216,7 @@ func (vcd *TestVCD) Test_CatalogAccessAsOrgUsers(check *C) {
 	catalog1AsSystem, err := org1AsSystem.GetCatalogByName(ctx, catalogName, true)
 	check.Assert(err, IsNil)
 	fmt.Printf("sharing catalog %s from org %s\n", catalogName, org1Name)
-	err = adminCatalog1AsSystem.SetAccessControl(&types.ControlAccessParams{
+	err = adminCatalog1AsSystem.SetAccessControl(ctx, &types.ControlAccessParams{
 		IsSharedToEveryone: false,
 		AccessSettings: &types.AccessSettingList{
 			AccessSetting: []*types.AccessSetting{
@@ -1257,11 +1257,11 @@ func (vcd *TestVCD) Test_CatalogAccessAsOrgUsers(check *C) {
 	check.Assert(mediaRecordAsSystem, NotNil)
 
 	// Retrieve catalog by ID in its own Org
-	adminCatalog1, err := vcdClient1.Client.GetAdminCatalogById(adminCatalog1AsSystem.AdminCatalog.ID)
+	adminCatalog1, err := vcdClient1.Client.GetAdminCatalogById(ctx, adminCatalog1AsSystem.AdminCatalog.ID)
 	check.Assert(err, IsNil)
 	check.Assert(adminCatalog1.AdminCatalog.HREF, Equals, adminCatalog1AsSystem.AdminCatalog.HREF)
 
-	catalog1, err := vcdClient1.Client.GetCatalogById(adminCatalog1AsSystem.AdminCatalog.ID)
+	catalog1, err := vcdClient1.Client.GetCatalogById(ctx, adminCatalog1AsSystem.AdminCatalog.ID)
 	check.Assert(err, IsNil)
 	check.Assert(catalog1.Catalog.HREF, Equals, catalog1AsSystem.Catalog.HREF)
 
@@ -1270,7 +1270,7 @@ func (vcd *TestVCD) Test_CatalogAccessAsOrgUsers(check *C) {
 	// Start retrieving catalog in the other org
 	fmt.Printf("retrieving catalog %s in org %s\n", catalogName, org2Name)
 	for time.Since(startTime) < timeout {
-		_, err = vcdClient2.Client.GetAdminCatalogById(adminCatalog1AsSystem.AdminCatalog.ID)
+		_, err = vcdClient2.Client.GetAdminCatalogById(ctx, adminCatalog1AsSystem.AdminCatalog.ID)
 		if err == nil {
 			fmt.Printf("shared catalog available in %s\n", time.Since(startTime))
 			break
@@ -1278,18 +1278,18 @@ func (vcd *TestVCD) Test_CatalogAccessAsOrgUsers(check *C) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	// Retrieve the shared catalog in the other organization
-	adminCatalog2, err := vcdClient2.Client.GetAdminCatalogById(adminCatalog1AsSystem.AdminCatalog.ID)
+	adminCatalog2, err := vcdClient2.Client.GetAdminCatalogById(ctx, adminCatalog1AsSystem.AdminCatalog.ID)
 	check.Assert(err, IsNil)
 	check.Assert(adminCatalog2, NotNil)
 
 	// Retrieve the catalog from both tenants, using functions that don't rely on organization internals
 	catalog1FromOrg, err := vcdClient1.Client.GetCatalogByName(ctx, org1.Org.Name, catalogName)
 	check.Assert(err, IsNil)
-	adminCatalog1FromOrg, err := vcdClient1.Client.GetAdminCatalogByName(org1.Org.Name, catalogName)
+	adminCatalog1FromOrg, err := vcdClient1.Client.GetAdminCatalogByName(ctx, org1.Org.Name, catalogName)
 	check.Assert(err, IsNil)
-	catalog2FromOrg, err := vcdClient2.Client.GetCatalogByName(org1.Org.Name, catalogName)
+	catalog2FromOrg, err := vcdClient2.Client.GetCatalogByName(ctx, org1.Org.Name, catalogName)
 	check.Assert(err, IsNil)
-	adminCatalog2FromOrg, err := vcdClient2.Client.GetAdminCatalogByName(org1.Org.Name, catalogName)
+	adminCatalog2FromOrg, err := vcdClient2.Client.GetAdminCatalogByName(ctx, org1.Org.Name, catalogName)
 	check.Assert(err, IsNil)
 
 	// Also retrieve the catalog items from both tenants

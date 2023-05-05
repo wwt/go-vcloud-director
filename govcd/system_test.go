@@ -575,11 +575,11 @@ func (vcd *TestVCD) Test_QueryAdminOrgVdcStorageProfileByID(check *C) {
 	if vcd.config.VCD.StorageProfile.SP1 == "" {
 		check.Skip("Skipping VDC StorageProfile query: no StorageProfile ID was given")
 	}
-	ref, err := vcd.vdc.FindStorageProfileReference(vcd.config.VCD.StorageProfile.SP1)
+	ref, err := vcd.vdc.FindStorageProfileReference(ctx, vcd.config.VCD.StorageProfile.SP1)
 	check.Assert(err, IsNil)
 	expectedStorageProfileID, err := GetUuidFromHref(ref.HREF, true)
 	check.Assert(err, IsNil)
-	vdcStorageProfile, err := QueryAdminOrgVdcStorageProfileByID(vcd.client, ref.ID)
+	vdcStorageProfile, err := QueryAdminOrgVdcStorageProfileByID(ctx, vcd.client, ref.ID)
 	check.Assert(err, IsNil)
 
 	storageProfileFound := false
@@ -612,11 +612,11 @@ func (vcd *TestVCD) Test_QueryOrgVdcStorageProfileByID(check *C) {
 	orgUserVcdClient, _, err := newOrgUserConnection(adminOrg, "query-org-vdc-storage-profile-by-id", "CHANGE-ME", vcd.config.Provider.Url, true)
 	check.Assert(err, IsNil)
 
-	ref, err := vcd.vdc.FindStorageProfileReference(vcd.config.VCD.StorageProfile.SP1)
+	ref, err := vcd.vdc.FindStorageProfileReference(ctx, vcd.config.VCD.StorageProfile.SP1)
 	check.Assert(err, IsNil)
 	expectedStorageProfileID, err := GetUuidFromHref(ref.HREF, true)
 	check.Assert(err, IsNil)
-	vdcStorageProfile, err := QueryOrgVdcStorageProfileByID(orgUserVcdClient, ref.ID)
+	vdcStorageProfile, err := QueryOrgVdcStorageProfileByID(ctx, orgUserVcdClient, ref.ID)
 	check.Assert(err, IsNil)
 
 	storageProfileFound := false
@@ -708,7 +708,7 @@ func (vcd *TestVCD) TestQueryAllVdcs(check *C) {
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
 
-	allVdcs, err := vcd.client.Client.QueryAllVdcs()
+	allVdcs, err := vcd.client.Client.QueryAllVdcs(ctx)
 	check.Assert(err, IsNil)
 
 	// Check for at least that many VDCs in VCD

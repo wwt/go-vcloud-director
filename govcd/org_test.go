@@ -638,7 +638,7 @@ func setupVdc(vcd *TestVCD, check *C, allocationModel string) (AdminOrg, *types.
 	check.Assert(err, IsNil)
 
 	check.Assert(storageProfile.HREF, Not(Equals), "")
-	results, err = vcd.client.QueryWithNotEncodedParams(nil, map[string]string{
+	results, err = vcd.client.QueryWithNotEncodedParams(ctx, nil, map[string]string{
 		"type":   "networkPool",
 		"filter": fmt.Sprintf("name==%s", vcd.config.VCD.ProviderVdc.NetworkPool),
 	})
@@ -707,7 +707,7 @@ func (vcd *TestVCD) Test_QueryStorageProfiles(check *C) {
 	// retrieve Org and VDC
 	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
-	adminVdc, err := adminOrg.GetAdminVDCByName(vcd.config.VCD.Vdc, false)
+	adminVdc, err := adminOrg.GetAdminVDCByName(ctx, vcd.config.VCD.Vdc, false)
 	check.Assert(err, IsNil)
 
 	// Gets the Provider VDC from the AdminVdc structure
@@ -717,7 +717,7 @@ func (vcd *TestVCD) Test_QueryStorageProfiles(check *C) {
 	check.Assert(providerVdcHref, Not(Equals), "")
 
 	// Gets the full list of storage profilers
-	rawSpList, err := vcd.client.Client.QueryAllProviderVdcStorageProfiles()
+	rawSpList, err := vcd.client.Client.QueryAllProviderVdcStorageProfiles(ctx)
 	check.Assert(err, IsNil)
 
 	// Manually select the storage profiles that belong to the current provider VDC
@@ -746,18 +746,18 @@ func (vcd *TestVCD) Test_QueryStorageProfiles(check *C) {
 	}
 
 	// Get the list of local storage profiles (belonging to the Provider VDC that the adminVdc depends on)
-	localSpList, err := vcd.client.Client.QueryProviderVdcStorageProfiles(providerVdcHref)
+	localSpList, err := vcd.client.Client.QueryProviderVdcStorageProfiles(ctx, providerVdcHref)
 	check.Assert(err, IsNil)
 	// Make sure the automated list and the manual list match
 	check.Assert(spList, DeepEquals, localSpList)
 
 	// Get the same list using the AdminVdc method and check that the result matches
-	compatibleSpList, err := adminVdc.QueryCompatibleStorageProfiles()
+	compatibleSpList, err := adminVdc.QueryCompatibleStorageProfiles(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(compatibleSpList, DeepEquals, localSpList)
 
 	for _, sp := range compatibleSpList {
-		fullSp, err := vcd.client.QueryProviderVdcStorageProfileByName(sp.Name, providerVdcHref)
+		fullSp, err := vcd.client.QueryProviderVdcStorageProfileByName(ctx, sp.Name, providerVdcHref)
 		check.Assert(err, IsNil)
 		check.Assert(sp.HREF, Equals, fullSp.HREF)
 		check.Assert(fullSp.ProviderVdcHREF, Equals, providerVdcHref)
@@ -766,18 +766,18 @@ func (vcd *TestVCD) Test_QueryStorageProfiles(check *C) {
 	// When we have duplicate names, we also check the effectiveness of the retrieval function with Provider VDC filter
 	for name := range duplicateNames {
 		// Duplicate name with specific provider VDC HREF will succeed
-		fullSp, err := vcd.client.QueryProviderVdcStorageProfileByName(name, providerVdcHref)
+		fullSp, err := vcd.client.QueryProviderVdcStorageProfileByName(ctx, name, providerVdcHref)
 		check.Assert(err, IsNil)
 		check.Assert(fullSp.ProviderVdcHREF, Equals, providerVdcHref)
 		// Duplicate name with empty provider VDC HREF will fail
-		faultySp, err := vcd.client.QueryProviderVdcStorageProfileByName(name, "")
+		faultySp, err := vcd.client.QueryProviderVdcStorageProfileByName(ctx, name, "")
 		check.Assert(err, NotNil)
 		check.Assert(faultySp, IsNil)
 	}
 
 	// Search explicitly for a storage profile not present in current provider VDC
 	if notLocalStorageProfile != "" {
-		fullSp, err := vcd.client.QueryProviderVdcStorageProfileByName(notLocalStorageProfile, providerVdcHref)
+		fullSp, err := vcd.client.QueryProviderVdcStorageProfileByName(ctx, notLocalStorageProfile, providerVdcHref)
 		check.Assert(err, NotNil)
 		check.Assert(fullSp, IsNil)
 	}
@@ -788,11 +788,11 @@ func (vcd *TestVCD) Test_AddRemoveVdcStorageProfiles(check *C) {
 	if vcd.config.VCD.ProviderVdc.Name == "" {
 		check.Skip("No provider VDC found in configuration")
 	}
-	providerVDCs, err := QueryProviderVdcByName(vcd.client, vcd.config.VCD.ProviderVdc.Name)
+	providerVDCs, err := QueryProviderVdcByName(ctx, vcd.client, vcd.config.VCD.ProviderVdc.Name)
 	check.Assert(err, IsNil)
 	check.Assert(len(providerVDCs), Equals, 1)
 
-	rawSpList, err := vcd.client.Client.QueryAllProviderVdcStorageProfiles()
+	rawSpList, err := vcd.client.Client.QueryAllProviderVdcStorageProfiles(ctx)
 	check.Assert(err, IsNil)
 	var spList []*types.QueryResultProviderVdcStorageProfileRecordType
 	for _, sp := range rawSpList {
@@ -801,7 +801,7 @@ func (vcd *TestVCD) Test_AddRemoveVdcStorageProfiles(check *C) {
 		}
 	}
 
-	localSpList, err := vcd.client.Client.QueryProviderVdcStorageProfiles(providerVDCs[0].HREF)
+	localSpList, err := vcd.client.Client.QueryProviderVdcStorageProfiles(ctx, providerVDCs[0].HREF)
 	check.Assert(err, IsNil)
 	check.Assert(spList, DeepEquals, localSpList)
 
@@ -831,74 +831,78 @@ func (vcd *TestVCD) Test_AddRemoveVdcStorageProfiles(check *C) {
 	adminOrg, vdcConfiguration, err := setupVdc(vcd, check, "AllocationPool")
 	check.Assert(err, IsNil)
 
-	adminVdc, err := adminOrg.GetAdminVDCByName(vdcConfiguration.Name, true)
+	adminVdc, err := adminOrg.GetAdminVDCByName(ctx, vdcConfiguration.Name, true)
 	check.Assert(err, IsNil)
 
 	// Add another storage profile
-	err = adminVdc.AddStorageProfileWait(&types.VdcStorageProfileConfiguration{
-		Enabled: takeBoolPointer(true),
-		Units:   "MB",
-		Limit:   1024,
-		Default: false,
-		ProviderVdcStorageProfile: &types.Reference{
-			HREF: sp2.HREF,
-			Name: sp2.Name,
-		},
-	}, "new sp 2")
+	err = adminVdc.AddStorageProfileWait(
+		ctx,
+		&types.VdcStorageProfileConfiguration{
+			Enabled: takeBoolPointer(true),
+			Units:   "MB",
+			Limit:   1024,
+			Default: false,
+			ProviderVdcStorageProfile: &types.Reference{
+				HREF: sp2.HREF,
+				Name: sp2.Name,
+			},
+		}, "new sp 2")
 	check.Assert(err, IsNil)
 	check.Assert(len(adminVdc.AdminVdc.VdcStorageProfiles.VdcStorageProfile), Equals, 2)
 
 	// Find the default storage profile and makes sure it matches with the one we know to be the default
-	defaultSpRef, err := adminVdc.GetDefaultStorageProfileReference()
+	defaultSpRef, err := adminVdc.GetDefaultStorageProfileReference(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(defaultSp.Name, Equals, defaultSpRef.Name)
 
 	// Remove the second storage profile
-	err = adminVdc.RemoveStorageProfileWait(sp2.Name)
+	err = adminVdc.RemoveStorageProfileWait(ctx, sp2.Name)
 	check.Assert(err, IsNil)
 	check.Assert(len(adminVdc.AdminVdc.VdcStorageProfiles.VdcStorageProfile), Equals, 1)
 
 	// Add the second storage profile again
-	err = adminVdc.AddStorageProfileWait(&types.VdcStorageProfileConfiguration{
-		Enabled: takeBoolPointer(true),
-		Units:   "MB",
-		Limit:   1024,
-		Default: false,
-		ProviderVdcStorageProfile: &types.Reference{
-			HREF: sp2.HREF,
-			Name: sp2.Name,
-		},
-	}, "new sp 2")
+	err = adminVdc.AddStorageProfileWait(
+		ctx,
+		&types.VdcStorageProfileConfiguration{
+			Enabled: takeBoolPointer(true),
+			Units:   "MB",
+			Limit:   1024,
+			Default: false,
+			ProviderVdcStorageProfile: &types.Reference{
+				HREF: sp2.HREF,
+				Name: sp2.Name,
+			},
+		}, "new sp 2")
 
 	check.Assert(err, IsNil)
 	check.Assert(len(adminVdc.AdminVdc.VdcStorageProfiles.VdcStorageProfile), Equals, 2)
 
 	// Change default storage profile from the original one to the second one
-	err = adminVdc.SetDefaultStorageProfile(sp2.Name)
+	err = adminVdc.SetDefaultStorageProfile(ctx, sp2.Name)
 	check.Assert(err, IsNil)
 
 	// Check that the default storage profile was changed
-	defaultSpRef, err = adminVdc.GetDefaultStorageProfileReference()
+	defaultSpRef, err = adminVdc.GetDefaultStorageProfileReference(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(defaultSpRef.Name, Equals, sp2.Name)
 
 	// Set the default storage profile again to the same item.
 	// This proves that SetDefaultStorageProfile is idempotent
-	err = adminVdc.SetDefaultStorageProfile(sp2.Name)
+	err = adminVdc.SetDefaultStorageProfile(ctx, sp2.Name)
 	check.Assert(err, IsNil)
-	defaultSpRef, err = adminVdc.GetDefaultStorageProfileReference()
+	defaultSpRef, err = adminVdc.GetDefaultStorageProfileReference(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(defaultSpRef.Name, Equals, sp2.Name)
 
 	// Remove the former default storage profile
-	err = adminVdc.RemoveStorageProfileWait(defaultSp.Name)
+	err = adminVdc.RemoveStorageProfileWait(ctx, defaultSp.Name)
 	check.Assert(err, IsNil)
 	check.Assert(len(adminVdc.AdminVdc.VdcStorageProfiles.VdcStorageProfile), Equals, 1)
 
 	// Delete the VDC
-	vdc, err := adminOrg.GetVDCByName(adminVdc.AdminVdc.Name, false)
+	vdc, err := adminOrg.GetVDCByName(ctx, adminVdc.AdminVdc.Name, false)
 	check.Assert(err, IsNil)
-	err = vdc.DeleteWait(true, true)
+	err = vdc.DeleteWait(ctx, true, true)
 	check.Assert(err, IsNil)
 }
 
@@ -1231,11 +1235,11 @@ func (vcd *TestVCD) TestQueryOrgVdcList(check *C) {
 		fmt.Println("# Org and VDC structure layout")
 		queryOrgList := []string{"System", vcd.config.VCD.Org, newOrgName1, newOrgName2}
 		for _, orgName := range queryOrgList {
-			org, err := vcd.client.GetOrgByName(orgName)
+			org, err := vcd.client.GetOrgByName(ctx, orgName)
 			check.Assert(err, IsNil)
 			check.Assert(org, NotNil)
 
-			vdcs, err := org.QueryOrgVdcList()
+			vdcs, err := org.QueryOrgVdcList(ctx)
 			check.Assert(err, IsNil)
 			if testVerbose {
 				fmt.Printf("VDCs for Org '%s'\n", orgName)
@@ -1269,16 +1273,16 @@ func validateQueryOrgVdcResults(vcd *TestVCD, check *C, name, orgName string, ex
 		fmt.Printf("# Checking VDCs in Org '%s' (%s):\n", orgName, name)
 	}
 
-	org, err := vcd.client.GetOrgByName(orgName)
+	org, err := vcd.client.GetOrgByName(ctx, orgName)
 	check.Assert(err, IsNil)
-	orgList, err := org.QueryOrgVdcList()
+	orgList, err := org.QueryOrgVdcList(ctx)
 	check.Assert(err, IsNil)
 
 	// Number of components should be equal to the one returned by 'adminOrg.GetAllVDCs' which looks up VDCs in
 	// <AdminOrg> structure
-	adminOrg, err := vcd.client.GetAdminOrgByName(orgName)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, orgName)
 	check.Assert(err, IsNil)
-	allVdcs, err := adminOrg.GetAllVDCs(true)
+	allVdcs, err := adminOrg.GetAllVDCs(ctx, true)
 	check.Assert(err, IsNil)
 	check.Assert(len(orgList), Equals, len(allVdcs))
 
