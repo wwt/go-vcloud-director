@@ -1625,13 +1625,13 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 	}
 }
 
-func (vcd *TestVCD) TearDownSuite(ctx context.Context, check *C) {
+func (vcd *TestVCD) TearDownSuite(check *C) {
 	// We will try to remove every entity that has been registered into
 	// CleanupEntityList. Entities that have already been cleaned up by their
 	// functions will be ignored.
 	for i, cleanupEntity := range cleanupEntityList {
 		fmt.Printf("# %d of %d - ", i+1, len(cleanupEntityList))
-		vcd.removeLeftoverEntities(ctx, cleanupEntity)
+		vcd.removeLeftoverEntities(context.Background(), cleanupEntity)
 		removePersistentCleanupList()
 	}
 }
