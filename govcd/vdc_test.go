@@ -640,7 +640,7 @@ func (vcd *TestVCD) TestVAppTemplateRetrieval(check *C) {
 	check.Assert(vAppTemplateRecord.Name, Equals, vAppTemplate.VAppTemplate.Name)
 	check.Assert(vAppTemplateRecord.HREF, Equals, vAppTemplate.VAppTemplate.HREF)
 
-	vmTemplateRecord, err := vcd.client.QuerySynchronizedVmInVAppTemplateByHref(vAppTemplate.VAppTemplate.HREF, "**")
+	vmTemplateRecord, err := vcd.client.QuerySynchronizedVmInVAppTemplateByHref(ctx, vAppTemplate.VAppTemplate.HREF, "**")
 	check.Assert(err, IsNil)
 	check.Assert(vmTemplateRecord, NotNil)
 
@@ -648,7 +648,7 @@ func (vcd *TestVCD) TestVAppTemplateRetrieval(check *C) {
 	_, err = vdc.GetVAppTemplateByName(ctx, "INVALID")
 	check.Assert(err, NotNil)
 
-	_, err = vcd.client.QuerySynchronizedVmInVAppTemplateByHref(vAppTemplate.VAppTemplate.HREF, "INVALID")
+	_, err = vcd.client.QuerySynchronizedVmInVAppTemplateByHref(ctx, vAppTemplate.VAppTemplate.HREF, "INVALID")
 	check.Assert(err, Equals, ErrorEntityNotFound)
 }
 
@@ -677,13 +677,13 @@ func (vcd *TestVCD) TestMediaRetrieval(check *C) {
 	check.Assert(mediaFromCatalog, NotNil)
 
 	// Test cases
-	mediaFromVdc, err := vcd.client.QueryMediaById(mediaFromCatalog.Media.ID)
+	mediaFromVdc, err := vcd.client.QueryMediaById(ctx, mediaFromCatalog.Media.ID)
 	check.Assert(err, IsNil)
 	check.Assert(mediaFromCatalog.Media.HREF, Equals, mediaFromVdc.MediaRecord.HREF)
 	check.Assert(mediaFromCatalog.Media.Name, Equals, mediaFromVdc.MediaRecord.Name)
 
 	// Test non-existent Media item
-	mediaFromVdc, err = vcd.client.QueryMediaById("INVALID")
+	mediaFromVdc, err = vcd.client.QueryMediaById(ctx, "INVALID")
 	check.Assert(err, NotNil)
 	check.Assert(mediaFromVdc, IsNil)
 }

@@ -29,19 +29,19 @@ func (vcd *TestVCD) Test_VmGroupsCRUD(check *C) {
 	pVdc, err := vcd.client.GetProviderVdcByName(ctx, vcd.config.VCD.NsxtProviderVdc.Name)
 	check.Assert(err, IsNil)
 
-	vmGroup, err := vcd.client.GetVmGroupByNameAndProviderVdcUrn(vcd.config.VCD.NsxtProviderVdc.PlacementPolicyVmGroup, pVdc.ProviderVdc.ID)
+	vmGroup, err := vcd.client.GetVmGroupByNameAndProviderVdcUrn(ctx, vcd.config.VCD.NsxtProviderVdc.PlacementPolicyVmGroup, pVdc.ProviderVdc.ID)
 	check.Assert(err, IsNil)
 	check.Assert(vmGroup.VmGroup.Name, Equals, vcd.config.VCD.NsxtProviderVdc.PlacementPolicyVmGroup)
 
-	vmGroup2, err := vcd.client.GetVmGroupById(vmGroup.VmGroup.ID)
+	vmGroup2, err := vcd.client.GetVmGroupById(ctx, vmGroup.VmGroup.ID)
 	check.Assert(err, IsNil)
 	check.Assert(vmGroup2, DeepEquals, vmGroup)
 
-	vmGroup3, err := vcd.client.GetVmGroupByNamedVmGroupIdAndProviderVdcUrn(vmGroup2.VmGroup.NamedVmGroupId, pVdc.ProviderVdc.ID)
+	vmGroup3, err := vcd.client.GetVmGroupByNamedVmGroupIdAndProviderVdcUrn(ctx, vmGroup2.VmGroup.NamedVmGroupId, pVdc.ProviderVdc.ID)
 	check.Assert(err, IsNil)
 	check.Assert(vmGroup3, DeepEquals, vmGroup2)
 
-	logicalVmGroup, err := vcd.client.CreateLogicalVmGroup(types.LogicalVmGroup{
+	logicalVmGroup, err := vcd.client.CreateLogicalVmGroup(ctx, types.LogicalVmGroup{
 		Name: check.TestName(),
 		NamedVmGroupReferences: types.OpenApiReferences{
 			types.OpenApiReference{
@@ -53,7 +53,7 @@ func (vcd *TestVCD) Test_VmGroupsCRUD(check *C) {
 	check.Assert(err, IsNil)
 	AddToCleanupList(logicalVmGroup.LogicalVmGroup.ID, "logicalVmGroup", "", check.TestName())
 
-	retrievedLogicalVmGroup, err := vcd.client.GetLogicalVmGroupById(logicalVmGroup.LogicalVmGroup.ID)
+	retrievedLogicalVmGroup, err := vcd.client.GetLogicalVmGroupById(ctx, logicalVmGroup.LogicalVmGroup.ID)
 	check.Assert(err, IsNil)
 	check.Assert(retrievedLogicalVmGroup.LogicalVmGroup, DeepEquals, logicalVmGroup.LogicalVmGroup)
 

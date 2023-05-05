@@ -58,7 +58,7 @@ func (vcd *TestVCD) Test_VdcComputePolicies(check *C) {
 		},
 	}
 
-	createdPolicy2, err := org.CreateVdcComputePolicy(ctx, newComputePolicy2.VdcComputePolicy)
+	createdPolicy2, err := client.CreateVdcComputePolicy(ctx, newComputePolicy2.VdcComputePolicy)
 	check.Assert(err, IsNil)
 
 	AddToCleanupList(createdPolicy2.VdcComputePolicy.ID, "vdcComputePolicy", "", check.TestName())

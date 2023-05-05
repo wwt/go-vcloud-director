@@ -32,7 +32,7 @@ func (vcd *TestVCD) Test_VdcComputePoliciesV2(check *C) {
 		},
 	}
 
-	createdPolicy, err := vcd.client.CreateVdcComputePolicyV2(newComputePolicy.VdcComputePolicyV2)
+	createdPolicy, err := vcd.client.CreateVdcComputePolicyV2(ctx, newComputePolicy.VdcComputePolicyV2)
 	check.Assert(err, IsNil)
 
 	AddToCleanupList(createdPolicy.VdcComputePolicyV2.ID, "vdcComputePolicy", "", check.TestName())
@@ -61,7 +61,7 @@ func (vcd *TestVCD) Test_VdcComputePoliciesV2(check *C) {
 		},
 	}
 
-	createdPolicy2, err := vcd.client.CreateVdcComputePolicyV2(newComputePolicy2.VdcComputePolicyV2)
+	createdPolicy2, err := vcd.client.CreateVdcComputePolicyV2(ctx, newComputePolicy2.VdcComputePolicyV2)
 	check.Assert(err, IsNil)
 
 	AddToCleanupList(createdPolicy2.VdcComputePolicyV2.ID, "vdcComputePolicy", "", check.TestName())
@@ -85,7 +85,7 @@ func (vcd *TestVCD) Test_VdcComputePoliciesV2(check *C) {
 	check.Assert(updatedPolicy.VdcComputePolicyV2, DeepEquals, createdPolicy2.VdcComputePolicyV2)
 
 	// Step 3 - Get all VDC compute policies
-	allExistingPolicies, err := vcd.client.GetAllVdcComputePoliciesV2(nil)
+	allExistingPolicies, err := vcd.client.GetAllVdcComputePoliciesV2(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(allExistingPolicies, NotNil)
 
@@ -96,12 +96,12 @@ func (vcd *TestVCD) Test_VdcComputePoliciesV2(check *C) {
 		queryParams := url.Values{}
 		queryParams.Add("filter", "id=="+onePolicy.VdcComputePolicyV2.ID)
 
-		expectOnePolicyResultById, err := vcd.client.GetAllVdcComputePoliciesV2(queryParams)
+		expectOnePolicyResultById, err := vcd.client.GetAllVdcComputePoliciesV2(ctx, queryParams)
 		check.Assert(err, IsNil)
 		check.Assert(len(expectOnePolicyResultById) == 1, Equals, true)
 
 		// Step 2.2 - Retrieve
-		exactItem, err := vcd.client.GetVdcComputePolicyV2ById(onePolicy.VdcComputePolicyV2.ID)
+		exactItem, err := vcd.client.GetVdcComputePolicyV2ById(ctx, onePolicy.VdcComputePolicyV2.ID)
 		check.Assert(err, IsNil)
 
 		check.Assert(err, IsNil)
@@ -116,13 +116,13 @@ func (vcd *TestVCD) Test_VdcComputePoliciesV2(check *C) {
 	err = createdPolicy.Delete(ctx)
 	check.Assert(err, IsNil)
 	// Step 5 - Try to read deleted VDC computed policy should end up with error 'ErrorEntityNotFound'
-	deletedPolicy, err := vcd.client.GetVdcComputePolicyV2ById(createdPolicy.VdcComputePolicyV2.ID)
+	deletedPolicy, err := vcd.client.GetVdcComputePolicyV2ById(ctx, createdPolicy.VdcComputePolicyV2.ID)
 	check.Assert(ContainsNotFound(err), Equals, true)
 	check.Assert(deletedPolicy, IsNil)
 
 	err = createdPolicy2.Delete(ctx)
 	check.Assert(err, IsNil)
-	deletedPolicy2, err := vcd.client.GetVdcComputePolicyV2ById(createdPolicy2.VdcComputePolicyV2.ID)
+	deletedPolicy2, err := vcd.client.GetVdcComputePolicyV2ById(ctx, createdPolicy2.VdcComputePolicyV2.ID)
 	check.Assert(ContainsNotFound(err), Equals, true)
 	check.Assert(deletedPolicy2, IsNil)
 }
@@ -154,7 +154,7 @@ func (vcd *TestVCD) Test_SetAssignedComputePoliciesV2(check *C) {
 			PolicyType: "VdcVmPolicy",
 		},
 	}
-	createdPolicy, err := vcd.client.CreateVdcComputePolicyV2(newComputePolicy.VdcComputePolicyV2)
+	createdPolicy, err := vcd.client.CreateVdcComputePolicyV2(ctx, newComputePolicy.VdcComputePolicyV2)
 	check.Assert(err, IsNil)
 	AddToCleanupList(createdPolicy.VdcComputePolicyV2.ID, "vdcComputePolicy", "", check.TestName())
 
@@ -171,12 +171,12 @@ func (vcd *TestVCD) Test_SetAssignedComputePoliciesV2(check *C) {
 			PolicyType: "VdcVmPolicy",
 		},
 	}
-	createdPolicy2, err := vcd.client.CreateVdcComputePolicyV2(newComputePolicy2.VdcComputePolicyV2)
+	createdPolicy2, err := vcd.client.CreateVdcComputePolicyV2(ctx, newComputePolicy2.VdcComputePolicyV2)
 	check.Assert(err, IsNil)
 	AddToCleanupList(createdPolicy2.VdcComputePolicyV2.ID, "vdcComputePolicy", "", check.TestName())
 
 	// Get default compute policy
-	allAssignedComputePolicies, err := adminVdc.GetAllAssignedVdcComputePoliciesV2(nil)
+	allAssignedComputePolicies, err := adminVdc.GetAllAssignedVdcComputePoliciesV2(ctx, nil)
 	check.Assert(err, IsNil)
 	var defaultPolicyId string
 	for _, assignedPolicy := range allAssignedComputePolicies {
@@ -184,7 +184,7 @@ func (vcd *TestVCD) Test_SetAssignedComputePoliciesV2(check *C) {
 			defaultPolicyId = assignedPolicy.VdcComputePolicyV2.ID
 		}
 	}
-	allAssignedComputePolicies, err = vcd.client.GetAllAssignedVdcComputePoliciesV2(adminVdc.AdminVdc.ID, nil)
+	allAssignedComputePolicies, err = vcd.client.GetAllAssignedVdcComputePoliciesV2(ctx, adminVdc.AdminVdc.ID, nil)
 	check.Assert(err, IsNil)
 	for _, assignedPolicy := range allAssignedComputePolicies {
 		if assignedPolicy.VdcComputePolicyV2.ID == vcd.vdc.Vdc.DefaultComputePolicy.ID {
@@ -201,7 +201,7 @@ func (vcd *TestVCD) Test_SetAssignedComputePoliciesV2(check *C) {
 		{HREF: vdcComputePolicyHref.String() + createdPolicy2.VdcComputePolicyV2.ID},
 		{HREF: vdcComputePolicyHref.String() + defaultPolicyId}}}
 
-	assignedVdcComputePolicies, err := adminVdc.SetAssignedComputePolicies(policyReferences)
+	assignedVdcComputePolicies, err := adminVdc.SetAssignedComputePolicies(ctx, policyReferences)
 	check.Assert(err, IsNil)
 	check.Assert(strings.SplitAfter(policyReferences.VdcComputePolicyReference[0].HREF, "vdcComputePolicy:")[1], Equals,
 		strings.SplitAfter(assignedVdcComputePolicies.VdcComputePolicyReference[0].HREF, "vdcComputePolicy:")[1])
@@ -212,7 +212,7 @@ func (vcd *TestVCD) Test_SetAssignedComputePoliciesV2(check *C) {
 	policyReferences = types.VdcComputePolicyReferences{VdcComputePolicyReference: []*types.Reference{
 		{HREF: vdcComputePolicyHref.String() + defaultPolicyId}}}
 
-	_, err = adminVdc.SetAssignedComputePolicies(policyReferences)
+	_, err = adminVdc.SetAssignedComputePolicies(ctx, policyReferences)
 	check.Assert(err, IsNil)
 
 	err = createdPolicy.Delete(ctx)
@@ -236,12 +236,12 @@ func (vcd *TestVCD) Test_VdcVmPlacementPoliciesV2(check *C) {
 	check.Assert(err, IsNil)
 
 	// We also need the VM Group to create a VM Placement Policy
-	vmGroup, err := vcd.client.GetVmGroupByNameAndProviderVdcUrn(vcd.config.VCD.NsxtProviderVdc.PlacementPolicyVmGroup, pVdc.ProviderVdc.ID)
+	vmGroup, err := vcd.client.GetVmGroupByNameAndProviderVdcUrn(ctx, vcd.config.VCD.NsxtProviderVdc.PlacementPolicyVmGroup, pVdc.ProviderVdc.ID)
 	check.Assert(err, IsNil)
 	check.Assert(vmGroup.VmGroup.Name, Equals, vcd.config.VCD.NsxtProviderVdc.PlacementPolicyVmGroup)
 
 	// We'll also use a Logical VM Group to create the VM Placement Policy
-	logicalVmGroup, err := vcd.client.CreateLogicalVmGroup(types.LogicalVmGroup{
+	logicalVmGroup, err := vcd.client.CreateLogicalVmGroup(ctx, types.LogicalVmGroup{
 		Name: check.TestName(),
 		NamedVmGroupReferences: types.OpenApiReferences{
 			types.OpenApiReference{
@@ -295,7 +295,7 @@ func (vcd *TestVCD) Test_VdcVmPlacementPoliciesV2(check *C) {
 		},
 	}
 
-	createdPolicy, err := vcd.client.CreateVdcComputePolicyV2(newComputePolicy.VdcComputePolicyV2)
+	createdPolicy, err := vcd.client.CreateVdcComputePolicyV2(ctx, newComputePolicy.VdcComputePolicyV2)
 	check.Assert(err, IsNil)
 
 	AddToCleanupList(createdPolicy.VdcComputePolicyV2.ID, "vdcComputePolicy", "", check.TestName())
@@ -314,7 +314,7 @@ func (vcd *TestVCD) Test_VdcVmPlacementPoliciesV2(check *C) {
 	// Delete the VM Placement Policy and check it doesn't exist anymore
 	err = createdPolicy.Delete(ctx)
 	check.Assert(err, IsNil)
-	deletedPolicy, err := vcd.client.GetVdcComputePolicyV2ById(createdPolicy.VdcComputePolicyV2.ID)
+	deletedPolicy, err := vcd.client.GetVdcComputePolicyV2ById(ctx, createdPolicy.VdcComputePolicyV2.ID)
 	check.Assert(ContainsNotFound(err), Equals, true)
 	check.Assert(deletedPolicy, IsNil)
 
@@ -340,7 +340,7 @@ func (vcd *TestVCD) Test_VdcDuplicatedVmPlacementPolicyGetsACleanError(check *C)
 	check.Assert(err, IsNil)
 
 	// We also need the VM Group to create a VM Placement Policy
-	vmGroup, err := vcd.client.GetVmGroupByNameAndProviderVdcUrn(vcd.config.VCD.NsxtProviderVdc.PlacementPolicyVmGroup, pVdc.ProviderVdc.ID)
+	vmGroup, err := vcd.client.GetVmGroupByNameAndProviderVdcUrn(ctx, vcd.config.VCD.NsxtProviderVdc.PlacementPolicyVmGroup, pVdc.ProviderVdc.ID)
 	check.Assert(err, IsNil)
 	check.Assert(vmGroup.VmGroup.Name, Equals, vcd.config.VCD.NsxtProviderVdc.PlacementPolicyVmGroup)
 
@@ -372,13 +372,13 @@ func (vcd *TestVCD) Test_VdcDuplicatedVmPlacementPolicyGetsACleanError(check *C)
 		},
 	}
 
-	createdPolicy, err := vcd.client.CreateVdcComputePolicyV2(newComputePolicy.VdcComputePolicyV2)
+	createdPolicy, err := vcd.client.CreateVdcComputePolicyV2(ctx, newComputePolicy.VdcComputePolicyV2)
 	check.Assert(err, IsNil)
 	check.Assert(createdPolicy, NotNil)
 
 	AddToCleanupList(createdPolicy.VdcComputePolicyV2.ID, "vdcComputePolicy", "", check.TestName())
 
-	_, err = vcd.client.CreateVdcComputePolicyV2(newComputePolicy.VdcComputePolicyV2)
+	_, err = vcd.client.CreateVdcComputePolicyV2(ctx, newComputePolicy.VdcComputePolicyV2)
 	check.Assert(err, NotNil)
 	check.Assert(true, Equals, strings.Contains(err.Error(), "VM Placement Policy with name '"+check.TestName()+"' already exists"))
 

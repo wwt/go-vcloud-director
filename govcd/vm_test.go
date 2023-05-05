@@ -730,10 +730,10 @@ func (vcd *TestVCD) Test_VmShutdown(check *C) {
 	if vmName == "" {
 		check.Skip("skipping test because no VM is found")
 	}
-	vm, err := vcd.client.Client.GetVMByHref(existingVm.HREF)
+	vm, err := vcd.client.Client.GetVMByHref(ctx, existingVm.HREF)
 	check.Assert(err, IsNil)
 
-	vdc, err := vm.GetParentVdc()
+	vdc, err := vm.GetParentVdc(ctx)
 	check.Assert(err, IsNil)
 
 	// Ensure VM is not powered on
@@ -755,7 +755,7 @@ func (vcd *TestVCD) Test_VmShutdown(check *C) {
 		err = vm.Refresh(ctx)
 		check.Assert(err, IsNil)
 
-		vmQuery, err := vdc.QueryVM(vapp.VApp.Name, vm.VM.Name)
+		vmQuery, err := vdc.QueryVM(ctx, vapp.VApp.Name, vm.VM.Name)
 		check.Assert(err, IsNil)
 
 		printVerbose("VM Tools Status: %s\n", vmQuery.VM.GcStatus)
@@ -767,7 +767,7 @@ func (vcd *TestVCD) Test_VmShutdown(check *C) {
 	}
 	printVerbose("Shuting down VM:\n")
 
-	task, err := vm.Shutdown()
+	task, err := vm.Shutdown(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
@@ -1140,7 +1140,7 @@ func (vcd *TestVCD) Test_UpdateInternalDisk(check *C) {
 
 	// verify VM description still available - test for bugfix #418
 	description := "Test_UpdateInternalDisk_Description"
-	vm, err = vm.UpdateVmSpecSection(vm.VM.VmSpecSection, description)
+	vm, err = vm.UpdateVmSpecSection(ctx, vm.VM.VmSpecSection, description)
 	check.Assert(err, IsNil)
 
 	//verify
@@ -1750,7 +1750,7 @@ func (vcd *TestVCD) Test_VMUpdateComputePolicies(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(providerVdc, NotNil)
 
-	vmGroup, err := vcd.client.GetVmGroupByNameAndProviderVdcUrn(vcd.config.VCD.NsxtProviderVdc.PlacementPolicyVmGroup, providerVdc.ProviderVdc.ID)
+	vmGroup, err := vcd.client.GetVmGroupByNameAndProviderVdcUrn(ctx, vcd.config.VCD.NsxtProviderVdc.PlacementPolicyVmGroup, providerVdc.ProviderVdc.ID)
 	check.Assert(err, IsNil)
 	check.Assert(vmGroup, NotNil)
 
@@ -1807,11 +1807,11 @@ func (vcd *TestVCD) Test_VMUpdateComputePolicies(check *C) {
 			},
 		})
 
-		sizingPolicies[i], err = vcd.client.CreateVdcComputePolicyV2(sizingPolicies[i].VdcComputePolicyV2)
+		sizingPolicies[i], err = vcd.client.CreateVdcComputePolicyV2(ctx, sizingPolicies[i].VdcComputePolicyV2)
 		check.Assert(err, IsNil)
 		AddToCleanupList(sizingPolicies[i].VdcComputePolicyV2.ID, "vdcComputePolicy", vcd.org.Org.Name, sizingPolicyName)
 
-		placementPolicies[i], err = vcd.client.CreateVdcComputePolicyV2(placementPolicies[i].VdcComputePolicyV2)
+		placementPolicies[i], err = vcd.client.CreateVdcComputePolicyV2(ctx, placementPolicies[i].VdcComputePolicyV2)
 		check.Assert(err, IsNil)
 		AddToCleanupList(placementPolicies[i].VdcComputePolicyV2.ID, "vdcComputePolicy", vcd.org.Org.Name, placementPolicyName)
 	}
@@ -1820,7 +1820,7 @@ func (vcd *TestVCD) Test_VMUpdateComputePolicies(check *C) {
 	check.Assert(err, IsNil)
 
 	// Add the created compute policies to the ones that the VDC has already assigned
-	alreadyAssignedPolicies, err := adminVdc.GetAllAssignedVdcComputePoliciesV2(nil)
+	alreadyAssignedPolicies, err := adminVdc.GetAllAssignedVdcComputePoliciesV2(ctx, nil)
 	check.Assert(err, IsNil)
 	var allComputePoliciesToAssign []*types.Reference
 	for _, alreadyAssignedPolicy := range alreadyAssignedPolicies {
@@ -1831,7 +1831,7 @@ func (vcd *TestVCD) Test_VMUpdateComputePolicies(check *C) {
 		allComputePoliciesToAssign = append(allComputePoliciesToAssign, &types.Reference{HREF: vdcComputePolicyHref.String() + placementPolicies[i].VdcComputePolicyV2.ID})
 	}
 
-	assignedVdcComputePolicies, err := adminVdc.SetAssignedComputePolicies(types.VdcComputePolicyReferences{VdcComputePolicyReference: allComputePoliciesToAssign})
+	assignedVdcComputePolicies, err := adminVdc.SetAssignedComputePolicies(ctx, types.VdcComputePolicyReferences{VdcComputePolicyReference: allComputePoliciesToAssign})
 	check.Assert(err, IsNil)
 	check.Assert(len(alreadyAssignedPolicies)+numberOfPolicies*2, Equals, len(assignedVdcComputePolicies.VdcComputePolicyReference))
 
@@ -1841,37 +1841,37 @@ func (vcd *TestVCD) Test_VMUpdateComputePolicies(check *C) {
 
 	// Update all Compute Policies: Sizing and Placement
 	check.Assert(err, IsNil)
-	vm, err = vm.UpdateComputePolicyV2(sizingPolicies[0].VdcComputePolicyV2.ID, placementPolicies[0].VdcComputePolicyV2.ID, "")
+	vm, err = vm.UpdateComputePolicyV2(ctx, sizingPolicies[0].VdcComputePolicyV2.ID, placementPolicies[0].VdcComputePolicyV2.ID, "")
 	check.Assert(err, IsNil)
 	check.Assert(vm.VM.ComputePolicy.VmSizingPolicy.ID, Equals, sizingPolicies[0].VdcComputePolicyV2.ID)
 	check.Assert(vm.VM.ComputePolicy.VmPlacementPolicy.ID, Equals, placementPolicies[0].VdcComputePolicyV2.ID)
 
 	// Update Sizing policy only
-	vm, err = vm.UpdateComputePolicyV2(sizingPolicies[0].VdcComputePolicyV2.ID, placementPolicies[1].VdcComputePolicyV2.ID, "")
+	vm, err = vm.UpdateComputePolicyV2(ctx, sizingPolicies[0].VdcComputePolicyV2.ID, placementPolicies[1].VdcComputePolicyV2.ID, "")
 	check.Assert(err, IsNil)
 	check.Assert(vm.VM.ComputePolicy.VmSizingPolicy.ID, Equals, sizingPolicies[0].VdcComputePolicyV2.ID)
 	check.Assert(vm.VM.ComputePolicy.VmPlacementPolicy.ID, Equals, placementPolicies[1].VdcComputePolicyV2.ID)
 
 	// Update Placement policy only
-	vm, err = vm.UpdateComputePolicyV2(sizingPolicies[1].VdcComputePolicyV2.ID, placementPolicies[1].VdcComputePolicyV2.ID, "")
+	vm, err = vm.UpdateComputePolicyV2(ctx, sizingPolicies[1].VdcComputePolicyV2.ID, placementPolicies[1].VdcComputePolicyV2.ID, "")
 	check.Assert(err, IsNil)
 	check.Assert(vm.VM.ComputePolicy.VmSizingPolicy.ID, Equals, sizingPolicies[1].VdcComputePolicyV2.ID)
 	check.Assert(vm.VM.ComputePolicy.VmPlacementPolicy.ID, Equals, placementPolicies[1].VdcComputePolicyV2.ID)
 
 	// Remove Placement Policy
-	vm, err = vm.UpdateComputePolicyV2(sizingPolicies[1].VdcComputePolicyV2.ID, "", "")
+	vm, err = vm.UpdateComputePolicyV2(ctx, sizingPolicies[1].VdcComputePolicyV2.ID, "", "")
 	check.Assert(err, IsNil)
 	check.Assert(vm.VM.ComputePolicy.VmSizingPolicy.ID, Equals, sizingPolicies[1].VdcComputePolicyV2.ID)
 	check.Assert(vm.VM.ComputePolicy.VmPlacementPolicy, IsNil)
 
 	// Remove Sizing Policy
-	vm, err = vm.UpdateComputePolicyV2("", placementPolicies[1].VdcComputePolicyV2.ID, "")
+	vm, err = vm.UpdateComputePolicyV2(ctx, "", placementPolicies[1].VdcComputePolicyV2.ID, "")
 	check.Assert(err, IsNil)
 	check.Assert(vm.VM.ComputePolicy.VmSizingPolicy, IsNil)
 	check.Assert(vm.VM.ComputePolicy.VmPlacementPolicy.ID, Equals, placementPolicies[1].VdcComputePolicyV2.ID)
 
 	// Try to remove both, it should fail
-	_, err = vm.UpdateComputePolicyV2("", "", "")
+	_, err = vm.UpdateComputePolicyV2(ctx, "", "", "")
 	check.Assert(err, NotNil)
 	check.Assert(true, Equals, strings.Contains(err.Error(), "either sizing policy ID or placement policy ID is needed"))
 
@@ -1896,7 +1896,7 @@ func (vcd *TestVCD) Test_VMUpdateComputePolicies(check *C) {
 		beforeTestPolicyReferences = append(beforeTestPolicyReferences, &types.Reference{HREF: vdcComputePolicyHref.String() + assignedPolicy.VdcComputePolicyV2.ID})
 	}
 
-	_, err = adminVdc.SetAssignedComputePolicies(types.VdcComputePolicyReferences{VdcComputePolicyReference: beforeTestPolicyReferences})
+	_, err = adminVdc.SetAssignedComputePolicies(ctx, types.VdcComputePolicyReferences{VdcComputePolicyReference: beforeTestPolicyReferences})
 	check.Assert(err, IsNil)
 }
 
@@ -2101,20 +2101,20 @@ func (vcd *TestVCD) Test_VMChangeCPU(check *C) {
 	check.Assert(0, Not(Equals), currentCpus)
 	check.Assert(0, Not(Equals), currentCores)
 
-	vm, err := vcd.client.Client.GetVMByHref(existingVm.HREF)
+	vm, err := vcd.client.Client.GetVMByHref(ctx, existingVm.HREF)
 	check.Assert(err, IsNil)
 
 	cores := 2
 	cpuCount := 4
 
-	err = vm.ChangeCPU(cpuCount, cores)
+	err = vm.ChangeCPU(ctx, cpuCount, cores)
 	check.Assert(err, IsNil)
 
 	check.Assert(*vm.VM.VmSpecSection.NumCpus, Equals, cpuCount)
 	check.Assert(*vm.VM.VmSpecSection.NumCoresPerSocket, Equals, cores)
 
 	// return to previous value
-	err = vm.ChangeCPU(*currentCpus, *currentCores)
+	err = vm.ChangeCPU(ctx, *currentCpus, *currentCores)
 	check.Assert(err, IsNil)
 }
 
@@ -2135,13 +2135,13 @@ func (vcd *TestVCD) Test_VMChangeCPUAndCoreCount(check *C) {
 	check.Assert(0, Not(Equals), currentCpus)
 	check.Assert(0, Not(Equals), currentCores)
 
-	vm, err := vcd.client.Client.GetVMByHref(existingVm.HREF)
+	vm, err := vcd.client.Client.GetVMByHref(ctx, existingVm.HREF)
 	check.Assert(err, IsNil)
 
 	cores := 2
 	cpuCount := 4
 
-	err = vm.ChangeCPUAndCoreCount(&cpuCount, &cores)
+	err = vm.ChangeCPUAndCoreCount(ctx, &cpuCount, &cores)
 	check.Assert(err, IsNil)
 
 	check.Assert(*vm.VM.VmSpecSection.NumCpus, Equals, cpuCount)
@@ -2149,7 +2149,7 @@ func (vcd *TestVCD) Test_VMChangeCPUAndCoreCount(check *C) {
 
 	// Try changing only CPU count and seeing if coreCount remains the same
 	newCpuCount := 2
-	err = vm.ChangeCPUAndCoreCount(&newCpuCount, nil)
+	err = vm.ChangeCPUAndCoreCount(ctx, &newCpuCount, nil)
 	check.Assert(err, IsNil)
 
 	check.Assert(*vm.VM.VmSpecSection.NumCpus, Equals, newCpuCount)
@@ -2157,14 +2157,14 @@ func (vcd *TestVCD) Test_VMChangeCPUAndCoreCount(check *C) {
 
 	// Change only core count and check that CPU count remains as it was
 	newCoreCount := 1
-	err = vm.ChangeCPUAndCoreCount(nil, &newCoreCount)
+	err = vm.ChangeCPUAndCoreCount(ctx, nil, &newCoreCount)
 	check.Assert(err, IsNil)
 
 	check.Assert(*vm.VM.VmSpecSection.NumCpus, Equals, newCpuCount)
 	check.Assert(*vm.VM.VmSpecSection.NumCoresPerSocket, Equals, newCoreCount)
 
 	// return to previous value
-	err = vm.ChangeCPUAndCoreCount(currentCpus, currentCores)
+	err = vm.ChangeCPUAndCoreCount(ctx, currentCpus, currentCores)
 	check.Assert(err, IsNil)
 }
 
@@ -2183,17 +2183,17 @@ func (vcd *TestVCD) Test_VMChangeMemory(check *C) {
 	currentMemory := existingVm.VmSpecSection.MemoryResourceMb.Configured
 	check.Assert(0, Not(Equals), currentMemory)
 
-	vm, err := vcd.client.Client.GetVMByHref(existingVm.HREF)
+	vm, err := vcd.client.Client.GetVMByHref(ctx, existingVm.HREF)
 	check.Assert(err, IsNil)
 
-	err = vm.ChangeMemory(2304)
+	err = vm.ChangeMemory(ctx, 2304)
 	check.Assert(err, IsNil)
 
 	check.Assert(existingVm.VmSpecSection.MemoryResourceMb, Not(IsNil))
 	check.Assert(vm.VM.VmSpecSection.MemoryResourceMb.Configured, Equals, int64(2304))
 
 	// return to previous value
-	err = vm.ChangeMemory(currentMemory)
+	err = vm.ChangeMemory(ctx, currentMemory)
 	check.Assert(err, IsNil)
 }
 
@@ -2291,7 +2291,7 @@ func createNsxtVAppAndVm(vcd *TestVCD, check *C) (*VApp, *VM) {
 			},
 		},
 	}
-	vm, err := vapp.AddRawVM(vmDef)
+	vm, err := vapp.AddRawVM(ctx, vmDef)
 	check.Assert(err, IsNil)
 	check.Assert(vm, NotNil)
 	check.Assert(vm.VM.Name, Equals, vmDef.SourcedItem.Source.Name)
@@ -2312,7 +2312,7 @@ func (vcd *TestVCD) Test_GetOvfEnvironment(check *C) {
 	if vmName == "" {
 		check.Skip("skipping test because no VM is found")
 	}
-	vm, err := vcd.client.Client.GetVMByHref(existingVm.HREF)
+	vm, err := vcd.client.Client.GetVMByHref(ctx, existingVm.HREF)
 	check.Assert(err, IsNil)
 
 	vmStatus, err := vm.GetStatus(ctx)
@@ -2326,7 +2326,7 @@ func (vcd *TestVCD) Test_GetOvfEnvironment(check *C) {
 	}
 
 	// Read ovfenv when VM is started
-	ovfenv, err := vm.GetEnvironment()
+	ovfenv, err := vm.GetEnvironment(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(ovfenv, NotNil)
 
@@ -2350,13 +2350,13 @@ func (vcd *TestVCD) Test_GetOvfEnvironment(check *C) {
 	}
 
 	// PowerOff
-	task, err := vm.PowerOff()
+	task, err := vm.PowerOff(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
-	ovfenv, err = vm.GetEnvironment()
+	ovfenv, err = vm.GetEnvironment(ctx)
 	check.Assert(strings.Contains(err.Error(), "OVF environment is only available when VM is powered on"), Equals, true)
 	check.Assert(ovfenv, IsNil)
 
