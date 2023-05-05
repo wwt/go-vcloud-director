@@ -16,7 +16,7 @@ func (vcd *TestVCD) Test_NsxtIpSecVpn(check *C) {
 	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
-	nsxtVdc, err := org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 
 	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
@@ -51,7 +51,7 @@ func (vcd *TestVCD) Test_NsxtIpSecVpnCustomSecurityProfile(check *C) {
 	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
-	nsxtVdc, err := org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 
 	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
@@ -123,7 +123,7 @@ func (vcd *TestVCD) Test_NsxtIpSecVpnCustomSecurityProfile(check *C) {
 	check.Assert(updatedIpSecVpn.NsxtIpSecVpn, DeepEquals, latestSecProfile.NsxtIpSecVpn)
 
 	// Remove object
-	err = createdIpSecVpn.Delete()
+	err = createdIpSecVpn.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -137,7 +137,7 @@ func (vcd *TestVCD) Test_NsxtIpSecVpnUniqueness(check *C) {
 	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
-	nsxtVdc, err := org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 
 	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
@@ -194,7 +194,7 @@ func (vcd *TestVCD) Test_NsxtIpSecVpnUniqueness(check *C) {
 	check.Assert(createdIpSecVpn2, IsNil)
 
 	// Removing the first IPsec VPN tunnel
-	err = createdIpSecVpn.Delete()
+	err = createdIpSecVpn.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -225,7 +225,7 @@ func runIpSecVpnTests(check *C, edge *NsxtEdgeGateway, ipSecDef *types.NsxtIpSec
 	check.Assert(updatedIpSecVpn.NsxtIpSecVpn.ID, Equals, ipSecDef.ID)
 	check.Assert(updatedIpSecVpn.NsxtIpSecVpn.RemoteEndpoint.RemoteAddress, Equals, ipSecDef.RemoteEndpoint.RemoteAddress)
 
-	err = createdIpSecVpn.Delete()
+	err = createdIpSecVpn.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Ensure rule does not exist in the list
@@ -243,10 +243,10 @@ func (vcd *TestVCD) Test_NsxtIpSecVpnCertificateAuth(check *C) {
 	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
-	nsxtVdc, err := org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 
 	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
@@ -311,8 +311,8 @@ func (vcd *TestVCD) Test_NsxtIpSecVpnCertificateAuth(check *C) {
 	runIpSecVpnTests(check, edge, ipSecDef)
 
 	// cleanup uploaded certificates
-	err = certWithKey.Delete()
+	err = certWithKey.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = caCert.Delete()
+	err = caCert.Delete(ctx)
 	check.Assert(err, IsNil)
 }

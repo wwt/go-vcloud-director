@@ -21,7 +21,7 @@ func (vcd *TestVCD) Test_AlbVirtualService(check *C) {
 	controller, cloud, seGroup, edge, seGroupAssignment, albPool := setupAlbVirtualServicePrerequisites(check, vcd)
 
 	// Setup Org user and connection
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	orgUserVcdClient, orgUser, err := newOrgUserConnection(adminOrg, "alb-virtual-service-testing", "CHANGE-ME", vcd.config.Provider.Url, true)
 	check.Assert(err, IsNil)
@@ -57,10 +57,10 @@ func (vcd *TestVCD) Test_AlbVirtualService(check *C) {
 		testMinimalVirtualServiceConfigHTTPTransparent(check, edge, poolWithMemberGroup, seGroup, vcd, orgUserVcdClient, false)
 
 		// cleanup ipset and pool membership
-		err = poolWithMemberGroup.Delete()
+		err = poolWithMemberGroup.Delete(ctx)
 		check.Assert(err, IsNil)
 
-		err = ipSet.Delete()
+		err = ipSet.Delete(ctx)
 		check.Assert(err, IsNil)
 	}
 
@@ -68,7 +68,7 @@ func (vcd *TestVCD) Test_AlbVirtualService(check *C) {
 	tearDownAlbVirtualServicePrerequisites(check, albPool, seGroupAssignment, edge, seGroup, cloud, controller)
 
 	// cleanup Org user
-	err = orgUser.Delete(true)
+	err = orgUser.Delete(ctx, true)
 	check.Assert(err, IsNil)
 }
 
@@ -246,7 +246,7 @@ func testMinimalVirtualServiceConfigL4(check *C, edge *NsxtEdgeGateway, pool *Ns
 }
 
 func testMinimalVirtualServiceConfigL4TLS(check *C, edge *NsxtEdgeGateway, pool *NsxtAlbPool, seGroup *NsxtAlbServiceEngineGroup, vcd *TestVCD, client *VCDClient) {
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
@@ -315,7 +315,7 @@ func testMinimalVirtualServiceConfigL4TLS(check *C, edge *NsxtEdgeGateway, pool 
 }
 
 func testVirtualServiceConfigWithCertHTTPS(check *C, edge *NsxtEdgeGateway, pool *NsxtAlbPool, seGroup *NsxtAlbServiceEngineGroup, vcd *TestVCD, client *VCDClient) {
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
@@ -381,7 +381,7 @@ func testVirtualServiceConfigWithCertHTTPS(check *C, edge *NsxtEdgeGateway, pool
 func testAlbVirtualServiceConfig(check *C, vcd *TestVCD, name string, setupConfig *types.NsxtAlbVirtualService, updateConfig *types.NsxtAlbVirtualService, client *VCDClient) {
 	fmt.Printf("# Running ALB Virtual Service test with config %s ('System' user: %t) ", name, client.Client.IsSysAdmin)
 
-	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	createdVirtualService, err := client.CreateNsxtAlbVirtualService(setupConfig)
@@ -490,7 +490,7 @@ func tearDownAlbVirtualServicePrerequisites(check *C, albPool *NsxtAlbPool, assi
 	check.Assert(err, IsNil)
 	err = assignment.Delete()
 	check.Assert(err, IsNil)
-	err = edge.DisableAlb()
+	err = edge.DisableAlb(ctx)
 	check.Assert(err, IsNil)
 	err = seGroup.Delete()
 	check.Assert(err, IsNil)

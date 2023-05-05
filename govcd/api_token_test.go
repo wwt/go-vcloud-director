@@ -35,7 +35,7 @@ func (vcd *TestVCD) TestVCDClient_GetBearerTokenFromApiToken(check *C) {
 		check.Skip(fmt.Sprintf("API token not set. Use TEST_VCD_API_TOKEN to indicate an API token for Org '%s'", orgName))
 	}
 
-	isApiTokenEnabled, err := vcd.client.Client.VersionEqualOrGreater("10.3.1", 3)
+	isApiTokenEnabled, err := vcd.client.Client.VersionEqualOrGreater(ctx, "10.3.1", 3)
 	check.Assert(err, IsNil)
 	if !isApiTokenEnabled {
 		check.Skip("This test requires VCD 10.3.1 or greater")

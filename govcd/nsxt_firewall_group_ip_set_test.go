@@ -15,7 +15,7 @@ func (vcd *TestVCD) Test_NsxtIpSet(check *C) {
 	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
-	nsxtVdc, err := org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 
 	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
@@ -96,7 +96,7 @@ func (vcd *TestVCD) Test_NsxtIpSet(check *C) {
 	check.Assert(edgeIpSetById.NsxtFirewallGroup, DeepEquals, edgeIpSetByName.NsxtFirewallGroup)
 
 	// Get Firewall Group using VDC Group
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	nsxtExternalNetwork, err := GetExternalNetworkV2ByName(vcd.client, vcd.config.VCD.Nsxt.ExternalNetwork)
@@ -159,9 +159,9 @@ func (vcd *TestVCD) Test_NsxtIpSet(check *C) {
 	check.Assert(associatedVms, IsNil)
 
 	// Remove
-	err = createdIpSet.Delete()
+	err = createdIpSet.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = vdcGroupIpSetByName.Delete()
+	err = vdcGroupIpSetByName.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Create IP Set using Edge Gateway method
@@ -177,10 +177,10 @@ func (vcd *TestVCD) Test_NsxtIpSet(check *C) {
 	check.Assert(edgeCreatedIpSet.NsxtFirewallGroup.ID, Not(Equals), "")
 	check.Assert(edgeCreatedIpSet.NsxtFirewallGroup.OwnerRef.Name, Equals, edge.EdgeGateway.Name)
 
-	err = edgeCreatedIpSet.Delete()
+	err = edgeCreatedIpSet.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Remove Edge Gateway
-	err = movedGateway.Delete()
+	err = movedGateway.Delete(ctx)
 	check.Assert(err, IsNil)
 }

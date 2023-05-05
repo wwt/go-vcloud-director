@@ -120,12 +120,12 @@ func (vcd *TestVCD) Test_NsxtEdgeCreate(check *C) {
 	check.Assert(ipAddr, DeepEquals, []netip.Addr(nil))
 
 	// Try a refresh operation
-	err = updatedEdge.Refresh()
+	err = updatedEdge.Refresh(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(updatedEdge.EdgeGateway.ID, Equals, e1.EdgeGateway.ID)
 
 	// Cleanup
-	err = updatedEdge.Delete()
+	err = updatedEdge.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -133,7 +133,7 @@ func (vcd *TestVCD) Test_NsxtEdgeVdcGroup(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointEdgeGateways)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
@@ -213,11 +213,11 @@ func (vcd *TestVCD) Test_NsxtEdgeVdcGroup(check *C) {
 	check.Assert(movedBackToVdcEdge.EdgeGateway, DeepEquals, createdEdge.EdgeGateway)
 
 	// Remove Edge Gateway
-	err = movedBackToVdcEdge.Delete()
+	err = movedBackToVdcEdge.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Remove VDC Group
-	err = vdcGroup.Delete()
+	err = vdcGroup.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Remove VDC
@@ -229,7 +229,7 @@ func (vcd *TestVCD) Test_NsxtEdgeGatewayUsedAndUnusedIPs(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointEdgeGateways)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
@@ -420,10 +420,10 @@ func (vcd *TestVCD) Test_NsxtEdgeGatewayUsedAndUnusedIPs(check *C) {
 	check.Assert(allocatedIpCountAfterDeallocation, Equals, 1) // 1 primary
 
 	// Cleanup
-	err = createdEdge.Delete()
+	err = createdEdge.Delete(ctx)
 	check.Assert(err, IsNil)
 
-	err = createdNet.Delete()
+	err = createdNet.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -470,7 +470,7 @@ func (vcd *TestVCD) Test_NsxtEdgeQoS(check *C) {
 
 	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
-	nsxtVdc, err := org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)

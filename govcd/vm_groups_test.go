@@ -57,6 +57,6 @@ func (vcd *TestVCD) Test_VmGroupsCRUD(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(retrievedLogicalVmGroup.LogicalVmGroup, DeepEquals, logicalVmGroup.LogicalVmGroup)
 
-	err = logicalVmGroup.Delete()
+	err = logicalVmGroup.Delete(ctx)
 	check.Assert(err, IsNil)
 }

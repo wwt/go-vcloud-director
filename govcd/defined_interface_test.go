@@ -27,7 +27,7 @@ func (vcd *TestVCD) Test_DefinedInterface(check *C) {
 	// Creates the clients for the System admin and the Tenant user
 	systemAdministratorClient := vcd.client
 	tenantUserClient := NewVCDClient(vcd.client.Client.VCDHREF, true)
-	err := tenantUserClient.Authenticate(vcd.config.Tenants[0].User, vcd.config.Tenants[0].Password, vcd.config.Tenants[0].SysOrg)
+	err := tenantUserClient.Authenticate(ctx, vcd.config.Tenants[0].User, vcd.config.Tenants[0].Password, vcd.config.Tenants[0].SysOrg)
 	check.Assert(err, IsNil)
 
 	// First, it checks how many exist already, as VCD contains some pre-defined ones.
@@ -110,13 +110,13 @@ func (vcd *TestVCD) Test_DefinedInterface(check *C) {
 	check.Assert(strings.Contains(err.Error(), "ACCESS_TO_RESOURCE_IS_FORBIDDEN"), Equals, true)
 
 	// This one was obtained by the tenant, so it shouldn't be deletable
-	err = obtainedDefinedInterface2.Delete()
+	err = obtainedDefinedInterface2.Delete(ctx)
 	check.Assert(err, NotNil)
 	check.Assert(strings.Contains(err.Error(), "ACCESS_TO_RESOURCE_IS_FORBIDDEN"), Equals, true)
 
 	// We perform the actual removal with the System administrator
 	deletedId := newDefinedInterfaceFromSysAdmin.DefinedInterface.ID
-	err = newDefinedInterfaceFromSysAdmin.Delete()
+	err = newDefinedInterfaceFromSysAdmin.Delete(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(*newDefinedInterfaceFromSysAdmin.DefinedInterface, DeepEquals, types.DefinedInterface{})
 

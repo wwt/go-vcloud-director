@@ -8,6 +8,7 @@ package govcd
 
 import (
 	"fmt"
+	. "gopkg.in/check.v1"
 	"os"
 
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
@@ -81,7 +82,7 @@ func (vcd *TestVCD) Test_CatalogAccessControl(check *C) {
 	check.Assert(err, IsNil)
 	vcd.testCatalogAccessControl(adminorg, catalog, check.TestName(), catalogName, check)
 
-	orgInfo, err := catalog.getOrgInfo(ctx)
+	orgInfo, err := catalog.getOrgInfo()
 	check.Assert(err, IsNil)
 	check.Assert(orgInfo.OrgId, Equals, extractUuid(adminorg.AdminOrg.ID))
 	check.Assert(orgInfo.OrgName, Equals, adminorg.AdminOrg.Name)
@@ -349,10 +350,10 @@ func (vcd *TestVCD) testCatalogAccessControl(adminOrg *AdminOrg, catalog accessC
 		}
 		err = testAccessControl(ctx, catalogName+" catalog two org", catalog, twoOrgsSettings, twoOrgsSettings, true, catalogTenantContext, check)
 		check.Assert(err, IsNil)
-		catalogs, err := vcd.client.Client.QueryCatalogRecords(catalogName, TenantContext{newOrg.AdminOrg.ID, newOrg.AdminOrg.Name})
+		catalogs, err := vcd.client.Client.QueryCatalogRecords(ctx, catalogName, TenantContext{newOrg.AdminOrg.ID, newOrg.AdminOrg.Name})
 		check.Assert(err, IsNil)
 		check.Assert(len(catalogs), Equals, 1)
-		foundCatalog, err := vcd.client.Client.GetAdminCatalogByHref(catalogs[0].HREF)
+		foundCatalog, err := vcd.client.Client.GetAdminCatalogByHref(ctx, catalogs[0].HREF)
 		check.Assert(err, IsNil)
 		check.Assert(foundCatalog.AdminCatalog.ID, Equals, catalog.GetId())
 	}

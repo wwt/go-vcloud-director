@@ -41,9 +41,9 @@ type subscriptionTestData struct {
 // When running this way, you will see the tasks originated by the catalogs and the ones started by the catalog items
 func (vcd *TestVCD) Test_SubscribedCatalog(check *C) {
 
-	fromOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	fromOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
-	toOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org + "-1")
+	toOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org+"-1")
 	check.Assert(err, IsNil)
 
 	if toOrg.AdminOrg.Vdcs == nil || len(toOrg.AdminOrg.Vdcs.Vdcs) == 0 {
@@ -53,13 +53,13 @@ func (vcd *TestVCD) Test_SubscribedCatalog(check *C) {
 	// See Test_PublishToExternalOrganizations for details
 	fromOrg.AdminOrg.OrgSettings.OrgGeneralSettings.CanPublishCatalogs = true
 	fromOrg.AdminOrg.OrgSettings.OrgGeneralSettings.CanPublishExternally = true
-	_, err = fromOrg.Update()
+	_, err = fromOrg.Update(ctx)
 
 	check.Assert(err, IsNil)
-	vdc, err := fromOrg.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	vdc, err := fromOrg.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 
-	storageProfile, err := vdc.FindStorageProfileReference(vcd.config.VCD.StorageProfile.SP1)
+	storageProfile, err := vdc.FindStorageProfileReference(ctx, vcd.config.VCD.StorageProfile.SP1)
 	check.Assert(err, IsNil)
 	createStorageProfiles := types.CatalogStorageProfiles{VdcStorageProfile: []*types.Reference{&storageProfile}}
 
@@ -114,14 +114,14 @@ func (vcd *TestVCD) Test_SubscribedCatalog(check *C) {
 func uploadTestItems(org *AdminOrg, catalogName, templatePath, mediaPath string, numTemplates, numMedia int) error {
 	var taskList []*Task
 
-	catalog, err := org.GetCatalogByName(catalogName, true)
+	catalog, err := org.GetCatalogByName(ctx, catalogName, true)
 	if err != nil {
 		return fmt.Errorf("catalog %s not found: %s", catalogName, err)
 	}
 
 	for i := 1; i <= numTemplates; i++ {
 		templateName := fmt.Sprintf("test-vt-%d", i)
-		uploadTask, err := catalog.UploadOvf(templatePath, templateName, "upload from test", 1024)
+		uploadTask, err := catalog.UploadOvf(ctx, templatePath, templateName, "upload from test", 1024)
 		if err != nil {
 			return err
 		}
@@ -129,13 +129,13 @@ func uploadTestItems(org *AdminOrg, catalogName, templatePath, mediaPath string,
 	}
 	for i := 1; i <= numMedia; i++ {
 		mediaName := fmt.Sprintf("test_media-%d", i)
-		uploadTask, err := catalog.UploadMediaImage(mediaName, "upload from test", mediaPath, 1024)
+		uploadTask, err := catalog.UploadMediaImage(ctx, mediaName, "upload from test", mediaPath, 1024)
 		if err != nil {
 			return err
 		}
 		taskList = append(taskList, uploadTask.Task)
 	}
-	_, err = WaitTaskListCompletionMonitor(taskList, testMonitor)
+	_, err = WaitTaskListCompletionMonitor(ctx, taskList, testMonitor)
 	fmt.Println()
 	return err
 }
@@ -157,18 +157,18 @@ func testSubscribedCatalog(testData subscriptionTestData, check *C) {
 
 	var fromCatalog *AdminCatalog
 	var err error
-	fromCatalog, err = fromOrg.GetAdminCatalogByName(publishingCatalogName, true)
+	fromCatalog, err = fromOrg.GetAdminCatalogByName(ctx, publishingCatalogName, true)
 	if err == nil {
 		drawHeader("-", "publishing catalog retrieved from previous test")
 	} else {
 		drawHeader("-", "creating publishing catalog")
-		fromCatalog, err = fromOrg.CreateCatalogWithStorageProfile(publishingCatalogName, "publisher catalog", &testData.storageProfile)
+		fromCatalog, err = fromOrg.CreateCatalogWithStorageProfile(ctx, publishingCatalogName, "publisher catalog", &testData.storageProfile)
 		check.Assert(err, IsNil)
 		AddToCleanupList(publishingCatalogName, "catalog", fromOrg.AdminOrg.Name, check.TestName())
 	}
 
 	subscriptionPassword := "superUnknown"
-	err = fromCatalog.PublishToExternalOrganizations(types.PublishExternalCatalogParams{
+	err = fromCatalog.PublishToExternalOrganizations(ctx, types.PublishExternalCatalogParams{
 		IsPublishedExternally:    takeBoolPointer(true),
 		Password:                 subscriptionPassword,
 		IsCachedEnabled:          takeBoolPointer(true),
@@ -182,7 +182,7 @@ func testSubscribedCatalog(testData subscriptionTestData, check *C) {
 		}
 		howManyTemplates := 3
 		howManyMediaItems := 3
-		publishedCatalogItems, err := fromCatalog.QueryCatalogItemList()
+		publishedCatalogItems, err := fromCatalog.QueryCatalogItemList(ctx)
 		if err == nil && len(publishedCatalogItems) == (howManyMediaItems+howManyTemplates) {
 			return
 		}
@@ -190,17 +190,17 @@ func testSubscribedCatalog(testData subscriptionTestData, check *C) {
 		err = uploadTestItems(fromOrg, fromCatalog.AdminCatalog.Name, testData.ovaPath, testData.mediaPath, howManyTemplates, howManyMediaItems)
 		check.Assert(err, IsNil)
 	}
-	err = fromCatalog.Refresh()
+	err = fromCatalog.Refresh(ctx)
 	check.Assert(err, IsNil)
 
 	check.Assert(fromCatalog.AdminCatalog.PublishExternalCatalogParams, NotNil)
 	check.Assert(fromCatalog.AdminCatalog.PublishExternalCatalogParams.CatalogPublishedUrl, Not(Equals), "")
 
 	uploadItemsIf("before_subscription")
-	err = fromCatalog.Refresh()
+	err = fromCatalog.Refresh(ctx)
 	check.Assert(err, IsNil)
 
-	subscriptionUrl, err := fromCatalog.FullSubscriptionUrl()
+	subscriptionUrl, err := fromCatalog.FullSubscriptionUrl(ctx)
 	check.Assert(err, IsNil)
 
 	subscriptionParams := types.ExternalCatalogSubscription{
@@ -216,7 +216,7 @@ func testSubscribedCatalog(testData subscriptionTestData, check *C) {
 		drawHeader("-", "creating subscribed catalog asynchronously")
 		// With asynchronous subscription the catalog starts the subscription but does not report its state, which is
 		// monitored by its internal Task
-		toCatalog, err = toOrg.CreateCatalogFromSubscriptionAsync(
+		toCatalog, err = toOrg.CreateCatalogFromSubscriptionAsync(ctx,
 			subscriptionParams,     // params
 			nil,                    // storage profile
 			subscribingCatalogName, // catalog name
@@ -225,6 +225,7 @@ func testSubscribedCatalog(testData subscriptionTestData, check *C) {
 	} else {
 		drawHeader("-", "creating subscribed catalog and waiting for completion")
 		toCatalog, err = toOrg.CreateCatalogFromSubscription(
+			ctx,
 			subscriptionParams,     // params
 			nil,                    // storage profile
 			subscribingCatalogName, // catalog name
@@ -236,7 +237,7 @@ func testSubscribedCatalog(testData subscriptionTestData, check *C) {
 	AddToCleanupList(subscribingCatalogName, "catalog", toOrg.AdminOrg.Name, check.TestName())
 
 	if testData.asynchronousSubscription {
-		err = toCatalog.Refresh()
+		err = toCatalog.Refresh(ctx)
 		check.Assert(err, IsNil)
 		if ResourceInProgress(toCatalog.AdminCatalog.Tasks) {
 			fmt.Println("catalog subscription tasks still in progress")
@@ -254,22 +255,22 @@ func testSubscribedCatalog(testData subscriptionTestData, check *C) {
 	// synchronise, as the subscription would have got at least the list of items
 	if testData.uploadWhen != "before_subscription" {
 		drawHeader("-", "synchronising catalog")
-		err = toCatalog.Sync()
+		err = toCatalog.Sync(ctx)
 		check.Assert(err, IsNil)
 	}
 
-	publishedCatalogItems, err := fromCatalog.QueryCatalogItemList()
+	publishedCatalogItems, err := fromCatalog.QueryCatalogItemList(ctx)
 	check.Assert(err, IsNil)
-	subscribedCatalogItems, err := toCatalog.QueryCatalogItemList()
+	subscribedCatalogItems, err := toCatalog.QueryCatalogItemList(ctx)
 	check.Assert(err, IsNil)
 	fmt.Printf("Catalog items after catalog sync: %d\n", len(subscribedCatalogItems))
-	publishedVappTemplates, err := fromCatalog.QueryVappTemplateList()
+	publishedVappTemplates, err := fromCatalog.QueryVappTemplateList(ctx)
 	check.Assert(err, IsNil)
-	subscribedVappTemplates, err := toCatalog.QueryVappTemplateList()
+	subscribedVappTemplates, err := toCatalog.QueryVappTemplateList(ctx)
 	check.Assert(err, IsNil)
-	publishedMediaItems, err := fromCatalog.QueryMediaList()
+	publishedMediaItems, err := fromCatalog.QueryMediaList(ctx)
 	check.Assert(err, IsNil)
-	subscribedMediaItems, err := toCatalog.QueryMediaList()
+	subscribedMediaItems, err := toCatalog.QueryMediaList(ctx)
 	check.Assert(err, IsNil)
 
 	fmt.Printf("vApp template after catalog sync %d\n", len(subscribedVappTemplates))
@@ -288,16 +289,16 @@ func testSubscribedCatalog(testData subscriptionTestData, check *C) {
 	// Synchronising all vApp templates and media items. If the subscription includes local copy,
 	// the synchronisation has alredy happened, and this extra call is very quick (~5 seconds)
 	drawHeader("-", "synchronising vApp templates and media items")
-	tasksVappTemplates, err := toCatalog.LaunchSynchronisationAllVappTemplates()
+	tasksVappTemplates, err := toCatalog.LaunchSynchronisationAllVappTemplates(ctx)
 	check.Assert(err, IsNil)
-	tasksMediaItems, err := toCatalog.LaunchSynchronisationAllMediaItems()
+	tasksMediaItems, err := toCatalog.LaunchSynchronisationAllMediaItems(ctx)
 	check.Assert(err, IsNil)
 
 	// Wait for all synchronisation tasks to end
 	var allTasks []*Task
 	allTasks = append(allTasks, tasksVappTemplates...)
 	allTasks = append(allTasks, tasksMediaItems...)
-	_, err = WaitTaskListCompletionMonitor(allTasks, testMonitor)
+	_, err = WaitTaskListCompletionMonitor(ctx, allTasks, testMonitor)
 	if !testVerbose {
 		fmt.Println()
 	}
@@ -307,12 +308,12 @@ func testSubscribedCatalog(testData subscriptionTestData, check *C) {
 	retrieveCatalogItems(toCatalog, subscribedCatalogItems, check)
 
 	startDelete := time.Now()
-	err = toCatalog.Delete(true, true)
+	err = toCatalog.Delete(ctx, true, true)
 	check.Assert(err, IsNil)
 	fmt.Printf("subscribed catalog deletion done in %s\n", time.Since(startDelete))
 	startDelete = time.Now()
 	if !testData.preservePublishingCatalog {
-		err = fromCatalog.Delete(true, true)
+		err = fromCatalog.Delete(ctx, true, true)
 		check.Assert(err, IsNil)
 		fmt.Printf("published catalog deletion done in %s\n", time.Since(startDelete))
 	}
@@ -321,15 +322,15 @@ func testSubscribedCatalog(testData subscriptionTestData, check *C) {
 
 func retrieveCatalogItems(toCatalog *AdminCatalog, subscribed []*types.QueryResultCatalogItemType, check *C) {
 	for _, item := range subscribed {
-		catalogItem, err := toCatalog.GetCatalogItemByHref(item.HREF)
+		catalogItem, err := toCatalog.GetCatalogItemByHref(ctx, item.HREF)
 		check.Assert(err, IsNil)
 		switch catalogItem.CatalogItem.Entity.Type {
 		case types.MimeVAppTemplate:
-			vAppTemplate, err := catalogItem.GetVAppTemplate()
+			vAppTemplate, err := catalogItem.GetVAppTemplate(ctx)
 			check.Assert(err, IsNil)
 			check.Assert(vAppTemplate.VAppTemplate.HREF, Equals, catalogItem.CatalogItem.Entity.HREF)
 		case types.MimeMediaItem:
-			mediaItem, err := toCatalog.GetMediaByHref(catalogItem.CatalogItem.Entity.HREF)
+			mediaItem, err := toCatalog.GetMediaByHref(ctx, catalogItem.CatalogItem.Entity.HREF)
 			check.Assert(err, IsNil)
 			check.Assert(extractUuid(mediaItem.Media.ID), Equals, extractUuid(catalogItem.CatalogItem.Entity.HREF))
 		}
@@ -358,7 +359,7 @@ func testSubscribedCatalogWithInvalidParameters(org *AdminOrg, subscription type
 	params := subscription
 	params.Location = strings.Replace(params.Location, uuid, "deadbeef-d72f-4a21-a4d2-4dc9e0b36555", 1)
 	// Use a valid host with invalid UUID
-	_, err := org.CreateCatalogFromSubscriptionAsync(params, nil, name, password, localCopy)
+	_, err := org.CreateCatalogFromSubscriptionAsync(ctx, params, nil, name, password, localCopy)
 	check.Assert(err, ErrorMatches, ".*RESOURCE_NOT_FOUND.*")
 
 	newUrl, err := url.Parse(subscription.Location)
@@ -367,12 +368,12 @@ func testSubscribedCatalogWithInvalidParameters(org *AdminOrg, subscription type
 	params = subscription
 	params.Location = strings.Replace(params.Location, newUrl.Host, "fake.example.com", 1)
 	// use an invalid host
-	_, err = org.CreateCatalogFromSubscriptionAsync(params, nil, name, password, localCopy)
+	_, err = org.CreateCatalogFromSubscriptionAsync(ctx, params, nil, name, password, localCopy)
 	check.Assert(err, ErrorMatches, ".*INVALID_URL_OR_PASSWORD.*")
 
 	params = subscription
 	params.Location = "not-an-URL"
 	// use an invalid URL
-	_, err = org.CreateCatalogFromSubscriptionAsync(params, nil, name, password, localCopy)
+	_, err = org.CreateCatalogFromSubscriptionAsync(ctx, params, nil, name, password, localCopy)
 	check.Assert(err, ErrorMatches, ".*UNKNOWN_ERROR.*")
 }

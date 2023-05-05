@@ -41,9 +41,9 @@ func (vcd *TestVCD) Test_GetAllAlbImportableServiceEngineGroups(check *C) {
 	check.Assert(impSeGrpByName.NsxtAlbImportableServiceEngineGroups, DeepEquals, cldImpSeGrpById.NsxtAlbImportableServiceEngineGroups)
 
 	// Cleanup
-	err = createdAlbCloud.Delete()
+	err = createdAlbCloud.Delete(ctx)
 	check.Assert(err, IsNil)
 
-	err = albController.Delete()
+	err = albController.Delete(ctx)
 	check.Assert(err, IsNil)
 }

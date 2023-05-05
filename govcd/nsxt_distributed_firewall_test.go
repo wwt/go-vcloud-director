@@ -23,7 +23,7 @@ func (vcd *TestVCD) Test_NsxtDistributedFirewallRules(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointEdgeGateways)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(adminOrg, NotNil)
 	check.Assert(err, IsNil)
 
@@ -51,7 +51,7 @@ func (vcd *TestVCD) Test_NsxtDistributedFirewallRules(check *C) {
 	test_NsxtDistributedFirewallRules(vcd, check, vdcGroup.VdcGroup.Id, orgUserVcdClient, orgUserVdc)
 
 	// Cleanup
-	err = vdcGroup.Delete()
+	err = vdcGroup.Delete(ctx)
 	check.Assert(err, IsNil)
 	err = vdc.DeleteWait(true, true)
 	check.Assert(err, IsNil)
@@ -133,9 +133,9 @@ func test_NsxtDistributedFirewallRules(vcd *TestVCD, check *C, vdcGroupId string
 	check.Assert(err, IsNil)
 	_, err = vdcGroup.DeactivateDfw()
 	check.Assert(err, IsNil)
-	err = ipSet.Delete()
+	err = ipSet.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = secGroup.Delete()
+	err = secGroup.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 

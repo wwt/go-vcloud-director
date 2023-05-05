@@ -545,7 +545,7 @@ func (vcd *TestVCD) Test_AnswerVmQuestion(check *C) {
 	check.Assert(isMediaInjected(vm.VM.VirtualHardwareSection.Item), Equals, false)
 
 	// Remove catalog item so far other tests don't fail
-	task, err := media.Delete()
+	task, err := media.Delete(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
@@ -1754,7 +1754,7 @@ func (vcd *TestVCD) Test_VMUpdateComputePolicies(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(vmGroup, NotNil)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
@@ -1883,7 +1883,7 @@ func (vcd *TestVCD) Test_VMUpdateComputePolicies(check *C) {
 	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
-	task, err = vapp.Delete()
+	task, err = vapp.Delete(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(task, Not(Equals), Task{})
 
@@ -2222,7 +2222,7 @@ func (vcd *TestVCD) Test_AddRawVm(check *C) {
 	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
-	task, err = vapp.Delete()
+	task, err = vapp.Delete(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(task, Not(Equals), Task{})
 
@@ -2231,15 +2231,15 @@ func (vcd *TestVCD) Test_AddRawVm(check *C) {
 }
 
 func createNsxtVAppAndVm(vcd *TestVCD, check *C) (*VApp, *VM) {
-	cat, err := vcd.org.GetCatalogByName(vcd.config.VCD.Catalog.NsxtBackedCatalogName, false)
+	cat, err := vcd.org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.NsxtBackedCatalogName, false)
 	check.Assert(err, IsNil)
 	check.Assert(cat, NotNil)
 	// Populate Catalog Item
-	catitem, err := cat.GetCatalogItemByName(vcd.config.VCD.Catalog.NsxtCatalogItem, false)
+	catitem, err := cat.GetCatalogItemByName(ctx, vcd.config.VCD.Catalog.NsxtCatalogItem, false)
 	check.Assert(err, IsNil)
 	check.Assert(catitem, NotNil)
 	// Get VAppTemplate
-	vapptemplate, err := catitem.GetVAppTemplate()
+	vapptemplate, err := catitem.GetVAppTemplate(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(vapptemplate.VAppTemplate.Children.VM[0].HREF, NotNil)
 
@@ -2297,7 +2297,7 @@ func createNsxtVAppAndVm(vcd *TestVCD, check *C) (*VApp, *VM) {
 	check.Assert(vm.VM.Name, Equals, vmDef.SourcedItem.Source.Name)
 
 	// Refresh vApp to have latest state
-	err = vapp.Refresh()
+	err = vapp.Refresh(ctx)
 	check.Assert(err, IsNil)
 
 	return vapp, vm

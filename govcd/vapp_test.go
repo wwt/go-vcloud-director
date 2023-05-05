@@ -865,7 +865,7 @@ func (vcd *TestVCD) Test_AddAndRemoveIsolatedVappNetwork(check *C) {
 func (vcd *TestVCD) Test_AddAndRemoveIsolatedVappNetworkIpv6(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
 
-	vapp, err := deployVappForTest(vcd, "Test_AddAndRemoveIsolatedVappNetwork")
+	vapp, err := deployVappForTest(ctx, vcd, "Test_AddAndRemoveIsolatedVappNetwork")
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
 
@@ -931,7 +931,7 @@ func (vcd *TestVCD) Test_AddAndRemoveIsolatedVappNetworkIpv6(check *C) {
 	check.Assert(networkFound.Configuration.Features.DhcpService.IPRange.StartAddress, Equals, dhcpStartAddress)
 	check.Assert(networkFound.Configuration.Features.DhcpService.IPRange.EndAddress, Equals, dhcpEndAddress)
 
-	err = vapp.Refresh()
+	err = vapp.Refresh(ctx)
 	check.Assert(err, IsNil)
 	vappNetworkConfig, err = vapp.RemoveNetwork(networkName)
 	check.Assert(err, IsNil)
@@ -945,7 +945,7 @@ func (vcd *TestVCD) Test_AddAndRemoveIsolatedVappNetworkIpv6(check *C) {
 	}
 	check.Assert(isExist, Equals, false)
 
-	task, err := vapp.Delete()
+	task, err := vapp.Delete(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
@@ -1565,10 +1565,10 @@ func (vcd *TestVCD) Test_AddNewVMFromMultiVmTemplate(check *C) {
 	check.Assert(task.Task.Status, Equals, "success")
 
 	// Remove catalog item so far other tests don't fail
-	catalogItem, err := catalog.GetCatalogItemByName(itemName, true)
+	catalogItem, err := catalog.GetCatalogItemByName(ctx, itemName, true)
 	check.Assert(err, IsNil)
 
-	err = catalogItem.Delete()
+	err = catalogItem.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -1597,7 +1597,7 @@ func (vcd *TestVCD) Test_AddNewVMWithComputeCapacity(check *C) {
 	vapptemplate, err := catitem.GetVAppTemplate(ctx)
 	check.Assert(err, IsNil)
 
-	vapp, err := deployVappForTest(vcd, "Test_AddNewVMWithComputeCapacity")
+	vapp, err := deployVappForTest(ctx, vcd, "Test_AddNewVMWithComputeCapacity")
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
 
@@ -1785,7 +1785,7 @@ func (vcd *TestVCD) Test_Vapp_LeaseUpdate(check *C) {
 	if vcd.config.VCD.Org == "" {
 		check.Skip("Organization not set in configuration")
 	}
-	org, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	orgVappLease := org.AdminOrg.OrgSettings.OrgVAppLeaseSettings
 
@@ -1848,7 +1848,7 @@ func (vcd *TestVCD) Test_Vapp_LeaseUpdate(check *C) {
 		check.Assert(vapp.VApp.LeaseSettingsSection.StorageLeaseInSeconds, Equals, *orgVappLease.StorageLeaseSeconds)
 	}
 
-	task, err := vapp.Delete()
+	task, err := vapp.Delete(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)

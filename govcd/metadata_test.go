@@ -244,11 +244,11 @@ func (vcd *TestVCD) Test_MetadataOnAdminCatalogCRUD(check *C) {
 
 	var catalogName string = check.TestName()
 
-	org, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	catalog, err := vcd.org.CreateCatalog(catalogName, catalogName)
+	catalog, err := vcd.org.CreateCatalog(ctx, catalogName, catalogName)
 	check.Assert(err, IsNil)
 	check.Assert(catalog, NotNil)
 	AddToCleanupList(catalogName, "catalog", org.AdminOrg.Name, catalogName)
@@ -319,7 +319,7 @@ func (vcd *TestVCD) Test_MetadataEntryOnVmCRUD(check *C) {
 
 func (vcd *TestVCD) Test_MetadataEntryOnVAppTemplateCRUD(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
-	cat, err := vcd.org.GetCatalogByName(vcd.config.VCD.Catalog.Name, false)
+	cat, err := vcd.org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	if err != nil {
 		check.Skip("Test_DeleteMetadataOnCatalogItem: Catalog not found. Test can't proceed")
 		return
@@ -329,12 +329,12 @@ func (vcd *TestVCD) Test_MetadataEntryOnVAppTemplateCRUD(check *C) {
 		check.Skip("Test_DeleteMetadataOnCatalogItem: Catalog Item not given. Test can't proceed")
 	}
 
-	catItem, err := cat.GetCatalogItemByName(vcd.config.VCD.Catalog.CatalogItem, false)
+	catItem, err := cat.GetCatalogItemByName(ctx, vcd.config.VCD.Catalog.CatalogItem, false)
 	check.Assert(err, IsNil)
 	check.Assert(catItem, NotNil)
 	check.Assert(catItem.CatalogItem.Name, Equals, vcd.config.VCD.Catalog.CatalogItem)
 
-	vAppTemplate, err := catItem.GetVAppTemplate()
+	vAppTemplate, err := catItem.GetVAppTemplate(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplate, NotNil)
 	check.Assert(vAppTemplate.VAppTemplate.Name, Equals, vcd.config.VCD.Catalog.CatalogItem)
@@ -449,13 +449,13 @@ func (vcd *TestVCD) Test_MetadataOnVdcNetworkCRUD(check *C) {
 
 func (vcd *TestVCD) Test_MetadataOnCatalogItemCRUD(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
-	catalog, err := vcd.org.GetCatalogByName(vcd.config.VCD.Catalog.Name, false)
+	catalog, err := vcd.org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	if err != nil {
 		check.Skip(fmt.Sprintf("%s: Catalog %s not found. Test can't proceed", check.TestName(), vcd.config.VCD.Catalog.Name))
 		return
 	}
 
-	catalogItem, err := catalog.GetCatalogItemByName(vcd.config.VCD.Catalog.CatalogItem, false)
+	catalogItem, err := catalog.GetCatalogItemByName(ctx, vcd.config.VCD.Catalog.CatalogItem, false)
 	if err != nil {
 		check.Skip(fmt.Sprintf("%s: Catalog item %s not found. Test can't proceed", check.TestName(), vcd.config.VCD.Catalog.CatalogItem))
 		return

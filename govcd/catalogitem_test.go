@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	//"strings"
+	. "gopkg.in/check.v1"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
@@ -207,10 +208,10 @@ func (vcd *TestVCD) Test_DeleteNonEmptyCatalog(check *C) {
 	catalogName := check.TestName()
 	catalogItemName := check.TestName() + "_item"
 	// Fetching organization
-	org, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
-	catalog, err := org.CreateCatalog(catalogName, catalogName)
+	catalog, err := org.CreateCatalog(ctx, catalogName, catalogName)
 	check.Assert(err, IsNil)
 	AddToCleanupList(catalogName, "catalog", vcd.org.Org.Name, check.TestName())
 
@@ -223,16 +224,16 @@ func (vcd *TestVCD) Test_DeleteNonEmptyCatalog(check *C) {
 	check.Assert(err, IsNil)
 	AddToCleanupList(catalogItemName, "catalogItem", vcd.org.Org.Name+"|"+catalogName, check.TestName())
 
-	retrievedCatalog, err := org.GetCatalogByName(catalogName, true)
+	retrievedCatalog, err := org.GetCatalogByName(ctx, catalogName, true)
 	check.Assert(err, IsNil)
-	catalogItem, err := retrievedCatalog.GetCatalogItemByName(catalogItemName, true)
+	catalogItem, err := retrievedCatalog.GetCatalogItemByName(ctx, catalogItemName, true)
 	check.Assert(err, IsNil)
 	check.Assert(catalogItem, NotNil)
 
-	err = retrievedCatalog.Delete(true, true)
+	err = retrievedCatalog.Delete(ctx, true, true)
 	check.Assert(err, IsNil)
 
-	retrievedCatalog, err = org.GetCatalogByName(catalogName, true)
+	retrievedCatalog, err = org.GetCatalogByName(ctx, catalogName, true)
 	check.Assert(err, NotNil)
 	check.Assert(retrievedCatalog, IsNil)
 }
@@ -246,13 +247,13 @@ func (vcd *TestVCD) Test_QueryVappTemplateList(check *C) {
 		return
 	}
 
-	cat, err := vcd.org.GetCatalogByName(catalogName, false)
+	cat, err := vcd.org.GetCatalogByName(ctx, catalogName, false)
 	if err != nil {
 		check.Skip("Test_QueryVappTemplateList: Catalog not found")
 		return
 	}
 
-	vAppTemplates, err := cat.QueryVappTemplateList()
+	vAppTemplates, err := cat.QueryVappTemplateList(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplates, NotNil)
 

@@ -484,7 +484,7 @@ func (vcd *TestVCD) TestVdcIsNsxt(check *C) {
 func (vcd *TestVCD) TestVdcIsNsxv(check *C) {
 	check.Assert(vcd.vdc.IsNsxv(), Equals, true)
 	// retrieve the same VDC as AdminVdc, to test the corresponding function
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	adminVdc, err := adminOrg.GetVDCByName(vcd.vdc.Vdc.Name, false)
 	check.Assert(err, IsNil)
@@ -499,11 +499,11 @@ func (vcd *TestVCD) TestVdcIsNsxv(check *C) {
 }
 
 func (vcd *TestVCD) TestCreateRawVapp(check *C) {
-	org, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	vdc, err := org.GetVDCByName(vcd.config.VCD.Vdc, false)
+	vdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Vdc, false)
 	check.Assert(err, IsNil)
 	check.Assert(vdc, NotNil)
 
@@ -515,7 +515,7 @@ func (vcd *TestVCD) TestCreateRawVapp(check *C) {
 
 	check.Assert(vapp.VApp.Name, Equals, name)
 	check.Assert(vapp.VApp.Description, Equals, description)
-	task, err := vapp.Delete()
+	task, err := vapp.Delete(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
@@ -523,11 +523,11 @@ func (vcd *TestVCD) TestCreateRawVapp(check *C) {
 
 func (vcd *TestVCD) TestSetControlAccess(check *C) {
 	// Set VDC sharing to everyone
-	org, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	vdc, err := org.GetVDCByName(vcd.config.VCD.Vdc, false)
+	vdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Vdc, false)
 	check.Assert(err, IsNil)
 	check.Assert(vdc, NotNil)
 
@@ -598,37 +598,37 @@ func (vcd *TestVCD) TestVAppTemplateRetrieval(check *C) {
 		check.Skip(fmt.Sprintf("%s: Catalog Item not given. Test can't proceed", check.TestName()))
 	}
 
-	org, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	vdc, err := org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	vdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 	check.Assert(vdc, NotNil)
 
 	// Test cases
-	vAppTemplate, err := vdc.GetVAppTemplateByName(vcd.config.VCD.Catalog.NsxtCatalogItem)
+	vAppTemplate, err := vdc.GetVAppTemplateByName(ctx, vcd.config.VCD.Catalog.NsxtCatalogItem)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplate.VAppTemplate.Name, Equals, vcd.config.VCD.Catalog.NsxtCatalogItem)
 	if vcd.config.VCD.Catalog.CatalogItemDescription != "" {
 		check.Assert(strings.Contains(vAppTemplate.VAppTemplate.Description, vcd.config.VCD.Catalog.CatalogItemDescription), Equals, true)
 	}
 
-	vAppTemplate, err = vcd.client.GetVAppTemplateById(vAppTemplate.VAppTemplate.ID)
+	vAppTemplate, err = vcd.client.GetVAppTemplateById(ctx, vAppTemplate.VAppTemplate.ID)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplate.VAppTemplate.Name, Equals, vcd.config.VCD.Catalog.NsxtCatalogItem)
 	if vcd.config.VCD.Catalog.CatalogItemDescription != "" {
 		check.Assert(strings.Contains(vAppTemplate.VAppTemplate.Description, vcd.config.VCD.Catalog.CatalogItemDescription), Equals, true)
 	}
 
-	vAppTemplate, err = vdc.GetVAppTemplateByNameOrId(vAppTemplate.VAppTemplate.ID, false)
+	vAppTemplate, err = vdc.GetVAppTemplateByNameOrId(ctx, vAppTemplate.VAppTemplate.ID, false)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplate.VAppTemplate.Name, Equals, vcd.config.VCD.Catalog.NsxtCatalogItem)
 	if vcd.config.VCD.Catalog.CatalogItemDescription != "" {
 		check.Assert(strings.Contains(vAppTemplate.VAppTemplate.Description, vcd.config.VCD.Catalog.CatalogItemDescription), Equals, true)
 	}
 
-	vAppTemplate, err = vdc.GetVAppTemplateByNameOrId(vcd.config.VCD.Catalog.NsxtCatalogItem, false)
+	vAppTemplate, err = vdc.GetVAppTemplateByNameOrId(ctx, vcd.config.VCD.Catalog.NsxtCatalogItem, false)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplate.VAppTemplate.Name, Equals, vcd.config.VCD.Catalog.NsxtCatalogItem)
 	if vcd.config.VCD.Catalog.CatalogItemDescription != "" {
@@ -645,7 +645,7 @@ func (vcd *TestVCD) TestVAppTemplateRetrieval(check *C) {
 	check.Assert(vmTemplateRecord, NotNil)
 
 	// Test non-existent vApp Template
-	_, err = vdc.GetVAppTemplateByName("INVALID")
+	_, err = vdc.GetVAppTemplateByName(ctx, "INVALID")
 	check.Assert(err, NotNil)
 
 	_, err = vcd.client.QuerySynchronizedVmInVAppTemplateByHref(vAppTemplate.VAppTemplate.HREF, "INVALID")
@@ -660,19 +660,19 @@ func (vcd *TestVCD) TestMediaRetrieval(check *C) {
 		check.Skip(fmt.Sprintf("%s: NSX-T Media item not given. Test can't proceed", check.TestName()))
 	}
 
-	org, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	catalog, err := org.GetCatalogByName(vcd.config.VCD.Catalog.NsxtBackedCatalogName, false)
+	catalog, err := org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.NsxtBackedCatalogName, false)
 	check.Assert(err, IsNil)
 	check.Assert(catalog, NotNil)
 
-	vdc, err := org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	vdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 	check.Assert(vdc, NotNil)
 
-	mediaFromCatalog, err := catalog.GetMediaByName(vcd.config.Media.NsxtMedia, false)
+	mediaFromCatalog, err := catalog.GetMediaByName(ctx, vcd.config.Media.NsxtMedia, false)
 	check.Assert(err, IsNil)
 	check.Assert(mediaFromCatalog, NotNil)
 

@@ -14,7 +14,7 @@ func (vcd *TestVCD) Test_NsxEdgeBgpIpPrefixList(check *C) {
 
 	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
-	nsxtVdc, err := org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
@@ -75,7 +75,7 @@ func (vcd *TestVCD) Test_NsxEdgeBgpIpPrefixList(check *C) {
 	check.Assert(updatedBgpIpPrefixList.EdgeBgpIpPrefixList.ID, Equals, bgpIpPrefixLists[0].EdgeBgpIpPrefixList.ID)
 
 	// Delete
-	err = bgpIpPrefixLists[0].Delete()
+	err = bgpIpPrefixLists[0].Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Try to get once again and ensure it is not there

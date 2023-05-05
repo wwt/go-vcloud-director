@@ -21,7 +21,7 @@ func (vcd *TestVCD) Test_AlbPool(check *C) {
 	controller, cloud, seGroup, edge, assignment := setupAlbPoolPrerequisites(check, vcd)
 
 	// Setup Org user and connection
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	orgUserVcdClient, orgUser, err := newOrgUserConnection(adminOrg, "alb-pool-testing", "CHANGE-ME", vcd.config.Provider.Url, true)
 	check.Assert(err, IsNil)
@@ -42,7 +42,7 @@ func (vcd *TestVCD) Test_AlbPool(check *C) {
 	testPoolWithCertAndPrivateKey(check, vcd, edge.EdgeGateway.ID, orgUserVcdClient)
 
 	// Cleanup Org user
-	err = orgUser.Delete(true)
+	err = orgUser.Delete(ctx, true)
 	check.Assert(err, IsNil)
 }
 
@@ -119,7 +119,7 @@ func testAdvancedPoolConfig(check *C, edge *NsxtEdgeGateway, vcd *TestVCD, clien
 }
 
 func testPoolWithCertNoPrivateKey(check *C, vcd *TestVCD, edgeGatewayId string, client *VCDClient) {
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
@@ -145,12 +145,12 @@ func testPoolWithCertNoPrivateKey(check *C, vcd *TestVCD, edgeGatewayId string, 
 
 	testAlbPoolConfig(check, vcd, "CertificateWithNoPrivateKey", poolConfigWithCert, nil, client)
 
-	err = createdCertificate.Delete()
+	err = createdCertificate.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
 func testPoolWithCertAndPrivateKey(check *C, vcd *TestVCD, edgeGatewayId string, client *VCDClient) {
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
@@ -178,14 +178,14 @@ func testPoolWithCertAndPrivateKey(check *C, vcd *TestVCD, edgeGatewayId string,
 
 	testAlbPoolConfig(check, vcd, "CertificateWithPrivateKey", poolConfigWithCertAndKey, nil, client)
 
-	err = createdCertificate.Delete()
+	err = createdCertificate.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
 func testAlbPoolConfig(check *C, vcd *TestVCD, name string, setupConfig *types.NsxtAlbPool, updateConfig *types.NsxtAlbPool, client *VCDClient) {
 	fmt.Printf("# Running ALB Pool test with config %s ('System' user: %t) ", name, client.Client.IsSysAdmin)
 
-	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	createdPool, err := client.CreateNsxtAlbPool(setupConfig)
@@ -239,14 +239,14 @@ func testAlbPoolConfig(check *C, vcd *TestVCD, name string, setupConfig *types.N
 		check.Assert(updatedPool.NsxtAlbPool, NotNil)
 	}
 
-	err = createdPool.Delete()
+	err = createdPool.Delete(ctx)
 	check.Assert(err, IsNil)
 	fmt.Printf("Done.\n")
 }
 
 func setupAlbPoolPrerequisites(check *C, vcd *TestVCD) (*NsxtAlbController, *NsxtAlbCloud, *NsxtAlbServiceEngineGroup, *NsxtEdgeGateway, *NsxtAlbServiceEngineGroupAssignment) {
 	controller, cloud, seGroup := spawnAlbControllerCloudServiceEngineGroup(vcd, check, "SHARED")
-	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	// Enable ALB on Edge Gateway with default ServiceNetworkDefinition
@@ -268,15 +268,15 @@ func setupAlbPoolPrerequisites(check *C, vcd *TestVCD) (*NsxtAlbController, *Nsx
 	enabledSettings, err := edge.UpdateAlbSettings(albSettingsConfig)
 	if err != nil {
 		fmt.Printf("# error occured while enabling ALB on Edge Gateway. Cleaning up Service Engine Group, ALB Cloud and ALB Controller: %s", err)
-		err2 := seGroup.Delete()
+		err2 := seGroup.Delete(ctx)
 		if err2 != nil {
 			fmt.Printf("# got error while cleaning up Service Engine Group: %s", err)
 		}
-		err2 = cloud.Delete()
+		err2 = cloud.Delete(ctx)
 		if err2 != nil {
 			fmt.Printf("# got error while cleaning up ALB Cloud: %s", err)
 		}
-		err2 = controller.Delete()
+		err2 = controller.Delete(ctx)
 		if err2 != nil {
 			fmt.Printf("# got error while cleaning up ALB Controller: %s", err)
 		}
@@ -301,14 +301,14 @@ func setupAlbPoolPrerequisites(check *C, vcd *TestVCD) (*NsxtAlbController, *Nsx
 }
 
 func tearDownAlbPoolPrerequisites(check *C, assignment *NsxtAlbServiceEngineGroupAssignment, edge *NsxtEdgeGateway, seGroup *NsxtAlbServiceEngineGroup, cloud *NsxtAlbCloud, controller *NsxtAlbController) {
-	err := assignment.Delete()
+	err := assignment.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = edge.DisableAlb()
+	err = edge.DisableAlb(ctx)
 	check.Assert(err, IsNil)
-	err = seGroup.Delete()
+	err = seGroup.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = cloud.Delete()
+	err = cloud.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = controller.Delete()
+	err = controller.Delete(ctx)
 	check.Assert(err, IsNil)
 }

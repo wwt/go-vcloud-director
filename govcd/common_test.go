@@ -702,7 +702,7 @@ func makeEmptyVm(ctx context.Context, vapp *VApp, name string) (*VM, error) {
 
 // spawnTestVdc spawns a VDC in a given adminOrgName to be used in tests
 func spawnTestVdc(vcd *TestVCD, check *C, adminOrgName string) *Vdc {
-	adminOrg, err := vcd.client.GetAdminOrgByName(adminOrgName)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, adminOrgName)
 	check.Assert(err, IsNil)
 
 	providerVdcHref := getVdcProviderVdcHref(vcd, check)
@@ -762,7 +762,7 @@ func spawnTestVdc(vcd *TestVCD, check *C, adminOrgName string) *Vdc {
 
 // spawnTestOrg spawns an Org to be used in tests
 func spawnTestOrg(vcd *TestVCD, check *C, nameSuffix string) string {
-	newOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	newOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	newOrgName := check.TestName() + "-" + nameSuffix
 	task, err := CreateOrg(vcd.client, newOrgName, newOrgName, newOrgName, newOrg.AdminOrg.OrgSettings, true)
@@ -828,4 +828,37 @@ func (vcd *TestVCD) checkSkipWhenApiToken(check *C) {
 	if vcd.client.Client.UsingAccessToken {
 		check.Skip("This test can't run on API token")
 	}
+}
+
+func isTcpPortOpen(host, port string, timeout int) bool {
+	retryTimeout := timeout
+	// due to the VMs taking long time to boot it needs to be at least 5 minutes
+	// may be even more in slower environments
+	if timeout < 5*60 { // 5 minutes
+		retryTimeout = 5 * 60 // 5 minutes
+	}
+	timeOutAfterInterval := time.Duration(retryTimeout) * time.Second
+	timeoutAfter := time.After(timeOutAfterInterval)
+	tick := time.NewTicker(time.Duration(8) * time.Second)
+
+	for {
+		select {
+		case <-timeoutAfter:
+			fmt.Printf(" Failed\n")
+			return false
+		case <-tick.C:
+			timeout := time.Second * 3
+			conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, port), timeout)
+			if err != nil {
+				fmt.Printf(".")
+			}
+			// Connection established - the port is open
+			if conn != nil {
+				defer conn.Close()
+				fmt.Printf(" Done\n")
+				return true
+			}
+		}
+	}
+
 }

@@ -131,7 +131,7 @@ func (vcd *TestVCD) Test_SetAssignedComputePolicies(check *C) {
 	ctx := context.Background()
 
 	client := &vcd.client.Client
-	org, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
@@ -201,8 +201,8 @@ func (vcd *TestVCD) Test_SetAssignedComputePolicies(check *C) {
 	_, err = adminVdc.SetAssignedComputePolicies(ctx, policyReferences)
 	check.Assert(err, IsNil)
 
-	err = createdPolicy.Delete()
+	err = createdPolicy.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = createdPolicy2.Delete()
+	err = createdPolicy2.Delete(ctx)
 	check.Assert(err, IsNil)
 }

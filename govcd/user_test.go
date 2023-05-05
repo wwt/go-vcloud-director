@@ -187,7 +187,7 @@ func (vcd *TestVCD) Test_UserCRUD(check *C) {
 		// this will make DeployedVmQuota and StoredVmQuota unlimited
 		user.User.DeployedVmQuota = 0
 		user.User.StoredVmQuota = 0
-		err = user.Update()
+		err = user.Update(ctx)
 		check.Assert(err, IsNil)
 
 		// Get the user from API again

@@ -15,7 +15,7 @@ func (vcd *TestVCD) Test_NsxtDynamicSecurityGroup(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	vdcGroup, err := adminOrg.GetVdcGroupByName(vcd.config.VCD.Nsxt.VdcGroup)
@@ -91,6 +91,6 @@ func (vcd *TestVCD) Test_NsxtDynamicSecurityGroup(check *C) {
 	check.Assert(updatedDynamicGroup, DeepEquals, createdDynamicGroup)
 
 	// Remove Dynamic Security Group
-	err = updatedDynamicGroup.Delete()
+	err = updatedDynamicGroup.Delete(ctx)
 	check.Assert(err, IsNil)
 }

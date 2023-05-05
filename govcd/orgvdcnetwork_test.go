@@ -8,6 +8,7 @@ package govcd
 
 import (
 	"fmt"
+	. "gopkg.in/check.v1"
 
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 )
@@ -249,7 +250,7 @@ func (vcd *TestVCD) Test_GetNetworkListLarge(check *C) {
 		check.Assert(err, IsNil)
 	}
 
-	err = vcd.vdc.Refresh()
+	err = vcd.vdc.Refresh(ctx)
 	check.Assert(err, IsNil)
 
 	knownNetworkName1 := fmt.Sprintf("net-%s-d", baseName)
@@ -280,10 +281,10 @@ func (vcd *TestVCD) Test_GetNetworkListLarge(check *C) {
 		}
 		network, err := vcd.vdc.GetOrgVdcNetworkByName(networkName, false)
 		check.Assert(err, IsNil)
-		_, err = network.Delete()
+		_, err = network.Delete(ctx)
 		check.Assert(err, IsNil)
 	}
-	err = vcd.vdc.Refresh()
+	err = vcd.vdc.Refresh(ctx)
 	check.Assert(err, IsNil)
 }
 

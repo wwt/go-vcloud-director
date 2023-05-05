@@ -79,7 +79,7 @@ func (vcd *TestVCD) Test_NsxtAlbController(check *C) {
 	check.Assert(err, IsNil)
 
 	// Remove and make sure it is not found
-	err = updatedController.Delete()
+	err = updatedController.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Try to find controller and expect an

@@ -32,6 +32,6 @@ func (vcd *TestVCD) Test_GetAllAlbImportableClouds(check *C) {
 	check.Assert(controllerImportableCloudByName.NsxtAlbImportableCloud.ID, Equals, controllerImportableClouds[0].NsxtAlbImportableCloud.ID)
 
 	// Cleanup
-	err = albController.Delete()
+	err = albController.Delete(ctx)
 	check.Assert(err, IsNil)
 }

@@ -46,7 +46,7 @@ func (vcd *TestVCD) Test_CertificateInLibrary(check *C) {
 	check.Assert(fetchedCertificate.CertificateLibrary.Certificate, Equals, certificate)
 
 	//test with private key and upload to org context
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
@@ -120,7 +120,7 @@ func (vcd *TestVCD) Test_CertificateInLibrary(check *C) {
 	newDescription := "newDescription"
 	foundCertificateWithPrivateKey.CertificateLibrary.Alias = newAlias
 	foundCertificateWithPrivateKey.CertificateLibrary.Description = newDescription
-	updateCertificateWithPrivateKey, err := foundCertificateWithPrivateKey.Update()
+	updateCertificateWithPrivateKey, err := foundCertificateWithPrivateKey.Update(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(updateCertificateWithPrivateKey, NotNil)
 	check.Assert(updateCertificateWithPrivateKey.CertificateLibrary.Alias, Equals, newAlias)
@@ -132,7 +132,7 @@ func (vcd *TestVCD) Test_CertificateInLibrary(check *C) {
 
 	foundCertificate.CertificateLibrary.Alias = newAlias
 	foundCertificate.CertificateLibrary.Description = newDescription
-	updateCertificate, err := foundCertificate.Update()
+	updateCertificate, err := foundCertificate.Update(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(updateCertificate, NotNil)
 	check.Assert(updateCertificate.CertificateLibrary.Alias, Equals, newAlias)
@@ -143,13 +143,13 @@ func (vcd *TestVCD) Test_CertificateInLibrary(check *C) {
 	check.Assert(updateCertificate.CertificateLibrary.PrivateKeyPassphrase, NotNil) // isn't returned
 
 	//delete certificate
-	err = updateCertificateWithPrivateKey.Delete()
+	err = updateCertificateWithPrivateKey.Delete(ctx)
 	check.Assert(err, IsNil)
 	deletedCertificate, err := vcd.client.Client.GetCertificateFromLibraryById(updateCertificateWithPrivateKey.CertificateLibrary.Id)
 	check.Assert(ContainsNotFound(err), Equals, true)
 	check.Assert(deletedCertificate, IsNil)
 
-	err = updateCertificate.Delete()
+	err = updateCertificate.Delete(ctx)
 	check.Assert(err, IsNil)
 	deletedCertificate, err = adminOrg.client.GetCertificateFromLibraryById(updateCertificate.CertificateLibrary.Id)
 	check.Assert(ContainsNotFound(err), Equals, true)
@@ -191,7 +191,7 @@ func (vcd *TestVCD) Test_GetCertificateFromLibraryByName_ValidatesSymbolsInName(
 		check.Assert(foundCertificate, NotNil)
 		check.Assert(foundCertificate.CertificateLibrary.Alias, Equals, alias)
 
-		err = foundCertificate.Delete()
+		err = foundCertificate.Delete(ctx)
 		check.Assert(err, IsNil)
 	}
 }

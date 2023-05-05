@@ -9,6 +9,7 @@ package govcd
 import (
 	"context"
 	"fmt"
+	. "gopkg.in/check.v1"
 )
 
 // TODO: Write test for InstantiateVAppTemplate
@@ -65,10 +66,10 @@ func (vcd *TestVCD) Test_GetInformationFromVAppTemplate(check *C) {
 		check.Skip(check.TestName() + ": Catalog Item not given in testing configuration. Test can't proceed")
 	}
 
-	catalog, err := vcd.org.GetCatalogByName(vcd.config.VCD.Catalog.Name, false)
+	catalog, err := vcd.org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	check.Assert(err, IsNil)
 	check.Assert(catalog, NotNil)
-	vAppTemplate, err := catalog.GetVAppTemplateByName(vcd.config.VCD.Catalog.CatalogItem)
+	vAppTemplate, err := catalog.GetVAppTemplateByName(ctx, vcd.config.VCD.Catalog.CatalogItem)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplate, NotNil)
 
@@ -83,7 +84,7 @@ func (vcd *TestVCD) Test_GetInformationFromVAppTemplate(check *C) {
 
 func testUploadAndDeleteVAppTemplate(vcd *TestVCD, check *C, isOvfLink bool) {
 	fmt.Printf("Running: %s\n", check.TestName())
-	catalog, err := vcd.org.GetCatalogByName(vcd.config.VCD.Catalog.Name, false)
+	catalog, err := vcd.org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	if err != nil {
 		check.Skip(check.TestName() + ": Catalog not found. Test can't proceed")
 		return
@@ -100,7 +101,7 @@ func testUploadAndDeleteVAppTemplate(vcd *TestVCD, check *C, isOvfLink bool) {
 		err = uploadTask.WaitTaskCompletion(ctx)
 		check.Assert(err, IsNil)
 	} else {
-		task, err := catalog.UploadOvf(vcd.config.OVA.OvaPath, itemName, description, 1024)
+		task, err := catalog.UploadOvf(ctx, vcd.config.OVA.OvaPath, itemName, description, 1024)
 		check.Assert(err, IsNil)
 		err = task.WaitTaskCompletion(ctx)
 		check.Assert(err, IsNil)
@@ -108,7 +109,7 @@ func testUploadAndDeleteVAppTemplate(vcd *TestVCD, check *C, isOvfLink bool) {
 
 	AddToCleanupList(itemName, "catalogItem", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.Name, check.TestName())
 
-	vAppTemplate, err := catalog.GetVAppTemplateByName(itemName)
+	vAppTemplate, err := catalog.GetVAppTemplateByName(ctx, itemName)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplate, NotNil)
 	check.Assert(vAppTemplate.VAppTemplate.Name, Equals, itemName)
@@ -127,17 +128,17 @@ func testUploadAndDeleteVAppTemplate(vcd *TestVCD, check *C, isOvfLink bool) {
 	vAppTemplate.VAppTemplate.Description = descriptionForUpdate
 	vAppTemplate.VAppTemplate.GoldMaster = true
 
-	_, err = vAppTemplate.Update()
+	_, err = vAppTemplate.Update(ctx)
 	check.Assert(err, IsNil)
-	err = vAppTemplate.Refresh()
+	err = vAppTemplate.Refresh(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplate.VAppTemplate.Name, Equals, nameForUpdate)
 	check.Assert(vAppTemplate.VAppTemplate.Description, Equals, descriptionForUpdate)
 	check.Assert(vAppTemplate.VAppTemplate.GoldMaster, Equals, true)
 
-	err = vAppTemplate.Delete()
+	err = vAppTemplate.Delete(ctx)
 	check.Assert(err, IsNil)
-	vAppTemplate, err = catalog.GetVAppTemplateByName(itemName)
+	vAppTemplate, err = catalog.GetVAppTemplateByName(ctx, itemName)
 	check.Assert(err, NotNil)
 	check.Assert(vAppTemplate, IsNil)
 }

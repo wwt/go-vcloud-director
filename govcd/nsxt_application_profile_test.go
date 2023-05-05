@@ -124,7 +124,7 @@ func testAppPortProfile(appPortProfileConfig *types.NsxtAppPortProfile, scope st
 	check.Assert(foundAppProfileByName.NsxtAppPortProfile, DeepEquals, foundAppProfileById.NsxtAppPortProfile)
 
 	// Check VDC and VDC Group lookup
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 	vdc, vdcGroup := test_CreateVdcGroup(check, adminOrg, vcd)
@@ -138,12 +138,12 @@ func testAppPortProfile(appPortProfileConfig *types.NsxtAppPortProfile, scope st
 	check.Assert(err, IsNil)
 	check.Assert(foundAppProfileByNameInVdcGroup.NsxtAppPortProfile, DeepEquals, foundAppProfileById.NsxtAppPortProfile)
 	// Remove VDC group
-	err = vdcGroup.Delete()
+	err = vdcGroup.Delete(ctx)
 	check.Assert(err, IsNil)
 	err = vdc.DeleteWait(true, true)
 	check.Assert(err, IsNil)
 
-	err = appProfile.Delete()
+	err = appProfile.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Expect a not found error

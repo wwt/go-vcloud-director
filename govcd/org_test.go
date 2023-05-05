@@ -705,7 +705,7 @@ func setupVdc(vcd *TestVCD, check *C, allocationModel string) (AdminOrg, *types.
 func (vcd *TestVCD) Test_QueryStorageProfiles(check *C) {
 
 	// retrieve Org and VDC
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	adminVdc, err := adminOrg.GetAdminVDCByName(vcd.config.VCD.Vdc, false)
 	check.Assert(err, IsNil)

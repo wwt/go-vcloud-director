@@ -1628,7 +1628,7 @@ func TestOpenAPIEdgeGateway_DeallocateIpCount(t *testing.T) {
 				return
 			}
 
-			allocatedIpCount, err := egw.GetAllocatedIpCount(false)
+			allocatedIpCount, err := egw.GetAllocatedIpCount(ctx, false)
 			if err != nil {
 				t.Errorf("NsxtEdgeGateway.GetAllocatedIpCount() error = %v", err)
 			}

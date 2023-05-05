@@ -18,7 +18,7 @@ func (vcd *TestVCD) Test_NsxtVdcGroupOrgNetworks(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointEdgeGateways)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(adminOrg, NotNil)
 	check.Assert(err, IsNil)
 
@@ -104,12 +104,12 @@ func (vcd *TestVCD) Test_NsxtVdcGroupOrgNetworks(check *C) {
 
 	// Remove all created networks
 	for _, network := range sliceOfCreatedNetworkConfigs {
-		err = network.Delete()
+		err = network.Delete(ctx)
 		check.Assert(err, IsNil)
 	}
 
 	// Remove Edge Gateway
-	err = movedGateway.Delete()
+	err = movedGateway.Delete(ctx)
 	check.Assert(err, IsNil)
 
 }
@@ -300,7 +300,7 @@ func test_CreateVdcGroup(check *C, adminOrg *AdminOrg, vcd *TestVCD) (*Vdc, *Vdc
 }
 
 func createNewVdc(vcd *TestVCD, check *C, vdcName string) *Vdc {
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 

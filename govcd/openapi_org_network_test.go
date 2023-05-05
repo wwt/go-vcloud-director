@@ -584,7 +584,7 @@ func nsxtDhcpConfigNetworkMode(check *C, vcd *TestVCD, vdc *Vdc, orgNetId string
 }
 
 func runOpenApiOrgVdcNetworkWithVdcGroupTest(check *C, vcd *TestVCD, orgVdcNetworkConfig *types.OpenApiOrgVdcNetwork, expectNetworkType string, dhcpFunc []dhcpConfigFunc) {
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	nsxtExternalNetwork, err := GetExternalNetworkV2ByName(vcd.client, vcd.config.VCD.Nsxt.ExternalNetwork)
@@ -674,7 +674,7 @@ func runOpenApiOrgVdcNetworkWithVdcGroupTest(check *C, vcd *TestVCD, orgVdcNetwo
 		dhcpFunc[i](check, vcd, vdc, updatedOrgVdcNet.OpenApiOrgVdcNetwork.ID)
 	}
 	// Delete
-	err = orgVdcNet.Delete()
+	err = orgVdcNet.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Test again if it was deleted and expect it to contain ErrorEntityNotFound
@@ -685,7 +685,7 @@ func runOpenApiOrgVdcNetworkWithVdcGroupTest(check *C, vcd *TestVCD, orgVdcNetwo
 	check.Assert(ContainsNotFound(err), Equals, true)
 
 	//cleanup
-	err = movedGateway.Delete()
+	err = movedGateway.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -753,14 +753,14 @@ func testNsxtDhcpBinding(check *C, vcd *TestVCD, orgNet *OpenApiOrgVdcNetwork) {
 	check.Assert(updatedDhcpBinding.OpenApiOrgVdcNetworkDhcpBinding.MacAddress, Equals, dhcpBindingConfig.MacAddress)
 
 	// Attempt to refresh originally created binding and see if it got these new updates values as well
-	err = createdDhcpBinding.Refresh()
+	err = createdDhcpBinding.Refresh(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(createdDhcpBinding.OpenApiOrgVdcNetworkDhcpBinding.Description, Equals, dhcpBindingConfig.Description)
 	check.Assert(createdDhcpBinding.OpenApiOrgVdcNetworkDhcpBinding.IpAddress, Equals, dhcpBindingConfig.IpAddress)
 	check.Assert(createdDhcpBinding.OpenApiOrgVdcNetworkDhcpBinding.MacAddress, Equals, dhcpBindingConfig.MacAddress)
 
 	// Delete DHCP binding
-	err = createdDhcpBinding.Delete()
+	err = createdDhcpBinding.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Ensure the binding is removed

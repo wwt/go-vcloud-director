@@ -69,7 +69,7 @@ func (vcd *TestVCD) Test_RightsBundle(check *C) {
 
 	// Step 4 - updated created rights bundle
 	createdRightsBundle.RightsBundle.Description = "Updated description"
-	updatedRightsBundle, err := createdRightsBundle.Update()
+	updatedRightsBundle, err := createdRightsBundle.Update(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(updatedRightsBundle.RightsBundle, DeepEquals, createdRightsBundle.RightsBundle)
 
@@ -107,7 +107,7 @@ func (vcd *TestVCD) Test_RightsBundle(check *C) {
 	check.Assert(len(rights), Equals, 0)
 
 	// Step 8 - delete created rights bundle
-	err = updatedRightsBundle.Delete()
+	err = updatedRightsBundle.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Step 9 - try to read deleted rights bundle and expect error to contain 'ErrorEntityNotFound'

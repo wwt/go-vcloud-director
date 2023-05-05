@@ -17,7 +17,7 @@ import (
 // values in all rows should be the same.
 func (vcd *TestVCD) Test_TenantContext(check *C) {
 	// Check the tenant context of the AdminOrg (top of the hierarchy)
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 	check.Assert(adminOrg.TenantContext, NotNil)
@@ -139,7 +139,7 @@ func (vcd *TestVCD) Test_TenantContext(check *C) {
 	checkTenantContext(check, "adminCatalog by Name or ID", adminCatalogTenantContext, adminOrgTenantContext)
 
 	// Check that a catalog depending from our org has the same tenant context
-	catalog, err := adminOrg.GetCatalogByName(vcd.config.VCD.Catalog.Name, false)
+	catalog, err := adminOrg.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	check.Assert(err, IsNil)
 	check.Assert(catalog, NotNil)
 	catalogTenantContext, err := catalog.getTenantContext()

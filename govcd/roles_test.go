@@ -109,7 +109,7 @@ func (vcd *TestVCD) Test_Roles(check *C) {
 	check.Assert(len(rights), Equals, 0)
 
 	// Step 8 - delete created role
-	err = updatedRole.Delete()
+	err = updatedRole.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Step 9 - try to read deleted role and expect error to contain 'ErrorEntityNotFound'

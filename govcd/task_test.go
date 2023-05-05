@@ -17,10 +17,10 @@ import (
 func (vcd *TestVCD) Test_QueryTaskList(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
-	catalog, err := adminOrg.GetCatalogByName(vcd.config.VCD.Catalog.Name, false)
+	catalog, err := adminOrg.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	check.Assert(err, IsNil)
 	adminCatalog, err := adminOrg.GetAdminCatalogByName(vcd.config.VCD.Catalog.Name, false)
 	check.Assert(err, IsNil)

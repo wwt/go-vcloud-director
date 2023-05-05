@@ -17,7 +17,7 @@ import (
 func (vcd *TestVCD) Test_NsxvDistributedFirewall(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
 
-	org, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
@@ -32,7 +32,7 @@ func (vcd *TestVCD) Test_NsxvDistributedFirewall(check *C) {
 		notWorkingDfw := NewNsxvDistributedFirewall(nsxtVdc.client, nsxtVdc.AdminVdc.ID)
 		check.Assert(notWorkingDfw, NotNil)
 
-		isEnabled, err := notWorkingDfw.IsEnabled()
+		isEnabled, err := notWorkingDfw.IsEnabled(ctx)
 		check.Assert(err, IsNil)
 		check.Assert(isEnabled, Equals, false)
 
@@ -62,7 +62,7 @@ func (vcd *TestVCD) Test_NsxvDistributedFirewall(check *C) {
 	err = dfw.Enable()
 	check.Assert(err, IsNil)
 
-	enabled, err := dfw.IsEnabled()
+	enabled, err := dfw.IsEnabled(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(enabled, Equals, true)
 
@@ -77,21 +77,21 @@ func (vcd *TestVCD) Test_NsxvDistributedFirewall(check *C) {
 	err = dfw.Enable()
 	check.Assert(err, IsNil)
 
-	enabled, err = dfw.IsEnabled()
+	enabled, err = dfw.IsEnabled(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(enabled, Equals, true)
 
-	err = dfw.Disable()
+	err = dfw.Disable(ctx)
 	check.Assert(err, IsNil)
-	enabled, err = dfw.IsEnabled()
+	enabled, err = dfw.IsEnabled(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(enabled, Equals, false)
 
 	// Also dfw.Disable is idempotent
-	err = dfw.Disable()
+	err = dfw.Disable(ctx)
 	check.Assert(err, IsNil)
 
-	enabled, err = dfw.IsEnabled()
+	enabled, err = dfw.IsEnabled(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(enabled, Equals, false)
 }
@@ -99,7 +99,7 @@ func (vcd *TestVCD) Test_NsxvDistributedFirewall(check *C) {
 func (vcd *TestVCD) Test_NsxvDistributedFirewallUpdate(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
 
-	org, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
@@ -107,12 +107,12 @@ func (vcd *TestVCD) Test_NsxvDistributedFirewallUpdate(check *C) {
 	adminVdc, err := org.GetAdminVDCByName(vcd.config.VCD.Vdc, false)
 	check.Assert(err, IsNil)
 	check.Assert(adminVdc, NotNil)
-	vdc, err := org.GetVDCByName(vcd.config.VCD.Vdc, false)
+	vdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Vdc, false)
 	check.Assert(err, IsNil)
 
 	dfw := NewNsxvDistributedFirewall(adminVdc.client, adminVdc.AdminVdc.ID)
 	check.Assert(dfw, NotNil)
-	enabled, err := dfw.IsEnabled()
+	enabled, err := dfw.IsEnabled(ctx)
 	check.Assert(err, IsNil)
 	//
 	if enabled {
@@ -229,7 +229,7 @@ func (vcd *TestVCD) Test_NsxvDistributedFirewallUpdate(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(updatedRules, NotNil)
 
-	err = dfw.Disable()
+	err = dfw.Disable(ctx)
 	check.Assert(err, IsNil)
 
 }
@@ -237,7 +237,7 @@ func (vcd *TestVCD) Test_NsxvDistributedFirewallUpdate(check *C) {
 func (vcd *TestVCD) Test_NsxvServices(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
 
-	org, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 

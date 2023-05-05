@@ -34,7 +34,7 @@ func (vcd *TestVCD) Test_VcenterImportableDvpg(check *C) {
 	check.Assert(dvpgByName.VcenterImportableDvpg.BackingRef.Name, Equals, vcd.config.VCD.Nsxt.NsxtDvpg)
 
 	// Get all DVPGs withing NSX-T VDC
-	nsxtVdc, err := vcd.org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	nsxtVdc, err := vcd.org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 	check.Assert(nsxtVdc, NotNil)
 

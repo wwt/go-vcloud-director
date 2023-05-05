@@ -222,7 +222,7 @@ func (vcd *TestVCD) Test_OpenApiInlineStructCRUDRoles(check *C) {
 	deleteUrlRef, err := vcd.client.Client.OpenApiBuildEndpoint(endpoint, newRoleResponse.ID)
 	check.Assert(err, IsNil)
 
-	err = vcd.client.client.OpenApiDeleteItem(ctx, apiVersion, deleteUrlRef, nil, nil)
+	err = vcd.client.Client.OpenApiDeleteItem(ctx, apiVersion, deleteUrlRef, nil, nil)
 	check.Assert(err, IsNil)
 
 	// Step 6 - try to read deleted role and expect error to contain 'ErrorEntityNotFound'
@@ -276,7 +276,7 @@ func (vcd *TestVCD) Test_OpenApiInlineStructCRUDRoles(check *C) {
 	deleteUrlRef2, err := vcd.client.Client.OpenApiBuildEndpoint(endpoint, newRoleResponse.ID)
 	check.Assert(err, IsNil)
 
-	err = vcd.client.client.OpenApiDeleteItem(ctx, apiVersion, deleteUrlRef2, nil, nil)
+	err = vcd.client.Client.OpenApiDeleteItem(ctx, apiVersion, deleteUrlRef2, nil, nil)
 	check.Assert(err, IsNil)
 
 }

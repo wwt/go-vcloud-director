@@ -586,7 +586,7 @@ func (vcd *TestVCD) SetUpSuite(check *C) {
 			authenticationMode = "token"
 			err = vcd.client.SetToken(ctx, config.Provider.SysOrg, AuthorizationHeader, token)
 		} else {
-			err = vcd.client.Authenticate(config.Provider.User, config.Provider.Password, config.Provider.SysOrg)
+			err = vcd.client.Authenticate(ctx, config.Provider.User, config.Provider.Password, config.Provider.SysOrg)
 		}
 	}
 	if config.Provider.UseSamlAdfs {
@@ -659,7 +659,7 @@ func (vcd *TestVCD) SetUpSuite(check *C) {
 	if !skipVappCreation && config.VCD.Network.Net1 != "" && config.VCD.StorageProfile.SP1 != "" &&
 		config.VCD.Catalog.Name != "" && config.VCD.Catalog.CatalogItem != "" {
 		// deployVappForTest replaces the old createTestVapp() because it was using bad implemented method vdc.ComposeVApp
-		vcd.vapp, err = deployVappForTest(ctx, cd, TestSetUpSuite)
+		vcd.vapp, err = deployVappForTest(ctx, vcd, TestSetUpSuite)
 		// If no vApp is created, we skip all vApp tests
 		if err != nil {
 			fmt.Printf("%s\n", err)
@@ -813,7 +813,7 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 		vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
 	// 	OpenApiEntityFirewall has different API structure therefore generic `OpenApiEntity` case does not fit cleanup
 	case "OpenApiEntityFirewall":
-		apiVersion, err := vcd.client.Client.checkOpenApiEndpointCompatibility(types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointNsxtFirewallRules)
+		apiVersion, err := vcd.client.Client.checkOpenApiEndpointCompatibility(ctx, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointNsxtFirewallRules)
 		if err != nil {
 			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
 			return
@@ -826,7 +826,7 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 		}
 
 		// Attempt to use supplied path in entity.Parent for element deletion
-		err = vcd.client.client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil, nil)
+		err = vcd.client.Client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil, nil)
 		if err != nil {
 			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
 			return
@@ -835,13 +835,13 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 		vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
 	// 	OpenApiEntityAlbSettingsDisable has different API structure therefore generic `OpenApiEntity` case does not fit cleanup
 	case "OpenApiEntityAlbSettingsDisable":
-		edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(entity.Parent)
+		edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(ctx, entity.Parent)
 		if err != nil {
 			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
 			return
 		}
 
-		edgeAlbSettingsConfig, err := edge.GetAlbSettings()
+		edgeAlbSettingsConfig, err := edge.GetAlbSettings(ctx)
 		if err != nil {
 			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
 			return
@@ -851,7 +851,7 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 			return
 		}
 
-		err = edge.DisableAlb()
+		err = edge.DisableAlb(ctx)
 		if err != nil {
 			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
 			return
@@ -864,7 +864,7 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 
 		// Check if parent VDC was specified. If not - use the default NSX-V VDC
 		if entity.Parent != "" {
-			vdc, err = vcd.org.GetVDCByName(entity.Parent, true)
+			vdc, err = vcd.org.GetVDCByName(ctx, entity.Parent, true)
 			if err != nil {
 				vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
 				return
@@ -1147,18 +1147,18 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 			vcd.infoCleanup("removeLeftoverEntries: [ERROR] No ORG provided for VDC '%s'\n", entity.Name)
 			return
 		}
-		org, err := vcd.client.GetAdminOrgByName(entity.Parent)
+		org, err := vcd.client.GetAdminOrgByName(ctx, entity.Parent)
 		if err != nil {
 			vcd.infoCleanup(notFoundMsg, "org", entity.Parent)
 			return
 		}
-		vdc, err := org.GetVDCByName(entity.Name, false)
+		vdc, err := org.GetVDCByName(ctx, entity.Name, false)
 		if vdc == nil || err != nil {
 			vcd.infoCleanup(notFoundMsg, "vdc", entity.Name)
 			return
 		}
 		dfw := NewNsxvDistributedFirewall(vdc.client, vdc.Vdc.ID)
-		enabled, err := dfw.IsEnabled()
+		enabled, err := dfw.IsEnabled(ctx)
 		if err != nil {
 			vcd.infoCleanup("removeLeftoverEntries: [ERROR] checking distributed firewall from VCD '%s': %s", entity.Name, err)
 			return
@@ -1167,7 +1167,7 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
 			return
 		}
-		err = dfw.Disable()
+		err = dfw.Disable(ctx)
 		if err == nil {
 			vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
 		} else {
@@ -1568,7 +1568,7 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 			return
 		}
 
-		ldapConfig, err := org.GetLdapConfiguration()
+		ldapConfig, err := org.GetLdapConfiguration(ctx)
 		if err != nil {
 			vcd.infoCleanup("removeLeftoverEntries: [ERROR] Couldn't get LDAP settings for Org '%s': %s",
 				entity.Parent, err)
@@ -1577,7 +1577,7 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 
 		// This is done to avoid calling LdapDisable() if it has been unconfigured, due to bug with Org catalog publish settings
 		if ldapConfig.OrgLdapMode != types.LdapModeNone {
-			err = org.LdapDisable()
+			err = org.LdapDisable(ctx)
 			if err != nil {
 				vcd.infoCleanup("removeLeftoverEntries: [ERROR] Could not clear LDAP settings for Org '%s': %s",
 					entity.Parent, err)
@@ -1604,12 +1604,12 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 		return
 
 	case "logicalVmGroup":
-		logicalVmGroup, err := vcd.client.GetLogicalVmGroupById(entity.Name)
+		logicalVmGroup, err := vcd.client.GetLogicalVmGroupById(ctx, entity.Name)
 		if logicalVmGroup == nil || err != nil {
 			vcd.infoCleanup(notFoundMsg, "logicalVmGroup", entity.Name)
 			return
 		}
-		err = logicalVmGroup.Delete()
+		err = logicalVmGroup.Delete(ctx)
 		if err == nil {
 			vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
 		} else {
@@ -1705,7 +1705,7 @@ func (vcd *TestVCD) TestVCDClient_AuthenticateInvalidPassword(check *C) {
 		check.Fatalf("error getting client structure: %s", err)
 	}
 
-	err = client.Authenticate(config.Provider.User, "INVALID-PASSWORD", config.Provider.SysOrg)
+	err = client.Authenticate(ctx, config.Provider.User, "INVALID-PASSWORD", config.Provider.SysOrg)
 	if err == nil || !strings.Contains(err.Error(), "401") {
 		check.Fatalf("expected error for invalid credentials")
 	}
@@ -1721,7 +1721,7 @@ func (vcd *TestVCD) TestVCDClient_AuthenticateInvalidToken(check *C) {
 		check.Fatalf("error getting client structure: %s", err)
 	}
 
-	err = client.SetToken(config.Provider.SysOrg, AuthorizationHeader, "invalid-token")
+	err = client.SetToken(ctx, config.Provider.SysOrg, AuthorizationHeader, "invalid-token")
 	if err == nil || !strings.Contains(err.Error(), "401") {
 		check.Fatalf("expected error for invalid credentials")
 	}
@@ -1917,12 +1917,12 @@ func newOrgUserConnection(adminOrg *AdminOrg, userName, password, href string, i
 		return nil, nil, fmt.Errorf("[newOrgUserConnection] unable to pass url: %s", err)
 	}
 
-	_, err = adminOrg.GetUserByName(userName, false)
+	_, err = adminOrg.GetUserByName(ctx, userName, false)
 	if err == nil {
 		// user exists
 		return nil, nil, fmt.Errorf("user %s already exists", userName)
 	}
-	_, err = adminOrg.CreateUserSimple(OrgUserConfiguration{
+	_, err = adminOrg.CreateUserSimple(ctx, OrgUserConfiguration{
 		Name:            userName,
 		Password:        password,
 		RoleName:        OrgUserRoleOrganizationAdministrator,
@@ -1939,15 +1939,15 @@ func newOrgUserConnection(adminOrg *AdminOrg, userName, password, href string, i
 
 	AddToCleanupList(userName, "user", adminOrg.AdminOrg.Name, "newOrgUserConnection")
 
-	_ = adminOrg.Refresh()
+	_ = adminOrg.Refresh(ctx)
 	vcdClient := NewVCDClient(*u, insecure)
-	err = vcdClient.Authenticate(userName, password, adminOrg.AdminOrg.Name)
+	err = vcdClient.Authenticate(ctx, userName, password, adminOrg.AdminOrg.Name)
 	if err != nil {
 		return nil, nil, fmt.Errorf("[newOrgUserConnection] unable to authenticate: %s", err)
 	}
 
 	// return newUser
-	newUser, err := adminOrg.GetUserByName(userName, false)
+	newUser, err := adminOrg.GetUserByName(ctx, userName, false)
 	if err != nil {
 		return nil, nil, fmt.Errorf("[newOrgUserConnection] unable to retrieve newly created user: %s", err)
 	}

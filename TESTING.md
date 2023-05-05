@@ -246,7 +246,7 @@ func (vcd *TestVCD) Test_GetVAppTemplate(check *checks.C) {
 	catitem, err := cat.FindCatalogItem(vcd.config.VCD.Catalog.Catalogitem)
 	check.Assert(err, checks.IsNil)
 
-	vapptemplate, err := catitem.GetVAppTemplate()
+	vapptemplate, err := catitem.GetVAppTemplate(ctx)
 
     // #3: Tests the object contents
 	check.Assert(err, checks.IsNil)
@@ -296,7 +296,7 @@ func (vcd *TestVCD) Test_ComposeVApp(check *checks.C) {
 
 	// Here's the cleanup point
 	// Deleting VApp
-	task, err = vapp.Delete()
+	task, err = vapp.Delete(ctx)
 	task.WaitTaskCompletion()
 
 	// Here we can fail again.

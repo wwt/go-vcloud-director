@@ -74,13 +74,13 @@ func (vcd *TestVCD) Test_AlbClouds(check *C) {
 	check.Assert(albCloudById.NsxtAlbCloud.Name, Equals, createdAlbCloud.NsxtAlbCloud.Name)
 
 	// Cleanup
-	err = createdAlbCloud.Delete()
+	err = createdAlbCloud.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	_, err = vcd.client.GetAlbCloudByName(createdAlbCloud.NsxtAlbCloud.Name)
 	check.Assert(ContainsNotFound(err), Equals, true)
 
-	err = albController.Delete()
+	err = albController.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 

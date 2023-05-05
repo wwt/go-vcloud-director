@@ -15,7 +15,7 @@ func (vcd *TestVCD) Test_VdcNetworkProfile(check *C) {
 
 	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
-	nsxtVdc, err := org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 
 	existingVdcNetworkProfile, err := nsxtVdc.GetVdcNetworkProfile()

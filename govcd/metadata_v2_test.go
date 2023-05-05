@@ -8,6 +8,7 @@ package govcd
 
 import (
 	"fmt"
+	. "gopkg.in/check.v1"
 
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 )
@@ -45,7 +46,7 @@ func (vcd *TestVCD) TestAdminVdcMetadata(check *C) {
 		check.Skip("skipping test because VDC name is empty")
 	}
 
-	org, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
@@ -59,11 +60,11 @@ func (vcd *TestVCD) TestAdminVdcMetadata(check *C) {
 }
 
 func testVdcMetadata(vcd *TestVCD, check *C, testCase metadataTest) {
-	org, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	vdc, err := org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	vdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 	check.Assert(vdc, NotNil)
 	check.Assert(vdc.Vdc.Name, Equals, vcd.config.VCD.Nsxt.Vdc)
@@ -93,7 +94,7 @@ func (vcd *TestVCD) TestVAppMetadata(check *C) {
 
 func (vcd *TestVCD) TestVAppTemplateMetadata(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
-	vAppTemplate, err := vcd.nsxtVdc.GetVAppTemplateByName(vcd.config.VCD.Catalog.NsxtCatalogItem)
+	vAppTemplate, err := vcd.nsxtVdc.GetVAppTemplateByName(ctx, vcd.config.VCD.Catalog.NsxtCatalogItem)
 	if err != nil {
 		check.Skip("Skipping test because vApp Template was not found. Test can't proceed")
 		return
@@ -109,16 +110,16 @@ func (vcd *TestVCD) TestMediaRecordMetadata(check *C) {
 
 	skipWhenMediaPathMissing(vcd, check)
 
-	org, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	catalog, err := org.GetCatalogByName(vcd.config.VCD.Catalog.Name, false)
+	catalog, err := org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	check.Assert(err, IsNil)
 	check.Assert(catalog, NotNil)
 	check.Assert(catalog.Catalog.Name, Equals, vcd.config.VCD.Catalog.Name)
 
-	uploadTask, err := catalog.UploadMediaImage(check.TestName(), check.TestName(), vcd.config.Media.MediaPath, 1024)
+	uploadTask, err := catalog.UploadMediaImage(ctx, check.TestName(), check.TestName(), vcd.config.Media.MediaPath, 1024)
 	check.Assert(err, IsNil)
 	check.Assert(uploadTask, NotNil)
 	err = uploadTask.WaitTaskCompletion(ctx)
@@ -126,7 +127,7 @@ func (vcd *TestVCD) TestMediaRecordMetadata(check *C) {
 
 	AddToCleanupList(check.TestName(), "mediaCatalogImage", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.Name, "Test_AddMetadataOnMediaRecord")
 
-	err = vcd.org.Refresh()
+	err = vcd.org.Refresh(ctx)
 	check.Assert(err, IsNil)
 
 	mediaRecord, err := catalog.QueryMedia(check.TestName())
@@ -137,11 +138,11 @@ func (vcd *TestVCD) TestMediaRecordMetadata(check *C) {
 	testMetadataCRUDActions(mediaRecord, check, nil)
 
 	// cleanup uploaded media so that other tests don't fail
-	media, err := catalog.GetMediaByName(check.TestName(), true)
+	media, err := catalog.GetMediaByName(ctx, check.TestName(), true)
 	check.Assert(err, IsNil)
 	check.Assert(media, NotNil)
 
-	deleteTask, err := media.Delete()
+	deleteTask, err := media.Delete(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(deleteTask, NotNil)
 	err = deleteTask.WaitTaskCompletion(ctx)
@@ -153,16 +154,16 @@ func (vcd *TestVCD) TestMediaMetadata(check *C) {
 
 	skipWhenMediaPathMissing(vcd, check)
 
-	org, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	catalog, err := org.GetCatalogByName(vcd.config.VCD.Catalog.Name, false)
+	catalog, err := org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	check.Assert(err, IsNil)
 	check.Assert(catalog, NotNil)
 	check.Assert(catalog.Catalog.Name, Equals, vcd.config.VCD.Catalog.Name)
 
-	media, err := catalog.GetMediaByName(vcd.config.Media.Media, false)
+	media, err := catalog.GetMediaByName(ctx, vcd.config.Media.Media, false)
 	check.Assert(err, IsNil)
 
 	testMetadataCRUDActions(media, check, nil)
@@ -171,7 +172,7 @@ func (vcd *TestVCD) TestMediaMetadata(check *C) {
 func (vcd *TestVCD) TestAdminCatalogMetadata(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
 
-	org, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
@@ -186,11 +187,11 @@ func (vcd *TestVCD) TestAdminCatalogMetadata(check *C) {
 }
 
 func testCatalogMetadata(vcd *TestVCD, check *C, testCase metadataTest) {
-	org, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	catalog, err := org.GetCatalogByName(vcd.config.VCD.Catalog.NsxtBackedCatalogName, false)
+	catalog, err := org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.NsxtBackedCatalogName, false)
 	check.Assert(err, IsNil)
 	check.Assert(catalog, NotNil)
 	check.Assert(catalog.Catalog.Name, Equals, vcd.config.VCD.Catalog.NsxtBackedCatalogName)
@@ -203,7 +204,7 @@ func testCatalogMetadata(vcd *TestVCD, check *C, testCase metadataTest) {
 func (vcd *TestVCD) TestAdminOrgMetadata(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
@@ -260,13 +261,13 @@ func (vcd *TestVCD) TestOrgVDCNetworkMetadata(check *C) {
 
 func (vcd *TestVCD) TestCatalogItemMetadata(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
-	catalog, err := vcd.org.GetCatalogByName(vcd.config.VCD.Catalog.Name, false)
+	catalog, err := vcd.org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	if err != nil {
 		check.Skip(fmt.Sprintf("Catalog %s not found. Test can't proceed", vcd.config.VCD.Catalog.Name))
 		return
 	}
 
-	catalogItem, err := catalog.GetCatalogItemByName(vcd.config.VCD.Catalog.CatalogItem, false)
+	catalogItem, err := catalog.GetCatalogItemByName(ctx, vcd.config.VCD.Catalog.CatalogItem, false)
 	if err != nil {
 		check.Skip(fmt.Sprintf("Catalog item %s not found. Test can't proceed", vcd.config.VCD.Catalog.CatalogItem))
 		return

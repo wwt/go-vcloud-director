@@ -14,10 +14,10 @@ func (vcd *TestVCD) Test_GetAlbSettings(check *C) {
 	skipNoNsxtAlbConfiguration(vcd, check)
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointAlbEdgeGateway)
 
-	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
-	albSettings, err := edge.GetAlbSettings()
+	albSettings, err := edge.GetAlbSettings(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(albSettings, NotNil)
 	check.Assert(albSettings.Enabled, Equals, false)
@@ -31,7 +31,7 @@ func (vcd *TestVCD) Test_UpdateAlbSettings(check *C) {
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointAlbEdgeGateway)
 
 	controller, cloud, seGroup := spawnAlbControllerCloudServiceEngineGroup(vcd, check, "DEDICATED")
-	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	// Enable ALB on Edge Gateway with default ServiceNetworkDefinition
@@ -69,7 +69,7 @@ func (vcd *TestVCD) Test_UpdateAlbSettings(check *C) {
 	check.Assert(enabledSettingsCustomServiceDefinition.ServiceNetworkDefinition, Equals, "93.93.11.1/25")
 
 	// Disable ALB on Edge Gateway
-	err = edge.DisableAlb()
+	err = edge.DisableAlb(ctx)
 	check.Assert(err, IsNil)
 
 	// Enable IPv6 service network definition (VCD 10.4.0+)
@@ -79,7 +79,7 @@ func (vcd *TestVCD) Test_UpdateAlbSettings(check *C) {
 		enabledSettingsIpv6ServiceDefinition, err := edge.UpdateAlbSettings(albSettingsConfig)
 		check.Assert(err, IsNil)
 		check.Assert(enabledSettingsIpv6ServiceDefinition.Ipv6ServiceNetworkDefinition, Equals, "2001:0db8:85a3:0000:0000:8a2e:0370:7334/120")
-		err = edge.DisableAlb()
+		err = edge.DisableAlb(ctx)
 		check.Assert(err, IsNil)
 	}
 
@@ -90,20 +90,20 @@ func (vcd *TestVCD) Test_UpdateAlbSettings(check *C) {
 		enabledSettingsTransparentMode, err := edge.UpdateAlbSettings(albSettingsConfig)
 		check.Assert(err, IsNil)
 		check.Assert(*enabledSettingsTransparentMode.TransparentModeEnabled, Equals, true)
-		err = edge.DisableAlb()
+		err = edge.DisableAlb(ctx)
 		check.Assert(err, IsNil)
 	}
 
-	albSettings, err := edge.GetAlbSettings()
+	albSettings, err := edge.GetAlbSettings(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(albSettings, NotNil)
 	check.Assert(albSettings.Enabled, Equals, false)
 
 	// Remove objects
-	err = seGroup.Delete()
+	err = seGroup.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = cloud.Delete()
+	err = cloud.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = controller.Delete()
+	err = controller.Delete(ctx)
 	check.Assert(err, IsNil)
 }

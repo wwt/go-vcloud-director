@@ -38,7 +38,7 @@ func (vcd *TestVCD) Test_RdeAndRdeType(check *C) {
 	// Creates the clients for the System admin and the Tenant user
 	systemAdministratorClient := vcd.client
 	tenantUserClient := NewVCDClient(vcd.client.Client.VCDHREF, true)
-	err := tenantUserClient.Authenticate(vcd.config.Tenants[0].User, vcd.config.Tenants[0].Password, vcd.config.Tenants[0].SysOrg)
+	err := tenantUserClient.Authenticate(ctx, vcd.config.Tenants[0].User, vcd.config.Tenants[0].Password, vcd.config.Tenants[0].SysOrg)
 	check.Assert(err, IsNil)
 
 	unmarshaledRdeTypeSchema, err := loadRdeTypeSchemaFromTestResources()
@@ -169,7 +169,7 @@ func (vcd *TestVCD) Test_RdeAndRdeType(check *C) {
 
 	// We delete it with Sysadmin
 	deletedId := createdRdeType.DefinedEntityType.ID
-	err = createdRdeType.Delete()
+	err = createdRdeType.Delete(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(*createdRdeType.DefinedEntityType, DeepEquals, types.DefinedEntityType{})
 
@@ -209,7 +209,7 @@ func testRdeCrudWithGivenType(check *C, rdeType *DefinedEntityType) {
 	check.Assert(*rde.DefinedEntity.State, Equals, "PRE_CREATED")
 
 	// If we don't resolve the RDE, we cannot delete it
-	err = rde.Delete()
+	err = rde.Delete(ctx)
 	check.Assert(err, NotNil)
 	check.Assert(true, Equals, strings.Contains(err.Error(), "RDE_ENTITY_NOT_RESOLVED"))
 
@@ -243,7 +243,7 @@ func testRdeCrudWithGivenType(check *C, rdeType *DefinedEntityType) {
 
 	// Delete the RDE instance now that it's resolved
 	deletedId := rde.DefinedEntity.ID
-	err = rde.Delete()
+	err = rde.Delete(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(*rde.DefinedEntity, DeepEquals, types.DefinedEntity{})
 
@@ -283,7 +283,7 @@ func testRdeCrudAsTenant(check *C, vendor string, namespace string, version stri
 	check.Assert(*rde.DefinedEntity.State, Equals, "PRE_CREATED")
 
 	// If we don't resolve the RDE, we cannot delete it
-	err = rde.Delete()
+	err = rde.Delete(ctx)
 	check.Assert(err, NotNil)
 	check.Assert(true, Equals, strings.Contains(err.Error(), "RDE_ENTITY_NOT_RESOLVED"))
 

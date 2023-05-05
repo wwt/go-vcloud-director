@@ -183,7 +183,7 @@ func (vcd *TestVCD) test_GroupFinderGetGenericEntity(check *C) {
 // which sets up LDAP configuration.
 func (vcd *TestVCD) test_GroupUserListIsPopulated(check *C) {
 	fmt.Printf("Running: %s\n", "test_GroupUserListIsPopulated")
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
@@ -222,7 +222,7 @@ func (vcd *TestVCD) test_GroupUserListIsPopulated(check *C) {
 	check.Assert(grp.Group.UsersList.UserReference[0], NotNil)
 
 	// We check here that usersList doesn't make VCD fail, they should be sent as nil
-	err = grp.Update()
+	err = grp.Update(ctx)
 	check.Assert(err, IsNil)
 
 	user, err = adminOrg.GetUserByHref(grp.Group.UsersList.UserReference[0].HREF)
@@ -235,12 +235,12 @@ func (vcd *TestVCD) test_GroupUserListIsPopulated(check *C) {
 	check.Assert(copyWithoutUserList(grp.Group), DeepEquals, grp.Group)
 
 	// We check here that groupReferences doesn't make VCD fail, they should be sent as nil
-	err = user.Update()
+	err = user.Update(ctx)
 	check.Assert(err, IsNil)
 
 	// Cleanup
 	err = user.Delete(false)
 	check.Assert(err, IsNil)
-	err = grp.Delete()
+	err = grp.Delete(ctx)
 	check.Assert(err, IsNil)
 }

@@ -13,7 +13,7 @@ import (
 )
 
 func (vcd *TestVCD) Test_RoleTenantContext(check *C) {
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
@@ -56,7 +56,7 @@ func (vcd *TestVCD) Test_RoleTenantContext(check *C) {
 }
 
 func (vcd *TestVCD) Test_Rights(check *C) {
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 

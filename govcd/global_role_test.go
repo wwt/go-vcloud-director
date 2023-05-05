@@ -7,6 +7,7 @@
 package govcd
 
 import (
+	. "gopkg.in/check.v1"
 	"net/url"
 
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
@@ -77,7 +78,7 @@ func (vcd *TestVCD) Test_GlobalRoles(check *C) {
 
 	// Step 4 - updated created global role
 	createdGlobalRole.GlobalRole.Description = "Updated description"
-	updatedGlobalRole, err := createdGlobalRole.Update()
+	updatedGlobalRole, err := createdGlobalRole.Update(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(updatedGlobalRole.GlobalRole, DeepEquals, createdGlobalRole.GlobalRole)
 
@@ -121,7 +122,7 @@ func (vcd *TestVCD) Test_GlobalRoles(check *C) {
 	check.Assert(len(rights), Equals, 0)
 
 	// Step 8 - delete created global role
-	err = updatedGlobalRole.Delete()
+	err = updatedGlobalRole.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Step 9 - try to read deleted global role and expect error to contain 'ErrorEntityNotFound'

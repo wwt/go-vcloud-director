@@ -25,7 +25,7 @@ func (vcd *TestVCD) Test_CreateVdcGroup(check *C) {
 	}
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointVdcGroups)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
@@ -43,7 +43,7 @@ func (vcd *TestVCD) Test_NsxtVdcGroup(check *C) {
 	}
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointVdcGroups)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 	test_NsxtVdcGroup(check, adminOrg, vcd)
@@ -160,7 +160,7 @@ func (vcd *TestVCD) Test_GetVdcGroupByName_ValidatesSymbolsInName(check *C) {
 	}
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointVdcGroups)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 	test_GetVdcGroupByName_ValidatesSymbolsInName(check, adminOrg, vcd.nsxtVdc.vdcId())
@@ -190,7 +190,7 @@ func test_GetVdcGroupByName_ValidatesSymbolsInName(check *C, adminOrg *AdminOrg,
 		check.Assert(foundVdcGroup, NotNil)
 		check.Assert(foundVdcGroup.VdcGroup.Name, Equals, name)
 
-		err = foundVdcGroup.Delete()
+		err = foundVdcGroup.Delete(ctx)
 		check.Assert(err, IsNil)
 	}
 }
@@ -207,7 +207,7 @@ func (vcd *TestVCD) Test_NsxtVdcGroupWithOrgAdmin(check *C) {
 	}
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointVdcGroups)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 

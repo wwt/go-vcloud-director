@@ -53,7 +53,7 @@ func (vcd *TestVCD) Test_GetAllAlbServiceEngineGroups(check *C) {
 	AddToCleanupListOpenApi(createdSeGroup.NsxtAlbServiceEngineGroup.Name, check.TestName(), openApiEndpoint)
 
 	// Sync
-	err = createdSeGroup.Sync()
+	err = createdSeGroup.Sync(ctx)
 	check.Assert(err, IsNil)
 
 	// Find by Name
@@ -85,13 +85,13 @@ func (vcd *TestVCD) Test_GetAllAlbServiceEngineGroups(check *C) {
 	check.Assert(updatedSeGroup.NsxtAlbServiceEngineGroup, DeepEquals, createdSeGroup.NsxtAlbServiceEngineGroup)
 
 	// Cleanup
-	err = createdSeGroup.Delete()
+	err = createdSeGroup.Delete(ctx)
 	check.Assert(err, IsNil)
 
-	err = createdAlbCloud.Delete()
+	err = createdAlbCloud.Delete(ctx)
 	check.Assert(err, IsNil)
 
-	err = controller.Delete()
+	err = controller.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 

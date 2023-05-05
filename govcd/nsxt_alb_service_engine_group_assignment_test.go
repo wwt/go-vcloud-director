@@ -18,7 +18,7 @@ func (vcd *TestVCD) Test_GetAllEdgeAlbServiceEngineGroupAssignmentsDedicated(che
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointAlbEdgeGateway)
 
 	controller, cloud, seGroup := spawnAlbControllerCloudServiceEngineGroup(vcd, check, "DEDICATED")
-	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	// Enable ALB on Edge Gateway with default ServiceNetworkDefinition
@@ -76,15 +76,15 @@ func (vcd *TestVCD) Test_GetAllEdgeAlbServiceEngineGroupAssignmentsDedicated(che
 	check.Assert(updatedAssignment, IsNil)
 
 	// Perform immediate cleanups
-	err = assignment.Delete()
+	err = assignment.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = edge.DisableAlb()
+	err = edge.DisableAlb(ctx)
 	check.Assert(err, IsNil)
-	err = seGroup.Delete()
+	err = seGroup.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = cloud.Delete()
+	err = cloud.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = controller.Delete()
+	err = controller.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -96,7 +96,7 @@ func (vcd *TestVCD) Test_GetAllEdgeAlbServiceEngineGroupAssignmentsShared(check 
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointAlbEdgeGateway)
 
 	controller, cloud, seGroup := spawnAlbControllerCloudServiceEngineGroup(vcd, check, "SHARED")
-	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	// Enable ALB on Edge Gateway with default ServiceNetworkDefinition
@@ -156,14 +156,14 @@ func (vcd *TestVCD) Test_GetAllEdgeAlbServiceEngineGroupAssignmentsShared(check 
 	check.Assert(updatedAssignment, NotNil)
 
 	// Perform immediate cleanups
-	err = assignment.Delete()
+	err = assignment.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = edge.DisableAlb()
+	err = edge.DisableAlb(ctx)
 	check.Assert(err, IsNil)
-	err = seGroup.Delete()
+	err = seGroup.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = cloud.Delete()
+	err = cloud.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = controller.Delete()
+	err = controller.Delete(ctx)
 	check.Assert(err, IsNil)
 }

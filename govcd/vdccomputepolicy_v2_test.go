@@ -80,7 +80,7 @@ func (vcd *TestVCD) Test_VdcComputePoliciesV2(check *C) {
 
 	// Step 2 - Update
 	createdPolicy2.VdcComputePolicyV2.Description = takeStringPointer("Updated description")
-	updatedPolicy, err := createdPolicy2.Update()
+	updatedPolicy, err := createdPolicy2.Update(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(updatedPolicy.VdcComputePolicyV2, DeepEquals, createdPolicy2.VdcComputePolicyV2)
 
@@ -113,14 +113,14 @@ func (vcd *TestVCD) Test_VdcComputePoliciesV2(check *C) {
 	}
 
 	// Step 5 - Delete
-	err = createdPolicy.Delete()
+	err = createdPolicy.Delete(ctx)
 	check.Assert(err, IsNil)
 	// Step 5 - Try to read deleted VDC computed policy should end up with error 'ErrorEntityNotFound'
 	deletedPolicy, err := vcd.client.GetVdcComputePolicyV2ById(createdPolicy.VdcComputePolicyV2.ID)
 	check.Assert(ContainsNotFound(err), Equals, true)
 	check.Assert(deletedPolicy, IsNil)
 
-	err = createdPolicy2.Delete()
+	err = createdPolicy2.Delete(ctx)
 	check.Assert(err, IsNil)
 	deletedPolicy2, err := vcd.client.GetVdcComputePolicyV2ById(createdPolicy2.VdcComputePolicyV2.ID)
 	check.Assert(ContainsNotFound(err), Equals, true)
@@ -132,7 +132,7 @@ func (vcd *TestVCD) Test_SetAssignedComputePoliciesV2(check *C) {
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
 
-	org, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
@@ -215,9 +215,9 @@ func (vcd *TestVCD) Test_SetAssignedComputePoliciesV2(check *C) {
 	_, err = adminVdc.SetAssignedComputePolicies(policyReferences)
 	check.Assert(err, IsNil)
 
-	err = createdPolicy.Delete()
+	err = createdPolicy.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = createdPolicy2.Delete()
+	err = createdPolicy2.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -307,19 +307,19 @@ func (vcd *TestVCD) Test_VdcVmPlacementPoliciesV2(check *C) {
 
 	// Update the VM Placement Policy
 	createdPolicy.VdcComputePolicyV2.Description = takeStringPointer("Updated description")
-	updatedPolicy, err := createdPolicy.Update()
+	updatedPolicy, err := createdPolicy.Update(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(updatedPolicy.VdcComputePolicyV2, DeepEquals, createdPolicy.VdcComputePolicyV2)
 
 	// Delete the VM Placement Policy and check it doesn't exist anymore
-	err = createdPolicy.Delete()
+	err = createdPolicy.Delete(ctx)
 	check.Assert(err, IsNil)
 	deletedPolicy, err := vcd.client.GetVdcComputePolicyV2ById(createdPolicy.VdcComputePolicyV2.ID)
 	check.Assert(ContainsNotFound(err), Equals, true)
 	check.Assert(deletedPolicy, IsNil)
 
 	// Clean up
-	err = logicalVmGroup.Delete()
+	err = logicalVmGroup.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -382,6 +382,6 @@ func (vcd *TestVCD) Test_VdcDuplicatedVmPlacementPolicyGetsACleanError(check *C)
 	check.Assert(err, NotNil)
 	check.Assert(true, Equals, strings.Contains(err.Error(), "VM Placement Policy with name '"+check.TestName()+"' already exists"))
 
-	err = createdPolicy.Delete()
+	err = createdPolicy.Delete(ctx)
 	check.Assert(err, IsNil)
 }

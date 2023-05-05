@@ -92,7 +92,7 @@ func (vcd *TestVCD) Test_FindVAppTemplate(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
 
 	// Prepare test
-	cat, err := vcd.org.GetCatalogByName(vcd.config.VCD.Catalog.Name, false)
+	cat, err := vcd.org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	if err != nil {
 		check.Skip(fmt.Sprintf("%s: Catalog not found. Test can't proceed", check.TestName()))
 		return
@@ -102,28 +102,28 @@ func (vcd *TestVCD) Test_FindVAppTemplate(check *C) {
 	}
 
 	// Test cases
-	vAppTemplate, err := cat.GetVAppTemplateByName(vcd.config.VCD.Catalog.CatalogItem)
+	vAppTemplate, err := cat.GetVAppTemplateByName(ctx, vcd.config.VCD.Catalog.CatalogItem)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplate.VAppTemplate.Name, Equals, vcd.config.VCD.Catalog.CatalogItem)
 	if vcd.config.VCD.Catalog.CatalogItemDescription != "" {
 		check.Assert(vAppTemplate.VAppTemplate.Description, Equals, vcd.config.VCD.Catalog.CatalogItemDescription)
 	}
 
-	vAppTemplate, err = cat.GetVAppTemplateById(vAppTemplate.VAppTemplate.ID)
+	vAppTemplate, err = cat.GetVAppTemplateById(ctx, vAppTemplate.VAppTemplate.ID)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplate.VAppTemplate.Name, Equals, vcd.config.VCD.Catalog.CatalogItem)
 	if vcd.config.VCD.Catalog.CatalogItemDescription != "" {
 		check.Assert(vAppTemplate.VAppTemplate.Description, Equals, vcd.config.VCD.Catalog.CatalogItemDescription)
 	}
 
-	vAppTemplate, err = cat.GetVAppTemplateByNameOrId(vAppTemplate.VAppTemplate.ID, false)
+	vAppTemplate, err = cat.GetVAppTemplateByNameOrId(ctx, vAppTemplate.VAppTemplate.ID, false)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplate.VAppTemplate.Name, Equals, vcd.config.VCD.Catalog.CatalogItem)
 	if vcd.config.VCD.Catalog.CatalogItemDescription != "" {
 		check.Assert(vAppTemplate.VAppTemplate.Description, Equals, vcd.config.VCD.Catalog.CatalogItemDescription)
 	}
 
-	vAppTemplate, err = cat.GetVAppTemplateByNameOrId(vcd.config.VCD.Catalog.CatalogItem, false)
+	vAppTemplate, err = cat.GetVAppTemplateByNameOrId(ctx, vcd.config.VCD.Catalog.CatalogItem, false)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplate.VAppTemplate.Name, Equals, vcd.config.VCD.Catalog.CatalogItem)
 	if vcd.config.VCD.Catalog.CatalogItemDescription != "" {
@@ -131,7 +131,7 @@ func (vcd *TestVCD) Test_FindVAppTemplate(check *C) {
 	}
 
 	// Test non-existent vApp Template
-	vAppTemplate, err = cat.GetVAppTemplateByName("INVALID")
+	vAppTemplate, err = cat.GetVAppTemplateByName(ctx, "INVALID")
 	check.Assert(err, NotNil)
 	check.Assert(vAppTemplate, IsNil)
 }
@@ -187,7 +187,7 @@ func (vcd *TestVCD) Test_DeleteCatalog(check *C) {
 	AddToCleanupList(TestDeleteCatalog, "catalog", vcd.config.VCD.Org, check.TestName())
 	check.Assert(adminCatalog.AdminCatalog.Name, Equals, TestDeleteCatalog)
 
-	checkUploadOvf(vcd, check, vcd.config.OVA.OvaPath, TestDeleteCatalog, TestUploadOvf+"_"+check.TestName(), false)
+	checkUploadOvf(ctx, vcd, check, vcd.config.OVA.OvaPath, TestDeleteCatalog, TestUploadOvf+"_"+check.TestName(), false)
 	err = adminCatalog.Delete(ctx, false, false)
 	check.Assert(err, NotNil)
 	// Catalog is not empty. An attempt to delete without recursion will fail
@@ -221,52 +221,52 @@ func (vcd *TestVCD) Test_RenameCatalog(check *C) {
 	testUploadOvf := check.TestName() + "_ovf"
 	testUploadMedia := check.TestName() + "_media"
 
-	org, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	adminCatalog, err := org.CreateCatalog(testRenameCatalog, testRenameCatalog)
+	adminCatalog, err := org.CreateCatalog(ctx, testRenameCatalog, testRenameCatalog)
 	check.Assert(err, IsNil)
 	check.Assert(adminCatalog, NotNil)
 	AddToCleanupList(testRenameCatalog, "catalog", vcd.config.VCD.Org, check.TestName())
 
-	catalog, err := vcd.client.Client.GetCatalogByName(vcd.config.VCD.Org, testRenameCatalog)
+	catalog, err := vcd.client.Client.GetCatalogByName(ctx, vcd.config.VCD.Org, testRenameCatalog)
 	check.Assert(err, IsNil)
 	check.Assert(catalog, NotNil)
 
-	uploadTask, err := adminCatalog.UploadOvf(vcd.config.OVA.OvaPath, testUploadOvf, testUploadOvf, 1024)
+	uploadTask, err := adminCatalog.UploadOvf(ctx, vcd.config.OVA.OvaPath, testUploadOvf, testUploadOvf, 1024)
 	check.Assert(err, IsNil)
 	err = uploadTask.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
-	uploadTask, err = catalog.UploadMediaImage(testUploadMedia, testUploadMedia, vcd.config.Media.MediaPath, 1024)
+	uploadTask, err = catalog.UploadMediaImage(ctx, testUploadMedia, testUploadMedia, vcd.config.Media.MediaPath, 1024)
 	check.Assert(err, IsNil)
 	err = uploadTask.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
-	vAppTemplate1, err := catalog.GetVAppTemplateByName(testUploadOvf)
+	vAppTemplate1, err := catalog.GetVAppTemplateByName(ctx, testUploadOvf)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplate1, NotNil)
 
-	mediaImage1, err := catalog.GetMediaByName(testUploadMedia, true)
+	mediaImage1, err := catalog.GetMediaByName(ctx, testUploadMedia, true)
 	check.Assert(err, IsNil)
 	check.Assert(mediaImage1, NotNil)
 
 	adminCatalog.AdminCatalog.Name = testRenameCatalog + "_updated"
-	err = adminCatalog.Update()
+	err = adminCatalog.Update(ctx)
 	check.Assert(err, IsNil)
 	AddToCleanupList(testRenameCatalog+"_updated", "catalog", vcd.config.VCD.Org, check.TestName())
 
 	// Get a Catalog using the previously updated name
-	updatedCatalog, err := vcd.client.Client.GetCatalogByName(vcd.config.VCD.Org, testRenameCatalog+"_updated")
+	updatedCatalog, err := vcd.client.Client.GetCatalogByName(ctx, vcd.config.VCD.Org, testRenameCatalog+"_updated")
 	check.Assert(err, IsNil)
 	check.Assert(updatedCatalog, NotNil)
 
-	vAppTemplate2, err := updatedCatalog.GetVAppTemplateByName(testUploadOvf)
+	vAppTemplate2, err := updatedCatalog.GetVAppTemplateByName(ctx, testUploadOvf)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplate2, NotNil)
 
-	mediaImage2, err := updatedCatalog.GetMediaByName(testUploadMedia, false)
+	mediaImage2, err := updatedCatalog.GetMediaByName(ctx, testUploadMedia, false)
 	check.Assert(err, IsNil)
 	check.Assert(mediaImage2, NotNil)
 
@@ -275,7 +275,7 @@ func (vcd *TestVCD) Test_RenameCatalog(check *C) {
 	check.Assert(vAppTemplate1.VAppTemplate.HREF, Equals, vAppTemplate2.VAppTemplate.HREF)
 	check.Assert(mediaImage1.Media.HREF, Equals, mediaImage2.Media.HREF)
 
-	err = updatedCatalog.Delete(true, true)
+	err = updatedCatalog.Delete(ctx, true, true)
 	check.Assert(err, IsNil)
 }
 
@@ -463,7 +463,7 @@ func countFolders() int {
 }
 
 func checkUploadOvf(ctx context.Context, vcd *TestVCD, check *C, ovaFileName, catalogName, itemName string, deleteItemAtTheEnd bool) {
-	catalog, org := findCatalog(vcd, check, catalogName)
+	catalog, org := findCatalog(ctx, vcd, check, catalogName)
 
 	uploadTask, err := catalog.UploadOvf(ctx, ovaFileName, itemName, "upload from test", 1024)
 	check.Assert(err, IsNil)
@@ -516,11 +516,11 @@ func skipWhenOvaPathMissing(ovaPath string, check *C) {
 }
 
 func deleteCatalogItem(check *C, catalog *Catalog, itemName string) {
-	catalogItem, err := catalog.GetCatalogItemByName(itemName, true)
+	catalogItem, err := catalog.GetCatalogItemByName(ctx, itemName, true)
 	check.Assert(err, IsNil)
 	check.Assert(catalogItem, NotNil)
 
-	err = catalogItem.Delete()
+	err = catalogItem.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -788,12 +788,12 @@ func (vcd *TestVCD) Test_GetCatalogByNameSharedCatalog(check *C) {
 	newOrg1, vdc, sharedCatalog := createSharedCatalogInNewOrg(vcd, check, check.TestName())
 
 	// Try to find the catalog inside Org which owns it - newOrg1
-	catalogByName, err := newOrg1.GetCatalogByName(sharedCatalog.Catalog.Name, true)
+	catalogByName, err := newOrg1.GetCatalogByName(ctx, sharedCatalog.Catalog.Name, true)
 	check.Assert(err, IsNil)
 	check.Assert(catalogByName.Catalog.Name, Equals, sharedCatalog.Catalog.Name)
 
 	// Try to find the catalog in another Org with which this catalog is shared (vcd.Org)
-	sharedCatalogByName, err := vcd.org.GetCatalogByName(sharedCatalog.Catalog.Name, false)
+	sharedCatalogByName, err := vcd.org.GetCatalogByName(ctx, sharedCatalog.Catalog.Name, false)
 	check.Assert(err, IsNil)
 	check.Assert(sharedCatalogByName.Catalog.Name, Equals, sharedCatalog.Catalog.Name)
 
@@ -829,12 +829,12 @@ func (vcd *TestVCD) Test_GetCatalogByNamePrefersLocal(check *C) {
 	newOrg1, vdc, sharedCatalog := createSharedCatalogInNewOrg(vcd, check, vcd.config.VCD.Catalog.Name)
 
 	// Make sure that the Owner Org HREF is the local one for vcd.Org catalog named vcd.config.VCD.Catalog.Name
-	catalogByNameInTestOrg, err := vcd.org.GetCatalogByName(vcd.config.VCD.Catalog.Name, true)
+	catalogByNameInTestOrg, err := vcd.org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, true)
 	check.Assert(err, IsNil)
 	check.Assert(catalogByNameInTestOrg.parent.orgName(), Equals, vcd.org.Org.Name)
 
 	// Make sure that the Owner Org HREF is the local one for vcd.Org catalog named vcd.config.VCD.Catalog.Name
-	catalogByNameInNewOrg, err := newOrg1.GetCatalogByName(vcd.config.VCD.Catalog.Name, true)
+	catalogByNameInNewOrg, err := newOrg1.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, true)
 	check.Assert(err, IsNil)
 	check.Assert(catalogByNameInNewOrg.parent.orgName(), Equals, newOrg1.Org.Name)
 
@@ -852,27 +852,27 @@ func (vcd *TestVCD) Test_GetCatalogByXSharedCatalogOrgUser(check *C) {
 	newOrg1, vdc, sharedCatalog := createSharedCatalogInNewOrg(vcd, check, check.TestName())
 
 	// Create one more additional catalog which is not shared
-	unsharedCatalog, err := newOrg1.CreateCatalog("unshared-catalog", check.TestName())
+	unsharedCatalog, err := newOrg1.CreateCatalog(ctx, "unshared-catalog", check.TestName())
 	check.Assert(err, IsNil)
 	AddToCleanupList(unsharedCatalog.Catalog.Name, "catalog", newOrg1.Org.Name, check.TestName())
 
 	// Try to find the catalog inside Org which owns it - newOrg1
-	catalogByName, err := newOrg1.GetCatalogByName(sharedCatalog.Catalog.Name, true)
+	catalogByName, err := newOrg1.GetCatalogByName(ctx, sharedCatalog.Catalog.Name, true)
 	check.Assert(err, IsNil)
 	check.Assert(catalogByName.Catalog.Name, Equals, sharedCatalog.Catalog.Name)
 
 	// Try to find the catalog in another Org with which this catalog is shared (vcd.Org)
-	sharedCatalogByName, err := vcd.org.GetCatalogByName(sharedCatalog.Catalog.Name, false)
+	sharedCatalogByName, err := vcd.org.GetCatalogByName(ctx, sharedCatalog.Catalog.Name, false)
 	check.Assert(err, IsNil)
 	check.Assert(sharedCatalogByName.Catalog.Name, Equals, sharedCatalog.Catalog.Name)
 
 	// Try to find unshared catalog from another Org with System user
-	systemUnsharedCatalogByName, err := vcd.org.GetCatalogByName(unsharedCatalog.Catalog.Name, true)
+	systemUnsharedCatalogByName, err := vcd.org.GetCatalogByName(ctx, unsharedCatalog.Catalog.Name, true)
 	check.Assert(err, IsNil)
 	check.Assert(systemUnsharedCatalogByName.Catalog.ID, Equals, unsharedCatalog.Catalog.ID)
 
 	// Create an Org Admin user and test that it can find catalog as well
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	orgAdminClient, _, err := newOrgUserConnection(adminOrg, "test-user", "CHANGE-ME", vcd.config.Provider.Url, true)
 	check.Assert(err, IsNil)
@@ -880,7 +880,7 @@ func (vcd *TestVCD) Test_GetCatalogByXSharedCatalogOrgUser(check *C) {
 	check.Assert(err, IsNil)
 
 	// Find a catalog in the same Org using Org Admin user
-	orgAdminCatalogByNameSameOrg, err := orgAsOrgUser.GetCatalogByName(vcd.config.VCD.Catalog.Name, false)
+	orgAdminCatalogByNameSameOrg, err := orgAsOrgUser.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	check.Assert(err, IsNil)
 	check.Assert(orgAdminCatalogByNameSameOrg.Catalog.Name, Equals, vcd.config.VCD.Catalog.Name)
 
@@ -890,7 +890,7 @@ func (vcd *TestVCD) Test_GetCatalogByXSharedCatalogOrgUser(check *C) {
 	check.Assert(orgAdminCatalogByIdSameOrg.Catalog.ID, Equals, orgAdminCatalogByNameSameOrg.Catalog.ID)
 
 	// Find a shared catalog from another Org using Org Admin user
-	orgAdminCatalogByName, err := orgAsOrgUser.GetCatalogByName(sharedCatalog.Catalog.Name, false)
+	orgAdminCatalogByName, err := orgAsOrgUser.GetCatalogByName(ctx, sharedCatalog.Catalog.Name, false)
 	check.Assert(err, IsNil)
 	check.Assert(orgAdminCatalogByName.Catalog.Name, Equals, sharedCatalog.Catalog.Name)
 	check.Assert(orgAdminCatalogByName.Catalog.ID, Equals, sharedCatalog.Catalog.ID)
@@ -901,14 +901,14 @@ func (vcd *TestVCD) Test_GetCatalogByXSharedCatalogOrgUser(check *C) {
 	check.Assert(orgAdminCatalogById.Catalog.ID, Equals, sharedCatalog.Catalog.ID)
 
 	// Try to find unshared catalog from another Org with Org admin user and expect an ErrorEntityNotFound
-	_, err = orgAsOrgUser.GetCatalogByName(unsharedCatalog.Catalog.Name, true)
+	_, err = orgAsOrgUser.GetCatalogByName(ctx, unsharedCatalog.Catalog.Name, true)
 	check.Assert(ContainsNotFound(err), Equals, true)
 
 	_, err = orgAsOrgUser.GetCatalogById(unsharedCatalog.Catalog.ID, true)
 	check.Assert(ContainsNotFound(err), Equals, true)
 
 	// Cleanup
-	err = unsharedCatalog.Delete(true, true)
+	err = unsharedCatalog.Delete(ctx, true, true)
 	check.Assert(err, IsNil)
 
 	cleanupCatalogOrgVdc(check, sharedCatalog, vdc, vcd, newOrg1)
@@ -923,7 +923,7 @@ func createSharedCatalogInNewOrg(vcd *TestVCD, check *C, newCatalogName string) 
 	// Spawn a VDC inside newly created Org so that there is storage to create new catalog
 	vdc := spawnTestVdc(vcd, check, newOrgName1)
 
-	catalog, err := newOrg1.CreateCatalog(newCatalogName, "Catalog for testing")
+	catalog, err := newOrg1.CreateCatalog(ctx, newCatalogName, "Catalog for testing")
 	check.Assert(err, IsNil)
 	AddToCleanupList(newCatalogName, "catalog", newOrgName1, check.TestName())
 
@@ -951,15 +951,15 @@ func createSharedCatalogInNewOrg(vcd *TestVCD, check *C, newCatalogName string) 
 
 func cleanupCatalogOrgVdc(check *C, sharedCatalog Catalog, vdc *Vdc, vcd *TestVCD, newOrg1 *Org) {
 	// Cleanup catalog, vdc and org
-	err := sharedCatalog.Delete(true, true)
+	err := sharedCatalog.Delete(ctx, true, true)
 	check.Assert(err, IsNil)
 
 	err = vdc.DeleteWait(true, true)
 	check.Assert(err, IsNil)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(newOrg1.Org.Name)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, newOrg1.Org.Name)
 	check.Assert(err, IsNil)
-	err = adminOrg.Delete(true, true)
+	err = adminOrg.Delete(ctx, true, true)
 	check.Assert(err, IsNil)
 }
 
@@ -971,7 +971,7 @@ func (vcd *TestVCD) Test_PublishToExternalOrganizations(check *C) {
 	catalogName := check.TestName()
 	catalogDescription := check.TestName() + " description"
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
@@ -982,18 +982,18 @@ func (vcd *TestVCD) Test_PublishToExternalOrganizations(check *C) {
 	fmt.Println("Overcomming VCD 10.2.0 <-> 10.3.3 bug - explicitly setting catalog sharing")
 	adminOrg.AdminOrg.OrgSettings.OrgGeneralSettings.CanPublishCatalogs = true
 	adminOrg.AdminOrg.OrgSettings.OrgGeneralSettings.CanPublishExternally = true
-	updatedAdminOrg, err := adminOrg.Update()
+	updatedAdminOrg, err := adminOrg.Update(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(updatedAdminOrg, NotNil)
 
-	adminCatalog, err := adminOrg.CreateCatalog(catalogName, catalogDescription)
+	adminCatalog, err := adminOrg.CreateCatalog(ctx, catalogName, catalogDescription)
 	check.Assert(err, IsNil)
 	check.Assert(adminCatalog.AdminCatalog.Name, Equals, catalogName)
 	check.Assert(adminCatalog.AdminCatalog.Description, Equals, catalogDescription)
 
 	AddToCleanupList(catalogName, "catalog", vcd.config.VCD.Org, check.TestName())
 
-	err = adminCatalog.PublishToExternalOrganizations(types.PublishExternalCatalogParams{
+	err = adminCatalog.PublishToExternalOrganizations(ctx, types.PublishExternalCatalogParams{
 		IsPublishedExternally:    takeBoolPointer(true),
 		IsCachedEnabled:          takeBoolPointer(true),
 		Password:                 "secretOrNot",
@@ -1005,7 +1005,7 @@ func (vcd *TestVCD) Test_PublishToExternalOrganizations(check *C) {
 	check.Assert(*adminCatalog.AdminCatalog.PublishExternalCatalogParams.IsCachedEnabled, Equals, true)
 	check.Assert(adminCatalog.AdminCatalog.PublishExternalCatalogParams.Password, Equals, "******")
 
-	err = adminCatalog.Delete(true, true)
+	err = adminCatalog.Delete(ctx, true, true)
 	check.Assert(err, IsNil)
 
 	// test with Catalog
@@ -1013,14 +1013,14 @@ func (vcd *TestVCD) Test_PublishToExternalOrganizations(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	catalog, err := org.CreateCatalog(catalogName, catalogDescription)
+	catalog, err := org.CreateCatalog(ctx, catalogName, catalogDescription)
 	check.Assert(err, IsNil)
 	check.Assert(catalog.Catalog.Name, Equals, catalogName)
 	check.Assert(catalog.Catalog.Description, Equals, catalogDescription)
 
 	AddToCleanupList(catalogName, "catalog", vcd.config.VCD.Org, check.TestName())
 
-	err = catalog.PublishToExternalOrganizations(types.PublishExternalCatalogParams{
+	err = catalog.PublishToExternalOrganizations(ctx, types.PublishExternalCatalogParams{
 		IsPublishedExternally:    takeBoolPointer(true),
 		IsCachedEnabled:          takeBoolPointer(true),
 		Password:                 "secretOrNot",
@@ -1032,7 +1032,7 @@ func (vcd *TestVCD) Test_PublishToExternalOrganizations(check *C) {
 	check.Assert(*catalog.Catalog.PublishExternalCatalogParams.IsCachedEnabled, Equals, true)
 	check.Assert(catalog.Catalog.PublishExternalCatalogParams.Password, Equals, "******")
 
-	err = catalog.PublishToExternalOrganizations(types.PublishExternalCatalogParams{
+	err = catalog.PublishToExternalOrganizations(ctx, types.PublishExternalCatalogParams{
 		IsPublishedExternally:    takeBoolPointer(true),
 		IsCachedEnabled:          takeBoolPointer(false),
 		Password:                 "secretOrNot2",
@@ -1044,7 +1044,7 @@ func (vcd *TestVCD) Test_PublishToExternalOrganizations(check *C) {
 	check.Assert(*catalog.Catalog.PublishExternalCatalogParams.IsCachedEnabled, Equals, false)
 	check.Assert(catalog.Catalog.PublishExternalCatalogParams.Password, Equals, "******")
 
-	err = catalog.Delete(true, true)
+	err = catalog.Delete(ctx, true, true)
 	check.Assert(err, IsNil)
 }
 
@@ -1059,7 +1059,7 @@ func (vcd *TestVCD) Test_UploadOvfByLink_progress_works(check *C) {
 
 	itemName := TestUploadOvf + "URL"
 
-	catalog, org := findCatalog(vcd, check, vcd.config.VCD.Catalog.Name)
+	catalog, org := findCatalog(ctx, vcd, check, vcd.config.VCD.Catalog.Name)
 
 	uploadTask, err := catalog.UploadOvfByLink(vcd.config.OVA.OvfUrl, itemName, "upload from test")
 	check.Assert(err, IsNil)
@@ -1078,7 +1078,7 @@ func (vcd *TestVCD) Test_UploadOvfByLink_progress_works(check *C) {
 
 	AddToCleanupList(itemName, "catalogItem", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.Name, "Test_UploadOvfByLink_progress_works")
 
-	catalog, err = org.GetCatalogByName(vcd.config.VCD.Catalog.Name, true)
+	catalog, err = org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, true)
 	check.Assert(err, IsNil)
 	verifyCatalogItemUploaded(check, catalog, itemName)
 
@@ -1095,13 +1095,13 @@ func (vcd *TestVCD) Test_CatalogQueryMediaList(check *C) {
 		return
 	}
 
-	cat, err := vcd.org.GetCatalogByName(catalogName, false)
+	cat, err := vcd.org.GetCatalogByName(ctx, catalogName, false)
 	if err != nil {
 		check.Skip("Test_CatalogQueryMediaList: Catalog not found")
 		return
 	}
 
-	medias, err := cat.QueryMediaList()
+	medias, err := cat.QueryMediaList(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(medias, NotNil)
 
@@ -1124,18 +1124,18 @@ func (vcd *TestVCD) Test_CatalogUploadMediaImageWihUdfTypeIso(check *C) {
 		check.Skip("Skipping test because no UDF type ISO path was given")
 	}
 
-	catalog, org := findCatalog(vcd, check, vcd.config.VCD.Catalog.Name)
+	catalog, org := findCatalog(ctx, vcd, check, vcd.config.VCD.Catalog.Name)
 
 	mediaName := check.TestName()
 
-	uploadTask, err := catalog.UploadMediaImage(mediaName, "upload from test", vcd.config.Media.MediaUdfTypePath, 1024)
+	uploadTask, err := catalog.UploadMediaImage(ctx, mediaName, "upload from test", vcd.config.Media.MediaUdfTypePath, 1024)
 	check.Assert(err, IsNil)
 	err = uploadTask.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
 	AddToCleanupList(mediaName, "mediaCatalogImage", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.Name, mediaName)
 
-	catalog, err = org.GetCatalogByName(vcd.config.VCD.Catalog.Name, true)
+	catalog, err = org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, true)
 	check.Assert(err, IsNil)
 	check.Assert(catalog, NotNil)
 	verifyCatalogItemUploaded(check, catalog, mediaName)
@@ -1150,14 +1150,14 @@ func (vcd *TestVCD) Test_GetAdminCatalogById(check *C) {
 	}
 
 	// 1. Get a catalog from an organization
-	org, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	adminCatalog, err := org.GetAdminCatalogByName(vcd.config.VCD.Catalog.Name, false)
 	check.Assert(err, IsNil)
 
 	// 2. retrieve that same catalog from the client alone using HREF
-	adminCatalogByHref, err := vcd.client.Client.GetAdminCatalogByHref(adminCatalog.AdminCatalog.HREF)
+	adminCatalogByHref, err := vcd.client.Client.GetAdminCatalogByHref(ctx, adminCatalog.AdminCatalog.HREF)
 	check.Assert(err, IsNil)
 	check.Assert(adminCatalogByHref.AdminCatalog.HREF, Equals, adminCatalog.AdminCatalog.HREF)
 
@@ -1196,11 +1196,11 @@ func (vcd *TestVCD) Test_CatalogAccessAsOrgUsers(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(org2AsSystem, NotNil)
 	vcdClient1 := NewVCDClient(vcd.client.Client.VCDHREF, true)
-	err = vcdClient1.Authenticate(user1Name, password1, org1Name)
+	err = vcdClient1.Authenticate(ctx, user1Name, password1, org1Name)
 	check.Assert(err, IsNil)
 
 	vcdClient2 := NewVCDClient(vcd.client.Client.VCDHREF, true)
-	err = vcdClient2.Authenticate(user2Name, password2, org2Name)
+	err = vcdClient2.Authenticate(ctx, user2Name, password2, org2Name)
 	check.Assert(err, IsNil)
 
 	org1, err := vcdClient1.GetOrgByName(org1Name)
@@ -1210,10 +1210,10 @@ func (vcd *TestVCD) Test_CatalogAccessAsOrgUsers(check *C) {
 	check.Assert(org2, NotNil)
 	catalogName := check.TestName() + "-cat"
 	fmt.Printf("creating catalog %s in org %s\n", catalogName, org1Name)
-	adminCatalog1AsSystem, err := org1AsSystem.CreateCatalog(catalogName, fmt.Sprintf("catalog %s created in %s", catalogName, org1Name))
+	adminCatalog1AsSystem, err := org1AsSystem.CreateCatalog(ctx, catalogName, fmt.Sprintf("catalog %s created in %s", catalogName, org1Name))
 	check.Assert(err, IsNil)
 	AddToCleanupList(catalogName, "catalog", org1Name, check.TestName())
-	catalog1AsSystem, err := org1AsSystem.GetCatalogByName(catalogName, true)
+	catalog1AsSystem, err := org1AsSystem.GetCatalogByName(ctx, catalogName, true)
 	check.Assert(err, IsNil)
 	fmt.Printf("sharing catalog %s from org %s\n", catalogName, org1Name)
 	err = adminCatalog1AsSystem.SetAccessControl(&types.ControlAccessParams{
@@ -1238,21 +1238,21 @@ func (vcd *TestVCD) Test_CatalogAccessAsOrgUsers(check *C) {
 	vappTemplateName := check.TestName() + "-template"
 	mediaName := check.TestName() + "-media"
 	fmt.Printf("uploading vApp template into catalog %s\n", catalogName)
-	task, err := catalog1AsSystem.UploadOvf(vcd.config.OVA.OvaPath, vappTemplateName, vappTemplateName, 1024)
+	task, err := catalog1AsSystem.UploadOvf(ctx, vcd.config.OVA.OvaPath, vappTemplateName, vappTemplateName, 1024)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
 	fmt.Printf("uploading media image into catalog %s\n", catalogName)
-	uploadTask, err := catalog1AsSystem.UploadMediaImage(mediaName, "upload from test", vcd.config.Media.MediaPath, 1024)
+	uploadTask, err := catalog1AsSystem.UploadMediaImage(ctx, mediaName, "upload from test", vcd.config.Media.MediaPath, 1024)
 	check.Assert(err, IsNil)
 	err = uploadTask.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
-	vAppTemplateAsSystem, err := catalog1AsSystem.GetVAppTemplateByName(vappTemplateName)
+	vAppTemplateAsSystem, err := catalog1AsSystem.GetVAppTemplateByName(ctx, vappTemplateName)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplateAsSystem, NotNil)
-	mediaRecordAsSystem, err := catalog1AsSystem.GetMediaByName(mediaName, true)
+	mediaRecordAsSystem, err := catalog1AsSystem.GetMediaByName(ctx, mediaName, true)
 	check.Assert(err, IsNil)
 	check.Assert(mediaRecordAsSystem, NotNil)
 
@@ -1283,7 +1283,7 @@ func (vcd *TestVCD) Test_CatalogAccessAsOrgUsers(check *C) {
 	check.Assert(adminCatalog2, NotNil)
 
 	// Retrieve the catalog from both tenants, using functions that don't rely on organization internals
-	catalog1FromOrg, err := vcdClient1.Client.GetCatalogByName(org1.Org.Name, catalogName)
+	catalog1FromOrg, err := vcdClient1.Client.GetCatalogByName(ctx, org1.Org.Name, catalogName)
 	check.Assert(err, IsNil)
 	adminCatalog1FromOrg, err := vcdClient1.Client.GetAdminCatalogByName(org1.Org.Name, catalogName)
 	check.Assert(err, IsNil)
@@ -1293,17 +1293,17 @@ func (vcd *TestVCD) Test_CatalogAccessAsOrgUsers(check *C) {
 	check.Assert(err, IsNil)
 
 	// Also retrieve the catalog items from both tenants
-	vAppTemplate1, err := catalog1FromOrg.GetVAppTemplateByName(vappTemplateName)
+	vAppTemplate1, err := catalog1FromOrg.GetVAppTemplateByName(ctx, vappTemplateName)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplate1.VAppTemplate.HREF, Equals, vAppTemplateAsSystem.VAppTemplate.HREF)
-	mediaRecord1, err := catalog1FromOrg.GetMediaByName(mediaName, false)
+	mediaRecord1, err := catalog1FromOrg.GetMediaByName(ctx, mediaName, false)
 	check.Assert(err, IsNil)
 	check.Assert(mediaRecord1.Media.HREF, Equals, mediaRecordAsSystem.Media.HREF)
 
-	vAppTemplate2, err := catalog2FromOrg.GetVAppTemplateByName(vappTemplateName)
+	vAppTemplate2, err := catalog2FromOrg.GetVAppTemplateByName(ctx, vappTemplateName)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplate2.VAppTemplate.HREF, Equals, vAppTemplateAsSystem.VAppTemplate.HREF)
-	mediaRecord2, err := catalog2FromOrg.GetMediaByName(mediaName, false)
+	mediaRecord2, err := catalog2FromOrg.GetMediaByName(ctx, mediaName, false)
 	check.Assert(err, IsNil)
 	check.Assert(mediaRecord2.Media.HREF, Equals, mediaRecordAsSystem.Media.HREF)
 
@@ -1314,7 +1314,7 @@ func (vcd *TestVCD) Test_CatalogAccessAsOrgUsers(check *C) {
 	timeout = 30 * time.Second
 	startTime = time.Now()
 	for time.Since(startTime) < timeout {
-		err = adminCatalog1AsSystem.Delete(true, true)
+		err = adminCatalog1AsSystem.Delete(ctx, true, true)
 		if err == nil {
 			fmt.Printf("shared catalog deleted in %s\n", time.Since(startTime))
 			break
