@@ -1,4 +1,4 @@
-// +build extnetwork network functional openapi ALL
+//go:build extnetwork || network || functional || openapi || ALL
 
 /*
  * Copyright 2020 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -18,18 +18,14 @@ func (vcd *TestVCD) Test_CreateExternalNetworkV2Nsxt(check *C) {
 }
 
 func (vcd *TestVCD) Test_CreateExternalNetworkV2NsxtVrf(check *C) {
-	// The documented backing type of NSX-T VRF router is "NSXT_VRF_TIER0" (types.ExternalNetworkBackingTypeNsxtVrfTier0Router)
-	// but although it is documented - it fails and requires the same "NSXT_TIER0" (types.ExternalNetworkBackingTypeNsxtTier0Router)
-	// backing type to be specified
-	// As of 10.1.2 release it is not officially supported (support only introduced in 10.2.0) therefore skipping this test for
-	// 10.1.X. 10.1.1 allowed to create it, but 10.1.2 introduced a validator and throws error.
-	if vcd.client.Client.APIVCDMaxVersionIs(ctx, "< 35") {
-		check.Skip("NSX-T VRF-Lite backed external networks are officially supported only in 10.2.0+")
-	}
 	vcd.testCreateExternalNetworkV2Nsxt(check, vcd.config.VCD.Nsxt.Tier0routerVrf, types.ExternalNetworkBackingTypeNsxtTier0Router)
 }
 
-func (vcd *TestVCD) testCreateExternalNetworkV2Nsxt(check *C, nsxtTier0Router, backingType string) {
+func (vcd *TestVCD) Test_CreateExternalNetworkV2NsxtSegment(check *C) {
+	vcd.testCreateExternalNetworkV2Nsxt(check, vcd.config.VCD.Nsxt.NsxtImportSegment, types.ExternalNetworkBackingTypeNsxtSegment)
+}
+
+func (vcd *TestVCD) testCreateExternalNetworkV2Nsxt(check *C, backingName, backingType string) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointExternalNetworks
 	skipOpenApiEndpointTest(ctx, vcd, check, endpoint)
 	skipNoNsxtConfiguration(vcd, check)
@@ -42,11 +38,10 @@ func (vcd *TestVCD) testCreateExternalNetworkV2Nsxt(check *C, nsxtTier0Router, b
 	nsxtManagerId, err := BuildUrnWithUuid("urn:vcloud:nsxtmanager:", extractUuid(man[0].HREF))
 	check.Assert(err, IsNil)
 
-	tier0RouterVrf, err := vcd.client.GetImportableNsxtTier0RouterByName(ctx, nsxtTier0Router, nsxtManagerId)
-	check.Assert(err, IsNil)
+	backingId := getBackingIdByNameAndType(check, backingName, backingType, vcd, nsxtManagerId)
 
 	// Create network and test CRUD capabilities
-	netNsxt := testExternalNetworkV2(check.TestName(), backingType, tier0RouterVrf.NsxtTier0Router.ID, nsxtManagerId)
+	netNsxt := testExternalNetworkV2(vcd, check.TestName(), backingType, backingId, nsxtManagerId)
 	createdNet, err := CreateExternalNetworkV2(ctx, vcd.client, netNsxt)
 	check.Assert(err, IsNil)
 
@@ -85,6 +80,26 @@ func (vcd *TestVCD) testCreateExternalNetworkV2Nsxt(check *C, nsxtTier0Router, b
 	check.Assert(ContainsNotFound(err), Equals, true)
 }
 
+// getBackingIdByNameAndType looks up Backing ID by name and type
+func getBackingIdByNameAndType(check *C, backingName string, backingType string, vcd *TestVCD, nsxtManagerId string) string {
+	var backingId string
+	switch backingType {
+	case types.ExternalNetworkBackingTypeNsxtTier0Router: // Lookup T0 router ID
+		tier0RouterVrf, err := vcd.client.GetImportableNsxtTier0RouterByName(ctx, backingName, nsxtManagerId)
+		check.Assert(err, IsNil)
+		backingId = tier0RouterVrf.NsxtTier0Router.ID
+	case types.ExternalNetworkBackingTypeNsxtSegment: // Lookup segment ID
+		bareNsxtManagerId, err := getBareEntityUuid(nsxtManagerId)
+		check.Assert(err, IsNil)
+		filter := map[string]string{"nsxTManager": bareNsxtManagerId}
+
+		nsxtSegment, err := vcd.client.GetFilteredNsxtImportableSwitches(ctx, filter)
+		check.Assert(err, IsNil)
+		backingId = nsxtSegment[0].NsxtImportableSwitch.ID
+	}
+	return backingId
+}
+
 func (vcd *TestVCD) Test_CreateExternalNetworkV2Nsxv(check *C) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointExternalNetworks
 	skipOpenApiEndpointTest(ctx, vcd, check, endpoint)
@@ -108,14 +123,14 @@ func (vcd *TestVCD) Test_CreateExternalNetworkV2Nsxv(check *C) {
 	// Query
 	vcHref, err := getVcenterHref(vcd.client, vcd.config.VCD.VimServer)
 	check.Assert(err, IsNil)
-	vcuuid := extractUuid(vcHref)
+	vcUuid := extractUuid(vcHref)
 
-	vcUrn, err := BuildUrnWithUuid("urn:vcloud:vimserver:", vcuuid)
+	vcUrn, err := BuildUrnWithUuid("urn:vcloud:vimserver:", vcUuid)
 	check.Assert(err, IsNil)
 
-	neT := testExternalNetworkV2(check.TestName(), vcd.config.VCD.ExternalNetworkPortGroupType, pgs[0].MoRef, vcUrn)
+	net := testExternalNetworkV2(vcd, check.TestName(), vcd.config.VCD.ExternalNetworkPortGroupType, pgs[0].MoRef, vcUrn)
 
-	r, err := CreateExternalNetworkV2(ctx, vcd.client, neT)
+	r, err := CreateExternalNetworkV2(ctx, vcd.client, net)
 	check.Assert(err, IsNil)
 
 	// Use generic "OpenApiEntity" resource cleanup type
@@ -131,19 +146,19 @@ func (vcd *TestVCD) Test_CreateExternalNetworkV2Nsxv(check *C) {
 	check.Assert(err, IsNil)
 }
 
-func testExternalNetworkV2(name, backingType, backingId, NetworkProviderId string) *types.ExternalNetworkV2 {
-	neT := &types.ExternalNetworkV2{
+func testExternalNetworkV2(vcd *TestVCD, name, backingType, backingId, NetworkProviderId string) *types.ExternalNetworkV2 {
+	net := &types.ExternalNetworkV2{
 		ID:          "",
 		Name:        name,
 		Description: "",
-		Subnets: types.ExternalNetworkV2Subnets{[]types.ExternalNetworkV2Subnet{
+		Subnets: types.ExternalNetworkV2Subnets{Values: []types.ExternalNetworkV2Subnet{
 			{
 				Gateway:      "1.1.1.1",
 				PrefixLength: 24,
 				DNSSuffix:    "",
 				DNSServer1:   "",
 				DNSServer2:   "",
-				IPRanges: types.ExternalNetworkV2IPRanges{[]types.ExternalNetworkV2IPRange{
+				IPRanges: types.ExternalNetworkV2IPRanges{Values: []types.ExternalNetworkV2IPRange{
 					{
 						StartAddress: "1.1.1.3",
 						EndAddress:   "1.1.1.50",
@@ -154,20 +169,18 @@ func testExternalNetworkV2(name, backingType, backingId, NetworkProviderId strin
 				TotalIPCount: 0,
 			},
 		}},
-		NetworkBackings: types.ExternalNetworkV2Backings{[]types.ExternalNetworkV2Backing{
+		NetworkBackings: types.ExternalNetworkV2Backings{Values: []types.ExternalNetworkV2Backing{
 			{
 				BackingID: backingId,
-				// Name:        tier0Router.NsxtTier0Router.DisplayName,
-				BackingType: backingType,
 				NetworkProvider: types.NetworkProvider{
-					// Name: vcd.config.Nsxt.Manager,
 					ID: NetworkProviderId,
 				},
+				BackingTypeValue: backingType,
 			},
 		}},
 	}
 
-	return neT
+	return net
 }
 
 func getVcenterHref(vcdClient *VCDClient, name string) (string, error) {

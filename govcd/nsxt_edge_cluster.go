@@ -69,7 +69,6 @@ func filterNsxtEdgeClusters(name string, allNnsxtEdgeCluster []*NsxtEdgeCluster)
 	}
 
 	return filteredNsxtEdgeClusters
-
 }
 
 // GetAllNsxtEdgeClusters retrieves all available Edge Clusters for a particular VDC
@@ -78,28 +77,48 @@ func (vdc *Vdc) GetAllNsxtEdgeClusters(ctx context.Context, queryParameters url.
 		return nil, fmt.Errorf("VDC must have ID populated to retrieve NSX-T edge clusters")
 	}
 
-	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeClusters
-	minimumApiVersion, err := vdc.client.checkOpenApiEndpointCompatibility(ctx, endpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	urlRef, err := vdc.client.OpenApiBuildEndpoint(endpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get all NSX-T Edge clusters that are accessible to an organization VDC. The “_context” filter key must be set with
-	// the ID of the VDC for which we want to get available Edge Clusters for.
+	// Get all NSX-T Edge clusters that are accessible to an organization VDC. The 'orgVdcId'filter
+	// key must be set with the ID of the VDC for which we want to get available Edge Clusters for.
 	//
-	// _context==urn:vcloud:vdc:09722307-aee0-4623-af95-7f8e577c9ebc
+	// orgVdcId==urn:vcloud:vdc:09722307-aee0-4623-af95-7f8e577c9ebc
 
 	// Create a copy of queryParameters so that original queryParameters are not mutated (because a map is always a
 	// reference)
-	queryParams := queryParameterFilterAnd("_context=="+vdc.Vdc.ID, queryParameters)
+	queryParams := queryParameterFilterAnd("orgVdcId=="+vdc.Vdc.ID, queryParameters)
+
+	return getAllNsxtEdgeClusters(ctx, vdc.client, queryParams)
+}
+
+// GetAllNsxtEdgeClusters retrieves all NSX-T Edge Clusters in the system
+//
+// A filter is mandatory as otherwise request will fail
+// orgVdcId - | The filter orgVdcId must be set equal to the id of the NSX-T backed Org vDC for
+// which we want to get the edge clusters. Example:
+// (orgVdcId==urn:vcloud:vdc:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+// vdcGroupId - | The filter vdcGroupId must be set equal to the id of the NSX-T VDC Group for which
+// we want to get the edge clusters. Example:
+// (vdcGroupId==urn:vcloud:vdcGroup:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+// pvdcId - | The filter pvdcId must be set equal to the id of the NSX-T backed Provider VDC for
+// which we want to get the edge clusters. pvdcId filter is supported from version 35.2 Example:
+// (pvdcId==urn:vcloud:providervdc:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+func (vcdClient *VCDClient) GetAllNsxtEdgeClusters(ctx context.Context, queryParameters url.Values) ([]*NsxtEdgeCluster, error) {
+	return getAllNsxtEdgeClusters(ctx, &vcdClient.Client, queryParameters)
+}
+
+func getAllNsxtEdgeClusters(ctx context.Context, client *Client, queryParams url.Values) ([]*NsxtEdgeCluster, error) {
+	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeClusters
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	urlRef, err := client.OpenApiBuildEndpoint(endpoint)
+	if err != nil {
+		return nil, err
+	}
 
 	typeResponses := []*types.NsxtEdgeCluster{{}}
-	err = vdc.client.OpenApiGetAllItems(ctx, minimumApiVersion, urlRef, queryParams, &typeResponses)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParams, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +127,7 @@ func (vdc *Vdc) GetAllNsxtEdgeClusters(ctx context.Context, queryParameters url.
 	for sliceIndex := range typeResponses {
 		returnObjects[sliceIndex] = &NsxtEdgeCluster{
 			NsxtEdgeCluster: typeResponses[sliceIndex],
-			client:          vdc.client,
+			client:          client,
 		}
 	}
 

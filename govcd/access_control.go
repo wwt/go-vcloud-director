@@ -16,15 +16,9 @@ import (
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 )
 
-// orgInfoType is the basic information about an organization (needed for tenant context)
-type orgInfoType struct {
-	id   string
-	name string
-}
-
 // orgInfoCache is a cache to save org information, avoid repeated calls to compute the same result.
 // The keys to this map are the requesting objects IDs.
-var orgInfoCache = make(map[string]orgInfoType)
+var orgInfoCache = make(map[string]*TenantContext)
 
 // GetAccessControl retrieves the access control information for the requested entity
 func (client Client) GetAccessControl(ctx context.Context, href, entityType, entityName string, headerValues map[string]string) (*types.ControlAccessParams, error) {
@@ -76,7 +70,13 @@ func (client Client) GetAccessControl(ctx context.Context, href, entityType, ent
 // * The subject (HREF and Type are mandatory)
 // * The access level (one of ReadOnly, Change, FullControl)
 func (client *Client) SetAccessControl(ctx context.Context, accessControl *types.ControlAccessParams, href, entityType, entityName string, headerValues map[string]string) error {
+	return client.setAccessControlWithHttpMethod(ctx, http.MethodPost, accessControl, href, entityType, entityName, headerValues)
+}
 
+// setAccessControlWithMethod is the same as Client.SetAccessControl but allowing passing a different HTTP method.
+// This method has been created since VDC accessControl endpoint works with PUT and SetAccessControl method worked
+// exclusively with POST. This private method gives the flexibility to use both POST and PUT passing it as httpMethod parameter.
+func (client *Client) setAccessControlWithHttpMethod(ctx context.Context, httpMethod string, accessControl *types.ControlAccessParams, href, entityType, entityName string, headerValues map[string]string) error {
 	href += "/action/controlAccess"
 	// Make sure that subjects in the setting list are used only once
 	if accessControl.AccessSettings != nil && len(accessControl.AccessSettings.AccessSetting) > 0 {
@@ -119,7 +119,7 @@ func (client *Client) SetAccessControl(ctx context.Context, accessControl *types
 		ctx,
 		nil,               // params
 		nil,               // notEncodedParams
-		http.MethodPost,   // method
+		httpMethod,        // method
 		*queryUrl,         // reqUrl
 		body,              // body
 		client.APIVersion, // apiVersion
@@ -197,7 +197,7 @@ func (adminCatalog AdminCatalog) GetAccessControl(ctx context.Context, useTenant
 
 	// if useTenantContext is false, we use an empty header (= default behavior)
 	// if it is true, we use a header populated with tenant context values
-	accessControlHeader, err := adminCatalog.getAccessControlHeader(ctx, useTenantContext)
+	accessControlHeader, err := adminCatalog.getAccessControlHeader(useTenantContext)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +214,7 @@ func (adminCatalog AdminCatalog) SetAccessControl(ctx context.Context, accessCon
 
 	// if useTenantContext is false, we use an empty header (= default behavior)
 	// if it is true, we use a header populated with tenant context values
-	accessControlHeader, err := adminCatalog.getAccessControlHeader(ctx, useTenantContext)
+	accessControlHeader, err := adminCatalog.getAccessControlHeader(useTenantContext)
 	if err != nil {
 		return err
 	}
@@ -278,7 +278,7 @@ func (catalog Catalog) GetAccessControl(ctx context.Context, useTenantContext bo
 		return nil, fmt.Errorf("catalog HREF is empty")
 	}
 	href := strings.Replace(catalog.Catalog.HREF, "/admin/", "/", 1)
-	accessControlHeader, err := catalog.getAccessControlHeader(ctx, useTenantContext)
+	accessControlHeader, err := catalog.getAccessControlHeader(useTenantContext)
 	if err != nil {
 		return nil, err
 	}
@@ -296,7 +296,7 @@ func (catalog Catalog) SetAccessControl(ctx context.Context, accessControl *type
 
 	// if useTenantContext is false, we use an empty header (= default behavior)
 	// if it is true, we use a header populated with tenant context values
-	accessControlHeader, err := catalog.getAccessControlHeader(ctx, useTenantContext)
+	accessControlHeader, err := catalog.getAccessControlHeader(useTenantContext)
 	if err != nil {
 		return err
 	}
@@ -332,34 +332,130 @@ func (vapp *VApp) getAccessControlHeader(ctx context.Context, useTenantContext b
 	if err != nil {
 		return nil, err
 	}
-	return map[string]string{types.HeaderTenantContext: orgInfo.id, types.HeaderAuthContext: orgInfo.name}, nil
+	return map[string]string{types.HeaderTenantContext: orgInfo.OrgId, types.HeaderAuthContext: orgInfo.OrgName}, nil
 }
 
 // getAccessControlHeader builds the data needed to set the header when tenant context is required.
 // If useTenantContext is false, it returns an empty map.
 // Otherwise, it finds the Org ID and name and creates the header data
-func (catalog *Catalog) getAccessControlHeader(ctx context.Context, useTenantContext bool) (map[string]string, error) {
+func (catalog *Catalog) getAccessControlHeader(useTenantContext bool) (map[string]string, error) {
 	if !useTenantContext {
 		return map[string]string{}, nil
 	}
-	orgInfo, err := catalog.getOrgInfo(ctx)
+	orgInfo, err := catalog.getOrgInfo()
 	if err != nil {
 		return nil, err
 	}
-	return map[string]string{types.HeaderTenantContext: orgInfo.id, types.HeaderAuthContext: orgInfo.name}, nil
+	return map[string]string{types.HeaderTenantContext: orgInfo.OrgId, types.HeaderAuthContext: orgInfo.OrgName}, nil
 }
 
 // getAccessControlHeader builds the data needed to set the header when tenant context is required.
 // If useTenantContext is false, it returns an empty map.
 // Otherwise, it finds the Org ID and name and creates the header data
-func (adminCatalog *AdminCatalog) getAccessControlHeader(ctx context.Context, useTenantContext bool) (map[string]string, error) {
+func (adminCatalog *AdminCatalog) getAccessControlHeader(useTenantContext bool) (map[string]string, error) {
 	if !useTenantContext {
 		return map[string]string{}, nil
 	}
-	orgInfo, err := adminCatalog.getOrgInfo(ctx)
+	orgInfo, err := adminCatalog.getOrgInfo()
 
 	if err != nil {
 		return nil, err
 	}
-	return map[string]string{types.HeaderTenantContext: orgInfo.id, types.HeaderAuthContext: orgInfo.name}, nil
+	return map[string]string{types.HeaderTenantContext: orgInfo.OrgId, types.HeaderAuthContext: orgInfo.OrgName}, nil
+}
+
+// GetControlAccess read and returns the control access parameters from a VDC
+func (vdc *Vdc) GetControlAccess(ctx context.Context, useTenantContext bool) (*types.ControlAccessParams, error) {
+	err := checkSanityVdcControlAccess(vdc)
+	if err != nil {
+		return nil, err
+	}
+
+	var tenantContextHeaders map[string]string
+
+	if useTenantContext {
+		tenantContext, err := vdc.getTenantContext()
+		if err != nil {
+			return nil, fmt.Errorf("error getting the tenant context - %s", err)
+		}
+
+		tenantContextHeaders = getTenantContextHeader(tenantContext)
+	}
+
+	controlAccessParams, err := vdc.client.GetAccessControl(ctx, vdc.Vdc.HREF, "vdc", vdc.Vdc.Name, tenantContextHeaders)
+	if err != nil {
+		return nil, fmt.Errorf("there was an error when retrieving VDC control access params - %s", err)
+	}
+
+	return controlAccessParams, nil
+}
+
+// SetControlAccess sets VDC control access parameters for everybody or individual users/groups.
+// This method either sets control for everybody, passing isSharedToEveryOne true, and everyoneAccessLevel (currently only ReadOnly is supported for VDC) and nil for accessSettings,
+// or can set access control for specific users/groups, passing isSharedToEveryOne false, everyoneAccessLevel "" and accessSettings filled as desired.
+// The method will fail if tries to configure access control for everybody and passes individual users/groups to configure.
+// It returns the control access parameters that are read from the API (using Vdc.GetControlAccess).
+func (vdc *Vdc) SetControlAccess(ctx context.Context, isSharedToEveryOne bool, everyoneAccessLevel string, accessSettings []*types.AccessSetting, useTenantContext bool) (*types.ControlAccessParams, error) {
+	err := checkSanityVdcControlAccess(vdc)
+	if err != nil {
+		return nil, err
+	}
+
+	if (isSharedToEveryOne && accessSettings != nil) && len(accessSettings) > 0 {
+		return nil, fmt.Errorf("either configure access for everybody or individual users, not both at the same time")
+	}
+
+	var tenantContextHeaders map[string]string
+	var accessControl = &types.ControlAccessParams{
+		Xmlns: types.XMLNamespaceVCloud,
+	}
+
+	if isSharedToEveryOne { // Do configuration for everyone
+		if everyoneAccessLevel == "" {
+			return nil, fmt.Errorf("everyoneAccessLevel needs to be set if isSharedToEveryOne is true")
+		}
+
+		accessControl.IsSharedToEveryone = true
+		accessControl.EveryoneAccessLevel = takeStringPointer(everyoneAccessLevel)
+
+	} else { // Do configuration for individual users/groups
+		if len(accessSettings) > 0 {
+			accessControl.AccessSettings = &types.AccessSettingList{
+				AccessSetting: accessSettings,
+			}
+		}
+	}
+
+	if useTenantContext {
+		tenantContext, err := vdc.getTenantContext()
+		if err != nil {
+			return nil, fmt.Errorf("error getting the tenant context - %s", err)
+		}
+
+		tenantContextHeaders = getTenantContextHeader(tenantContext)
+	}
+
+	err = vdc.client.setAccessControlWithHttpMethod(ctx, http.MethodPut, accessControl, vdc.Vdc.HREF, "vdc", vdc.Vdc.Name, tenantContextHeaders)
+	if err != nil {
+		return nil, fmt.Errorf("there was an error when setting VDC control access params - %s", err)
+	}
+
+	return vdc.GetControlAccess(ctx, useTenantContext)
+}
+
+// DeleteControlAccess makes stop sharing VDC with anyone
+func (vdc *Vdc) DeleteControlAccess(ctx context.Context, useTenantContext bool) (*types.ControlAccessParams, error) {
+	return vdc.SetControlAccess(ctx, false, "", nil, useTenantContext)
+}
+
+// checkSanityVdcControlAccess is a function that check some Vdc attributes and returns error if any is missing. It is useful for
+// checking sanity of Vdc struct before running controlAccess methods.
+func checkSanityVdcControlAccess(vdc *Vdc) error {
+	if vdc.client == nil {
+		return fmt.Errorf("client has not been set up on Vdc struct. Please initialize it before using this method")
+	}
+	if vdc.Vdc == nil || vdc.Vdc.Name == "" {
+		return fmt.Errorf("types.Vdc struct has not been set up on Vdc struct or Vdc.Vdc.Name is missing. Please initialize it before using this method ")
+	}
+	return nil
 }

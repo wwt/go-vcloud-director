@@ -1,7 +1,7 @@
-// +build api openapi functional catalog vapp gateway network org query extnetwork task vm vdc system disk lb lbAppRule lbAppProfile lbServerPool lbServiceMonitor lbVirtualServer user search nsxv nsxt auth affinity ALL
+//go:build api || openapi || functional || catalog || vapp || gateway || network || org || query || extnetwork || task || vm || vdc || system || disk || lb || lbAppRule || lbAppProfile || lbServerPool || lbServiceMonitor || lbVirtualServer || user || search || nsxv || nsxt || auth || affinity || role || alb || certificate || vdcGroup || metadata || providervdc || rde || ALL
 
 /*
- * Copyright 2021 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
+ * Copyright 2022 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
  */
 
 package govcd
@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -42,7 +41,9 @@ func init() {
 	setBoolFlag(&ignoreCleanupFile, "vcd-ignore-cleanup-file", "GOVCD_IGNORE_CLEANUP_FILE", "Does not process previous cleanup file")
 	setBoolFlag(&debugShowRequestEnabled, "vcd-show-request", "GOVCD_SHOW_REQ", "Shows API request")
 	setBoolFlag(&debugShowResponseEnabled, "vcd-show-response", "GOVCD_SHOW_RESP", "Shows API response")
-
+	setBoolFlag(&connectAsOrgUser, "vcd-as-org-user", "VCD_TEST_ORG_USER", "Connect as Org user")
+	setBoolFlag(&connectAsOrgUser, "vcd-test-org-user", "VCD_TEST_ORG_USER", "Connect as Org user")
+	flag.IntVar(&connectTenantNum, "vcd-connect-tenant", connectTenantNum, "change index of tenant to use (0=first)")
 }
 
 const (
@@ -96,6 +97,14 @@ const (
 	TestRequiresSysAdminPrivileges = "Test %s requires system administrator privileges"
 )
 
+type Tenant struct {
+	User     string `yaml:"user,omitempty"`
+	Password string `yaml:"password,omitempty"`
+	Token    string `yaml:"token,omitempty"`
+	ApiToken string `yaml:"api_token,omitempty"`
+	SysOrg   string `yaml:"sysOrg,omitempty"`
+}
+
 // Struct to get info from a config yaml file that the user
 // specifies
 type TestConfig struct {
@@ -103,6 +112,7 @@ type TestConfig struct {
 		User     string `yaml:"user"`
 		Password string `yaml:"password"`
 		Token    string `yaml:"token"`
+		ApiToken string `yaml:"api_token"`
 
 		// UseSamlAdfs specifies if SAML auth is used for authenticating vCD instead of local login.
 		// The above `User` and `Password` will be used to authenticate against ADFS IdP when true.
@@ -125,7 +135,8 @@ type TestConfig struct {
 		MaxRetryTimeout int    `yaml:"maxRetryTimeout,omitempty"`
 		HttpTimeout     int64  `yaml:"httpTimeout,omitempty"`
 	}
-	VCD struct {
+	Tenants []Tenant `yaml:"tenants,omitempty"`
+	VCD     struct {
 		Org         string `yaml:"org"`
 		Vdc         string `yaml:"vdc"`
 		ProviderVdc struct {
@@ -134,14 +145,17 @@ type TestConfig struct {
 			NetworkPool    string `yaml:"network_pool"`
 		} `yaml:"provider_vdc"`
 		NsxtProviderVdc struct {
-			Name           string `yaml:"name"`
-			StorageProfile string `yaml:"storage_profile"`
-			NetworkPool    string `yaml:"network_pool"`
+			Name                   string `yaml:"name"`
+			StorageProfile         string `yaml:"storage_profile"`
+			NetworkPool            string `yaml:"network_pool"`
+			PlacementPolicyVmGroup string `yaml:"placementPolicyVmGroup,omitempty"`
 		} `yaml:"nsxt_provider_vdc"`
 		Catalog struct {
 			Name                    string `yaml:"name,omitempty"`
+			NsxtBackedCatalogName   string `yaml:"nsxtBackedCatalogName,omitempty"`
 			Description             string `yaml:"description,omitempty"`
 			CatalogItem             string `yaml:"catalogItem,omitempty"`
+			NsxtCatalogItem         string `yaml:"nsxtCatalogItem,omitempty"`
 			CatalogItemDescription  string `yaml:"catalogItemDescription,omitempty"`
 			CatalogItemWithMultiVms string `yaml:"catalogItemWithMultiVms,omitempty"`
 			VmNameInMultiVmItem     string `yaml:"vmNameInMultiVmItem,omitempty"`
@@ -163,18 +177,26 @@ type TestConfig struct {
 		ExternalNetworkPortGroup     string `yaml:"externalNetworkPortGroup,omitempty"`
 		ExternalNetworkPortGroupType string `yaml:"externalNetworkPortGroupType,omitempty"`
 		VimServer                    string `yaml:"vimServer,omitempty"`
-		Disk                         struct {
-			Size          int64 `yaml:"size,omitempty"`
-			SizeForUpdate int64 `yaml:"sizeForUpdate,omitempty"`
-		}
-		Nsxt struct {
-			Manager           string `yaml:"manager"`
-			Tier0router       string `yaml:"tier0router"`
-			Tier0routerVrf    string `yaml:"tier0routerVrf"`
-			Vdc               string `yaml:"vdc"`
-			ExternalNetwork   string `yaml:"externalNetwork"`
-			EdgeGateway       string `yaml:"edgeGateway"`
-			NsxtImportSegment string `yaml:"nsxtImportSegment"`
+		LdapServer                   string `yaml:"ldapServer,omitempty"`
+		Nsxt                         struct {
+			Manager             string `yaml:"manager"`
+			Tier0router         string `yaml:"tier0router"`
+			Tier0routerVrf      string `yaml:"tier0routerVrf"`
+			NsxtDvpg            string `yaml:"nsxtDvpg"`
+			GatewayQosProfile   string `yaml:"gatewayQosProfile"`
+			Vdc                 string `yaml:"vdc"`
+			ExternalNetwork     string `yaml:"externalNetwork"`
+			EdgeGateway         string `yaml:"edgeGateway"`
+			NsxtImportSegment   string `yaml:"nsxtImportSegment"`
+			VdcGroup            string `yaml:"vdcGroup"`
+			VdcGroupEdgeGateway string `yaml:"vdcGroupEdgeGateway"`
+			NsxtEdgeCluster     string `yaml:"nsxtEdgeCluster"`
+
+			NsxtAlbControllerUrl      string `yaml:"nsxtAlbControllerUrl"`
+			NsxtAlbControllerUser     string `yaml:"nsxtAlbControllerUser"`
+			NsxtAlbControllerPassword string `yaml:"nsxtAlbControllerPassword"`
+			NsxtAlbImportableCloud    string `yaml:"nsxtAlbImportableCloud"`
+			NsxtAlbServiceEngineGroup string `yaml:"nsxtAlbServiceEngineGroup"`
 		} `yaml:"nsxt"`
 	} `yaml:"vcd"`
 	Logging struct {
@@ -192,11 +214,14 @@ type TestConfig struct {
 		OvaMultiVmPath     string `yaml:"ovaMultiVmPath,omitempty"`
 		OvaWithoutSizePath string `yaml:"ovaWithoutSizePath,omitempty"`
 		OvfPath            string `yaml:"ovfPath,omitempty"`
+		OvfUrl             string `yaml:"ovfUrl,omitempty"`
 	} `yaml:"ova"`
 	Media struct {
-		MediaPath       string `yaml:"mediaPath,omitempty"`
-		Media           string `yaml:"mediaName,omitempty"`
-		PhotonOsOvaPath string `yaml:"photonOsOvaPath,omitempty"`
+		MediaPath        string `yaml:"mediaPath,omitempty"`
+		Media            string `yaml:"mediaName,omitempty"`
+		NsxtMedia        string `yaml:"nsxtBackedMediaName,omitempty"`
+		PhotonOsOvaPath  string `yaml:"photonOsOvaPath,omitempty"`
+		MediaUdfTypePath string `yaml:"mediaUdfTypePath,omitempty"`
 	} `yaml:"media"`
 }
 
@@ -257,6 +282,10 @@ var enableDebug bool
 // ignoreCleanupFile prevents processing a previous cleanup file
 var ignoreCleanupFile bool
 
+// connectAsOrgUser connects as Org user instead of System administrator
+var connectAsOrgUser bool
+var connectTenantNum int
+
 // Makes the name for the cleanup entities persistent file
 // Using a name for each vCD allows us to run tests with different servers
 // and persist the cleanup list for all.
@@ -296,7 +325,7 @@ func readCleanupList() ([]CleanupEntity, error) {
 	if os.IsNotExist(err) {
 		return nil, err
 	}
-	listText, err := ioutil.ReadFile(persistentCleanupListFile)
+	listText, err := os.ReadFile(filepath.Clean(persistentCleanupListFile))
 	if err != nil {
 		return nil, err
 	}
@@ -323,7 +352,7 @@ func writeCleanupList(cleanupList []CleanupEntity) error {
 	if err != nil {
 		return err
 	}
-	file, err := os.Create(persistentCleanupListFile)
+	file, err := os.Create(filepath.Clean(persistentCleanupListFile))
 	if err != nil {
 		return err
 	}
@@ -393,7 +422,6 @@ func AddToCleanupListOpenApi(name, createdBy, openApiEndpoint string) {
 
 // PrependToCleanupListOpenApi prepends an OpenAPI entity OpenApi objects `entityType=OpenApiEntity` and
 // `openApiEndpoint`should be set in format "types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointOrgVdcNetworks + ID"
-//lint:ignore U1000 Not yet used
 func PrependToCleanupListOpenApi(name, createdBy, openApiEndpoint string) {
 	for _, item := range cleanupEntityList {
 		// avoid adding the same item twice
@@ -414,7 +442,7 @@ func PrependToCleanupListOpenApi(name, createdBy, openApiEndpoint string) {
 // yaml file or if it cannot read it.
 func GetConfigStruct() (TestConfig, error) {
 	config := os.Getenv("GOVCD_CONFIG")
-	configStruct := TestConfig{}
+	var configStruct TestConfig
 	if config == "" {
 		// Finds the current directory, through the path of this running test
 		_, currentFilename, _, _ := runtime.Caller(0)
@@ -426,13 +454,27 @@ func GetConfigStruct() (TestConfig, error) {
 	if os.IsNotExist(err) {
 		return TestConfig{}, fmt.Errorf("Configuration file %s not found: %s", config, err)
 	}
-	yamlFile, err := ioutil.ReadFile(config)
+	yamlFile, err := os.ReadFile(filepath.Clean(config))
 	if err != nil {
 		return TestConfig{}, fmt.Errorf("could not read config file %s: %s", config, err)
 	}
 	err = yaml.Unmarshal(yamlFile, &configStruct)
 	if err != nil {
 		return TestConfig{}, fmt.Errorf("could not unmarshal yaml file: %s", err)
+	}
+	if connectAsOrgUser {
+		if len(configStruct.Tenants) == 0 {
+			return TestConfig{}, fmt.Errorf("org user connection required, but 'tenants[%d]' is empty", connectTenantNum)
+		}
+		if connectTenantNum > len(configStruct.Tenants)-1 {
+			return TestConfig{}, fmt.Errorf("org user connection required, but tenant number %d is higher than the number of tenants ", connectTenantNum)
+		}
+		// Change configStruct.Provider, to reuse the global fields, such as URL
+		configStruct.Provider.User = configStruct.Tenants[connectTenantNum].User
+		configStruct.Provider.Password = configStruct.Tenants[connectTenantNum].Password
+		configStruct.Provider.SysOrg = configStruct.Tenants[connectTenantNum].SysOrg
+		configStruct.Provider.Token = configStruct.Tenants[connectTenantNum].Token
+		configStruct.Provider.ApiToken = configStruct.Tenants[connectTenantNum].ApiToken
 	}
 	return configStruct, nil
 }
@@ -477,15 +519,17 @@ func (vcd *TestVCD) SetUpSuite(check *C) {
 		fmt.Println()
 		// Prints only the flags defined in this package
 		flag.CommandLine.VisitAll(func(f *flag.Flag) {
-			if strings.Contains(f.Name, "vcd-") {
+			if strings.HasPrefix(f.Name, "vcd-") {
 				fmt.Printf("  -%-40s %s (%v)\n", f.Name, f.Usage, f.Value)
 			}
 		})
 		fmt.Println()
-		os.Exit(0)
+		// This will skip the whole suite.
+		// Instead, running os.Exit(0) will panic
+		check.Skip("--- showing help ---")
 	}
 	config, err := GetConfigStruct()
-	if config == (TestConfig{}) || err != nil {
+	if config.Provider.Url == "" || err != nil {
 		panic(err)
 	}
 	vcd.config = config
@@ -528,12 +572,22 @@ func (vcd *TestVCD) SetUpSuite(check *C) {
 	}
 	ctx := context.Background()
 
+	apiToken := os.Getenv("VCD_API_TOKEN")
+	if apiToken == "" {
+		apiToken = config.Provider.ApiToken
+	}
+
 	authenticationMode := "password"
-	if token != "" {
-		authenticationMode = "token"
-		err = vcd.client.SetToken(ctx, config.Provider.SysOrg, AuthorizationHeader, token)
+	if apiToken != "" {
+		authenticationMode = "API-token"
+		err = vcd.client.SetToken(ctx, config.Provider.SysOrg, ApiTokenHeader, apiToken)
 	} else {
-		err = vcd.client.Authenticate(ctx, config.Provider.User, config.Provider.Password, config.Provider.SysOrg)
+		if token != "" {
+			authenticationMode = "token"
+			err = vcd.client.SetToken(ctx, config.Provider.SysOrg, AuthorizationHeader, token)
+		} else {
+			err = vcd.client.Authenticate(ctx, config.Provider.User, config.Provider.Password, config.Provider.SysOrg)
+		}
 	}
 	if config.Provider.UseSamlAdfs {
 		authenticationMode = "SAML password"
@@ -546,7 +600,7 @@ func (vcd *TestVCD) SetUpSuite(check *C) {
 	if err == nil {
 		versionInfo = fmt.Sprintf("version %s built at %s", version, versionTime)
 	}
-	fmt.Printf("Running on vCD %s (%s)\nas user %s@%s (using %s)\n", vcd.config.Provider.Url, versionInfo,
+	fmt.Printf("Running on VCD %s (%s)\nas user %s@%s (using %s)\n", vcd.config.Provider.Url, versionInfo,
 		vcd.config.Provider.User, vcd.config.Provider.SysOrg, authenticationMode)
 	if !vcd.client.Client.IsSysAdmin {
 		vcd.skipAdminTests = true
@@ -589,7 +643,7 @@ func (vcd *TestVCD) SetUpSuite(check *C) {
 	// Gets the persistent cleanup list from file, if exists.
 	cleanupList, err := readCleanupList()
 	if len(cleanupList) > 0 && err == nil {
-		if ignoreCleanupFile {
+		if !ignoreCleanupFile {
 			// If we found a cleanup file and we want to process it (default)
 			// We proceed to cleanup the leftovers before any other operation
 			fmt.Printf("*** Found cleanup file %s\n", makePersistentCleanupFileName())
@@ -604,7 +658,8 @@ func (vcd *TestVCD) SetUpSuite(check *C) {
 	// creates a new VApp for vapp tests
 	if !skipVappCreation && config.VCD.Network.Net1 != "" && config.VCD.StorageProfile.SP1 != "" &&
 		config.VCD.Catalog.Name != "" && config.VCD.Catalog.CatalogItem != "" {
-		vcd.vapp, err = vcd.createTestVapp(ctx, TestSetUpSuite)
+		// deployVappForTest replaces the old createTestVapp() because it was using bad implemented method vdc.ComposeVApp
+		vcd.vapp, err = deployVappForTest(ctx, vcd, TestSetUpSuite)
 		// If no vApp is created, we skip all vApp tests
 		if err != nil {
 			fmt.Printf("%s\n", err)
@@ -626,25 +681,6 @@ func (vcd *TestVCD) infoCleanup(format string, args ...interface{}) {
 	if vcd.config.Logging.VerboseCleanup {
 		fmt.Printf(format, args...)
 	}
-}
-
-// Gets the two or three components of a "parent" string, as passed to AddToCleanupList
-// If the number of split strings is not 2 or 3 it return 3 empty strings
-// Example input parent: my-org|my-vdc|my-edge-gw, separator: |
-// Output : first: my-org, second: my-vdc, third: my-edge-gw
-func splitParent(parent string, separator string) (first, second, third string) {
-	strList := strings.Split(parent, separator)
-	if len(strList) < 2 || len(strList) > 3 {
-		return "", "", ""
-	}
-	first = strList[0]
-	second = strList[1]
-
-	if len(strList) == 3 {
-		third = strList[2]
-	}
-
-	return
 }
 
 func getOrgVdcByNames(ctx context.Context, vcd *TestVCD, orgName, vdcName string) (*Org, *Vdc, error) {
@@ -721,15 +757,19 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 	// openApiEntity can be used to delete any OpenAPI entity due to the API being uniform and allowing the same
 	// low level OpenApiDeleteItem()
 	case "OpenApiEntity":
-
 		// entity.OpenApiEndpoint contains "endpoint/{ID}"
 		// (in format types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointOrgVdcNetworks + ID) but
 		// to lookup used API version this ID must not be present therefore below we remove suffix ID.
 		// This is done by splitting whole path by "/" and rebuilding path again without last element in slice (which is
 		// expected to be the ID)
+		// Sometimes API endpoint path might contain URNs in the middle (e.g. OpenApiEndpointNsxtNatRules). They are
+		// replaced back to string placeholder %s to match original definitions
 		endpointSlice := strings.Split(entity.OpenApiEndpoint, "/")
-		endpoint := strings.Join(endpointSlice[:len(endpointSlice)-1], "/") + "/"
-		apiVersion, _ := vcd.client.Client.checkOpenApiEndpointCompatibility(ctx, endpoint)
+		endpointWithUuid := strings.Join(endpointSlice[:len(endpointSlice)-1], "/") + "/"
+		// replace any "urns" (e.g. 'urn:vcloud:gateway:64966c36-e805-44e2-980b-c1077ab54956') with '%s' to match API definitions
+		re := regexp.MustCompile(`urn[^\/]+`) // Regexp matches from 'urn' up to next '/' in the path
+		endpointRemovedUuids := re.ReplaceAllString(endpointWithUuid, "%s")
+		apiVersion, _ := vcd.client.Client.checkOpenApiEndpointCompatibility(ctx, endpointRemovedUuids)
 
 		// Build UP complete endpoint address
 		urlRef, err := vcd.client.Client.OpenApiBuildEndpoint(entity.OpenApiEndpoint)
@@ -739,7 +779,15 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 		}
 
 		// Validate if the resource still exists
-		err = vcd.client.Client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, nil)
+		err = vcd.client.Client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, nil, nil)
+
+		// RDE Framework has a bug in VCD 10.3.0 that causes "not found" errors to return as "400 bad request",
+		// so we need to amend them
+		isBuggyRdeError := strings.Contains(entity.OpenApiEndpoint, types.OpenApiEndpointRdeInterfaces)
+		if isBuggyRdeError {
+			err = amendRdeApiError(&vcd.client.Client, err)
+		}
+
 		if ContainsNotFound(err) {
 			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
 			return
@@ -756,20 +804,79 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 		}
 
 		// Attempt to use supplied path in entity.Parent for element deletion
-		err = vcd.client.Client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil)
+		err = vcd.client.Client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil, nil)
 		if err != nil {
 			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
 			return
 		}
 
 		vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
+	// 	OpenApiEntityFirewall has different API structure therefore generic `OpenApiEntity` case does not fit cleanup
+	case "OpenApiEntityFirewall":
+		apiVersion, err := vcd.client.Client.checkOpenApiEndpointCompatibility(ctx, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointNsxtFirewallRules)
+		if err != nil {
+			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
+			return
+		}
 
-	case "vapp":
-		vapp, err := vcd.vdc.GetVAppByName(ctx, entity.Name, true)
+		urlRef, err := vcd.client.Client.OpenApiBuildEndpoint(entity.Name)
+		if err != nil {
+			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
+			return
+		}
+
+		// Attempt to use supplied path in entity.Parent for element deletion
+		err = vcd.client.Client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil, nil)
+		if err != nil {
+			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
+			return
+		}
+
+		vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
+	// 	OpenApiEntityAlbSettingsDisable has different API structure therefore generic `OpenApiEntity` case does not fit cleanup
+	case "OpenApiEntityAlbSettingsDisable":
+		edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(ctx, entity.Parent)
+		if err != nil {
+			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
+			return
+		}
+
+		edgeAlbSettingsConfig, err := edge.GetAlbSettings(ctx)
+		if err != nil {
+			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
+			return
+		}
+		if edgeAlbSettingsConfig.Enabled == false {
+			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
+			return
+		}
+
+		err = edge.DisableAlb(ctx)
 		if err != nil {
 			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
 			return
 		}
+
+		vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
+	case "vapp":
+		vdc := vcd.vdc
+		var err error
+
+		// Check if parent VDC was specified. If not - use the default NSX-V VDC
+		if entity.Parent != "" {
+			vdc, err = vcd.org.GetVDCByName(ctx, entity.Parent, true)
+			if err != nil {
+				vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
+				return
+			}
+		}
+
+		vapp, err := vdc.GetVAppByName(ctx, entity.Name, true)
+		if err != nil {
+			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
+			return
+		}
+
 		task, _ := vapp.Undeploy(ctx)
 		_ = task.WaitTaskCompletion(ctx)
 		// Detach all Org networks during vApp removal because network removal errors if it happens
@@ -1035,8 +1142,40 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
 		}
 		return
+	case "nsxv_dfw":
+		if entity.Parent == "" {
+			vcd.infoCleanup("removeLeftoverEntries: [ERROR] No ORG provided for VDC '%s'\n", entity.Name)
+			return
+		}
+		org, err := vcd.client.GetAdminOrgByName(ctx, entity.Parent)
+		if err != nil {
+			vcd.infoCleanup(notFoundMsg, "org", entity.Parent)
+			return
+		}
+		vdc, err := org.GetVDCByName(ctx, entity.Name, false)
+		if vdc == nil || err != nil {
+			vcd.infoCleanup(notFoundMsg, "vdc", entity.Name)
+			return
+		}
+		dfw := NewNsxvDistributedFirewall(vdc.client, vdc.Vdc.ID)
+		enabled, err := dfw.IsEnabled(ctx)
+		if err != nil {
+			vcd.infoCleanup("removeLeftoverEntries: [ERROR] checking distributed firewall from VCD '%s': %s", entity.Name, err)
+			return
+		}
+		if !enabled {
+			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
+			return
+		}
+		err = dfw.Disable(ctx)
+		if err == nil {
+			vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
+		} else {
+			vcd.infoCleanup("removeLeftoverEntries: [ERROR] removing distributed firewall from VCD '%s': %s", entity.Name, err)
+			return
+		}
 	case "standaloneVm":
-		vm, err := vcd.vdc.QueryVmById(ctx, entity.Name) // The VM ID must be passed as Name
+		vm, err := vcd.org.QueryVmById(ctx, entity.Name) // The VM ID must be passed as Name
 		if IsNotFound(err) {
 			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
 			return
@@ -1056,16 +1195,14 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 	case "vm":
 		vapp, err := vcd.vdc.GetVAppByName(ctx, entity.Parent, true)
 		if err != nil {
-			vcd.infoCleanup("removeLeftoverEntries: [ERROR] Deleting VM '%s' in vApp '%s'. Could not find vApp: %s\n",
-				entity.Name, entity.Parent, err)
+			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
 			return
 		}
 
 		vm, err := vapp.GetVMByName(ctx, entity.Name, false)
 
 		if err != nil {
-			vcd.infoCleanup("removeLeftoverEntries: [ERROR] Could not find VM '%s' in vApp '%s': %s\n",
-				entity.Name, vapp.VApp.Name, err)
+			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
 			return
 		}
 
@@ -1430,31 +1567,49 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 				entity.Parent, err)
 			return
 		}
-		err = org.LdapDisable(ctx)
 
+		ldapConfig, err := org.GetLdapConfiguration(ctx)
 		if err != nil {
-			vcd.infoCleanup("removeLeftoverEntries: [ERROR] Could not clear LDAP settings for Org '%s': %s",
+			vcd.infoCleanup("removeLeftoverEntries: [ERROR] Couldn't get LDAP settings for Org '%s': %s",
 				entity.Parent, err)
 			return
 		}
-		vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
+
+		// This is done to avoid calling LdapDisable() if it has been unconfigured, due to bug with Org catalog publish settings
+		if ldapConfig.OrgLdapMode != types.LdapModeNone {
+			err = org.LdapDisable(ctx)
+			if err != nil {
+				vcd.infoCleanup("removeLeftoverEntries: [ERROR] Could not clear LDAP settings for Org '%s': %s",
+					entity.Parent, err)
+				vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
+				return
+			}
+		}
+
+		vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
 		return
+
 	case "vdcComputePolicy":
-		if entity.Parent == "" {
-			vcd.infoCleanup("removeLeftoverEntries: [ERROR] No ORG provided for vdcComputePolicy '%s'\n", entity.Name)
-			return
-		}
-		org, err := vcd.client.GetAdminOrgByName(ctx, entity.Parent)
-		if err != nil {
-			vcd.infoCleanup(notFoundMsg, "org", entity.Parent)
-			return
-		}
-		policy, err := org.GetVdcComputePolicyById(ctx, entity.Name)
+		policy, err := vcd.client.GetVdcComputePolicyV2ById(ctx, entity.Name)
 		if policy == nil || err != nil {
 			vcd.infoCleanup(notFoundMsg, "vdcComputePolicy", entity.Name)
 			return
 		}
 		err = policy.Delete(ctx)
+		if err == nil {
+			vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
+		} else {
+			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
+		}
+		return
+
+	case "logicalVmGroup":
+		logicalVmGroup, err := vcd.client.GetLogicalVmGroupById(ctx, entity.Name)
+		if logicalVmGroup == nil || err != nil {
+			vcd.infoCleanup(notFoundMsg, "logicalVmGroup", entity.Name)
+			return
+		}
+		err = logicalVmGroup.Delete(ctx)
 		if err == nil {
 			vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
 		} else {
@@ -1470,189 +1625,105 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 	}
 }
 
-func (vcd *TestVCD) TearDownSuite(ctx context.Context, check *C) {
+func (vcd *TestVCD) TearDownSuite(check *C) {
 	// We will try to remove every entity that has been registered into
 	// CleanupEntityList. Entities that have already been cleaned up by their
 	// functions will be ignored.
 	for i, cleanupEntity := range cleanupEntityList {
 		fmt.Printf("# %d of %d - ", i+1, len(cleanupEntityList))
-		vcd.removeLeftoverEntities(ctx, cleanupEntity)
+		vcd.removeLeftoverEntities(context.Background(), cleanupEntity)
 		removePersistentCleanupList()
 	}
 }
 
 // Tests getloginurl with the endpoint given
 // in the config file.
-func TestClient_getloginurl(t *testing.T) {
+func (vcd *TestVCD) TestClient_getloginurl(check *C) {
+	if os.Getenv("GOVCD_API_VERSION") != "" {
+		check.Skip("custom API version is being used")
+	}
 	config, err := GetConfigStruct()
 	if err != nil {
-		t.Fatalf("err: %s", err)
+		check.Fatalf("err: %s", err)
 	}
 	client, err := GetTestVCDFromYaml(config)
 	if err != nil {
-		t.Fatalf("err: %s", err)
+		check.Fatalf("err: %s", err)
 	}
 
 	err = client.vcdloginurl(context.Background())
 	if err != nil {
-		t.Fatalf("err: %s", err)
+		check.Fatalf("err: %s", err)
 	}
 
-	if client.sessionHREF.Path != "/api/sessions" {
-		t.Fatalf("Getting LoginUrl failed, url: %s", client.sessionHREF.Path)
+	if client.sessionHREF.Path != "/cloudapi/1.0.0/sessions" {
+		check.Fatalf("Getting LoginUrl failed, url: %s", client.sessionHREF.Path)
 	}
 }
 
 // Tests Authenticate with the vcd credentials (or token) given in the config file
-func TestVCDClient_Authenticate(t *testing.T) {
+func (vcd *TestVCD) TestVCDClient_Authenticate(check *C) {
 	config, err := GetConfigStruct()
 	if err != nil {
-		t.Fatalf("err: %s", err)
+		check.Fatalf("err: %s", err)
 	}
 	client, err := GetTestVCDFromYaml(config)
 	if err != nil {
-		t.Fatalf("err: %s", err)
+		check.Fatalf("err: %s", err)
 	}
 	ctx := context.Background()
-
-	token := os.Getenv("VCD_TOKEN")
-	if token == "" {
-		token = config.Provider.Token
+	apiToken := os.Getenv("VCD_API_TOKEN")
+	if apiToken == "" {
+		apiToken = config.Provider.ApiToken
 	}
-	if token != "" {
-		err = client.SetToken(ctx, config.Provider.SysOrg, AuthorizationHeader, token)
+	if apiToken != "" {
+		err = client.SetToken(ctx, config.Provider.SysOrg, ApiTokenHeader, apiToken)
 	} else {
-		err = client.Authenticate(ctx, config.Provider.User, config.Provider.Password, config.Provider.SysOrg)
+		token := os.Getenv("VCD_TOKEN")
+		if token == "" {
+			token = config.Provider.Token
+		}
+		if token != "" {
+			err = client.SetToken(ctx, config.Provider.SysOrg, AuthorizationHeader, token)
+		} else {
+			err = client.Authenticate(ctx, config.Provider.User, config.Provider.Password, config.Provider.SysOrg)
+		}
 	}
 
 	if err != nil {
-		t.Fatalf("Error authenticating: %s", err)
+		check.Fatalf("Error authenticating: %s", err)
 	}
 }
 
-func (vcd *TestVCD) createTestVapp(ctx context.Context, name string) (*VApp, error) {
-	// ========================= issue#252 ==================================
-	// TODO: To be enabled when issue#252 is resolved.
-	// Allows re-using a pre-created vApp
-	// existingVapp, err := vcd.vdc.GetVAppByName(name, false)
-	// if err == nil {
-	// 	fmt.Printf("vApp %s already exists. Skipping creation\n",name)
-	// 	return existingVapp, nil
-	// }
-	// ======================================================================
-	// Populate OrgVDCNetwork
-	var networks []*types.OrgVDCNetwork
-	net, err := vcd.vdc.GetOrgVdcNetworkByName(ctx, vcd.config.VCD.Network.Net1, false)
+func (vcd *TestVCD) TestVCDClient_AuthenticateInvalidPassword(check *C) {
+	config, err := GetConfigStruct()
 	if err != nil {
-		return nil, fmt.Errorf("error finding network : %s, err: %s", vcd.config.VCD.Network.Net1, err)
+		check.Fatalf("err: %s", err)
 	}
-	networks = append(networks, net.OrgVDCNetwork)
-	// Populate Catalog
-	cat, err := vcd.org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
-	if err != nil || cat == nil {
-		return nil, fmt.Errorf("error finding catalog : %s", err)
-	}
-	// Populate Catalog Item
-	catitem, err := cat.GetCatalogItemByName(ctx, vcd.config.VCD.Catalog.CatalogItem, false)
+	client, err := GetTestVCDFromYaml(config)
 	if err != nil {
-		return nil, fmt.Errorf("error finding catalog item : %s", err)
-	}
-	// Get VAppTemplate
-	vAppTemplate, err := catitem.GetVAppTemplate(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error finding vapptemplate : %s", err)
-	}
-	// Get StorageProfileReference
-	storageProfileRef, err := vcd.vdc.FindStorageProfileReference(ctx, vcd.config.VCD.StorageProfile.SP1)
-	if err != nil {
-		return nil, fmt.Errorf("error finding storage profile: %s", err)
-	}
-	// Compose VApp
-	task, err := vcd.vdc.ComposeVApp(ctx, networks, vAppTemplate, storageProfileRef, name, "description", true)
-	if err != nil {
-		return nil, fmt.Errorf("error composing vapp: %s", err)
-	}
-	// After a successful creation, the entity is added to the cleanup list.
-	// If something fails after this point, the entity will be removed
-	AddToCleanupList(name, "vapp", "", "createTestVapp")
-	err = task.WaitTaskCompletion(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error composing vapp: %s", err)
-	}
-	// Get VApp
-	vapp, err := vcd.vdc.GetVAppByName(ctx, name, true)
-	if err != nil {
-		return nil, fmt.Errorf("error getting vapp: %s", err)
+		check.Fatalf("error getting client structure: %s", err)
 	}
 
-	err = vapp.BlockWhileStatus(ctx, "UNRESOLVED", vapp.client.MaxRetryTimeout)
-	if err != nil {
-		return nil, fmt.Errorf("error waiting for created test vApp to have working state: %s", err)
+	err = client.Authenticate(ctx, config.Provider.User, "INVALID-PASSWORD", config.Provider.SysOrg)
+	if err == nil || !strings.Contains(err.Error(), "401") {
+		check.Fatalf("expected error for invalid credentials")
 	}
-
-	return vapp, err
 }
 
-func Test_splitParent(t *testing.T) {
-	type args struct {
-		parent    string
-		separator string
+func (vcd *TestVCD) TestVCDClient_AuthenticateInvalidToken(check *C) {
+	config, err := GetConfigStruct()
+	if err != nil {
+		check.Fatalf("err: %s", err)
 	}
-	tests := []struct {
-		name       string
-		args       args
-		wantFirst  string
-		wantSecond string
-		wantThird  string
-	}{
-		{
-			name:       "Empty",
-			args:       args{parent: "", separator: "|"},
-			wantFirst:  "",
-			wantSecond: "",
-			wantThird:  "",
-		},
-		{
-			name:       "One",
-			wantFirst:  "",
-			wantSecond: "",
-			wantThird:  "",
-		},
-		{
-			name:       "Two",
-			args:       args{parent: "first|second", separator: "|"},
-			wantFirst:  "first",
-			wantSecond: "second",
-			wantThird:  "",
-		},
-		{
-			name:       "Three",
-			args:       args{parent: "first|second|third", separator: "|"},
-			wantFirst:  "first",
-			wantSecond: "second",
-			wantThird:  "third",
-		},
-		{
-			name:       "Four",
-			args:       args{parent: "first|second|third|fourth", separator: "|"},
-			wantFirst:  "",
-			wantSecond: "",
-			wantThird:  "",
-		},
+	client, err := GetTestVCDFromYaml(config)
+	if err != nil {
+		check.Fatalf("error getting client structure: %s", err)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotFirst, gotSecond, gotThird := splitParent(tt.args.parent, tt.args.separator)
-			if gotFirst != tt.wantFirst {
-				t.Errorf("splitParent() gotFirst = %v, want %v", gotFirst, tt.wantFirst)
-			}
-			if gotSecond != tt.wantSecond {
-				t.Errorf("splitParent() gotSecond = %v, want %v", gotSecond, tt.wantSecond)
-			}
-			if gotThird != tt.wantThird {
-				t.Errorf("splitParent() gotThird = %v, want %v", gotThird, tt.wantThird)
-			}
-		})
+
+	err = client.SetToken(ctx, config.Provider.SysOrg, AuthorizationHeader, "invalid-token")
+	if err == nil || !strings.Contains(err.Error(), "401") {
+		check.Fatalf("expected error for invalid credentials")
 	}
 }
 
@@ -1679,28 +1750,21 @@ func (vcd *TestVCD) findFirstVapp(ctx context.Context) VApp {
 		return VApp{}
 	}
 	wantedVapp := vcd.vapp.VApp.Name
-	vappName := ""
-	for _, res := range vdc.Vdc.ResourceEntities {
-		for _, item := range res.ResourceEntity {
-			// Finding a named vApp, if it was defined in config
-			if wantedVapp != "" {
-				if item.Name == wantedVapp {
-					vappName = item.Name
-					break
-				}
-			} else {
-				// Otherwise, we get the first vApp from the vDC list
+	if wantedVapp == "" {
+		// As no vApp is defined in config, we search for one randomly
+		for _, res := range vdc.Vdc.ResourceEntities {
+			for _, item := range res.ResourceEntity {
 				if item.Type == "application/vnd.vmware.vcloud.vApp+xml" {
-					vappName = item.Name
+					wantedVapp = item.Name
 					break
 				}
 			}
 		}
 	}
-	if wantedVapp == "" {
+	vapp, err := vdc.GetVAppByName(ctx, wantedVapp, false)
+	if err != nil {
 		return VApp{}
 	}
-	vapp, _ := vdc.GetVAppByName(ctx, vappName, false)
 	return *vapp
 }
 
@@ -1804,6 +1868,30 @@ func skipNoNsxtConfiguration(vcd *TestVCD, check *C) {
 	}
 }
 
+func skipNoNsxtAlbConfiguration(vcd *TestVCD, check *C) {
+	skipNoNsxtConfiguration(vcd, check)
+	generalMessage := "Missing NSX-T ALB config: "
+
+	if vcd.config.VCD.Nsxt.NsxtAlbControllerUrl == "" {
+		check.Skip(generalMessage + "No NSX-T ALB Controller URL specified in configuration")
+	}
+
+	if vcd.config.VCD.Nsxt.NsxtAlbControllerUser == "" {
+		check.Skip(generalMessage + "No NSX-T ALB Controller Name specified in configuration")
+	}
+
+	if vcd.config.VCD.Nsxt.NsxtAlbControllerPassword == "" {
+		check.Skip(generalMessage + "No NSX-T ALB Controller Password specified in configuration")
+	}
+
+	if vcd.config.VCD.Nsxt.NsxtAlbImportableCloud == "" {
+		check.Skip(generalMessage + "No NSX-T ALB Controller Importable Cloud Name")
+	}
+	if vcd.config.VCD.Nsxt.NsxtAlbServiceEngineGroup == "" {
+		check.Skip(generalMessage + "No NSX-T ALB Service Engine Group name specified in configuration")
+	}
+}
+
 // skipOpenApiEndpointTest is a helper to skip tests for particular unsupported OpenAPI endpoints
 func skipOpenApiEndpointTest(ctx context.Context, vcd *TestVCD, check *C, endpoint string) {
 	minimumRequiredApiVersion := endpointMinApiVersions[endpoint]
@@ -1818,4 +1906,51 @@ func skipOpenApiEndpointTest(ctx context.Context, vcd *TestVCD, check *C, endpoi
 			endpoint, constraint, maxSupportedVersion)
 		check.Skip(skipText)
 	}
+}
+
+// newOrgUserConnection creates a new Org User and returns a connection to it.
+// Attention: Set the user to use only lowercase letters. If you put upper case letters the function fails on waiting
+// because VCD creates the user with lowercase letters.
+func newOrgUserConnection(adminOrg *AdminOrg, userName, password, href string, insecure bool) (*VCDClient, *OrgUser, error) {
+	u, err := url.ParseRequestURI(href)
+	if err != nil {
+		return nil, nil, fmt.Errorf("[newOrgUserConnection] unable to pass url: %s", err)
+	}
+
+	_, err = adminOrg.GetUserByName(ctx, userName, false)
+	if err == nil {
+		// user exists
+		return nil, nil, fmt.Errorf("user %s already exists", userName)
+	}
+	_, err = adminOrg.CreateUserSimple(ctx, OrgUserConfiguration{
+		Name:            userName,
+		Password:        password,
+		RoleName:        OrgUserRoleOrganizationAdministrator,
+		ProviderType:    OrgUserProviderIntegrated,
+		IsEnabled:       true,
+		DeployedVmQuota: 0,
+		StoredVmQuota:   0,
+		FullName:        userName,
+		Description:     "Test user created by newOrgUserConnection",
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	AddToCleanupList(userName, "user", adminOrg.AdminOrg.Name, "newOrgUserConnection")
+
+	_ = adminOrg.Refresh(ctx)
+	vcdClient := NewVCDClient(*u, insecure)
+	err = vcdClient.Authenticate(ctx, userName, password, adminOrg.AdminOrg.Name)
+	if err != nil {
+		return nil, nil, fmt.Errorf("[newOrgUserConnection] unable to authenticate: %s", err)
+	}
+
+	// return newUser
+	newUser, err := adminOrg.GetUserByName(ctx, userName, false)
+	if err != nil {
+		return nil, nil, fmt.Errorf("[newOrgUserConnection] unable to retrieve newly created user: %s", err)
+	}
+
+	return vcdClient, newUser, nil
 }

@@ -246,7 +246,7 @@ func (vcd *TestVCD) Test_GetVAppTemplate(check *checks.C) {
 	catitem, err := cat.FindCatalogItem(vcd.config.VCD.Catalog.Catalogitem)
 	check.Assert(err, checks.IsNil)
 
-	vapptemplate, err := catitem.GetVAppTemplate()
+	vapptemplate, err := catitem.GetVAppTemplate(ctx)
 
     // #3: Tests the object contents
 	check.Assert(err, checks.IsNil)
@@ -296,7 +296,7 @@ func (vcd *TestVCD) Test_ComposeVApp(check *checks.C) {
 
 	// Here's the cleanup point
 	// Deleting VApp
-	task, err = vapp.Delete()
+	task, err = vapp.Delete(ctx)
 	task.WaitTaskCompletion()
 
 	// Here we can fail again.
@@ -342,6 +342,8 @@ While running tests, the following environment variables can be used:
 * `VCD_TOKEN` : specifies the authorization token to use instead of username/password
    (Use `./scripts/get_token.sh` to retrieve one)
 * `GOVCD_KEEP_TEST_OBJECTS` will skip deletion of objects created during tests.
+* `GOVCD_API_VERSION` allows to select the API version to use. This must be used **for testing purposes only** as the SDK
+   has been tested to use certain version of the API. Using this environment variable may lead to unexpected failures.
 
 When both the environment variable and the command line option are possible, the environment variable gets evaluated first.
 

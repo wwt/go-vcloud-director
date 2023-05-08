@@ -1,4 +1,4 @@
-// +build nsxv vm functional ALL
+//go:build nsxv || vm || functional || ALL
 
 /*
  * Copyright 2020 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -30,7 +30,7 @@ func (vcd *TestVCD) Test_VMGetDhcpAddress(check *C) {
 	ctx := context.Background()
 
 	// Construct new VM for test
-	vapp, err := vcd.createTestVapp(ctx, "GetDhcpAddress")
+	vapp, err := deployVappForTest(ctx, vcd, "GetDhcpAddress")
 	check.Assert(err, IsNil)
 	vmType, _ := vcd.findFirstVm(*vapp)
 	vm := &VM{

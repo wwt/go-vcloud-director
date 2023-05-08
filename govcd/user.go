@@ -30,6 +30,7 @@ type OrgUserConfiguration struct {
 	ProviderType    string // Optional: defaults to "INTEGRATED"
 	IsEnabled       bool   // Optional: defaults to false
 	IsLocked        bool   // Only used for updates
+	IsExternal      bool   // Optional: defaults to false
 	DeployedVmQuota int    // Optional: 0 means "unlimited"
 	StoredVmQuota   int    // Optional: 0 means "unlimited"
 	FullName        string // Optional
@@ -173,16 +174,16 @@ func (adminOrg *AdminOrg) GetUserByNameOrId(ctx context.Context, identifier stri
 	return entity.(*OrgUser), err
 }
 
-// GetRole finds a role within the organization
-// Deprecated: use GetRoleReference
-func (adminOrg *AdminOrg) GetRole(roleName string) (*types.Reference, error) {
-	return adminOrg.GetRoleReference(roleName)
-}
-
 // GetRoleReference finds a role within the organization
-func (adminOrg *AdminOrg) GetRoleReference(roleName string) (*types.Reference, error) {
+func (adminOrg *AdminOrg) GetRoleReference(ctx context.Context, roleName string) (*types.Reference, error) {
 
-	// There is no need to refresh the AdminOrg, until we implement CRUD for roles
+	// We force refresh of the organization, to make sure that roles recently created
+	// are taken into account.
+	// This will become unnecessary when we refactor the User management with OpenAPI
+	err := adminOrg.Refresh(ctx)
+	if err != nil {
+		return nil, err
+	}
 	for _, role := range adminOrg.AdminOrg.RoleReferences.RoleReference {
 		if role.Name == roleName {
 			return role, nil
@@ -284,13 +285,18 @@ func (adminOrg *AdminOrg) CreateUserSimple(ctx context.Context, userData OrgUser
 	if userData.Name == "" {
 		return nil, fmt.Errorf("name is mandatory to create a user")
 	}
-	if userData.Password == "" {
+	if userData.Password == "" && !userData.IsExternal {
 		return nil, fmt.Errorf("password is mandatory to create a user")
 	}
+	if userData.Password != "" && userData.IsExternal {
+		// External users don't need to provide a password
+		userData.Password = ""
+	}
+
 	if userData.RoleName == "" {
 		return nil, fmt.Errorf("role is mandatory to create a user")
 	}
-	role, err := adminOrg.GetRoleReference(userData.RoleName)
+	role, err := adminOrg.GetRoleReference(ctx, userData.RoleName)
 	if err != nil {
 		return nil, fmt.Errorf("error finding a role named %s", userData.RoleName)
 	}
@@ -301,6 +307,7 @@ func (adminOrg *AdminOrg) CreateUserSimple(ctx context.Context, userData OrgUser
 		ProviderType:    userData.ProviderType,
 		Name:            userData.Name,
 		IsEnabled:       userData.IsEnabled,
+		IsExternal:      userData.IsExternal,
 		Password:        userData.Password,
 		DeployedVmQuota: userData.DeployedVmQuota,
 		StoredVmQuota:   userData.StoredVmQuota,
@@ -333,8 +340,9 @@ func (user *OrgUser) GetRoleName() string {
 // Expected behaviour:
 // with takeOwnership = true, all entities owned by the user being deleted will be transferred to the caller.
 // with takeOwnership = false, if the user own catalogs, networks, or running VMs/vApps, the call will fail.
-//                             If the user owns only powered-off VMs/vApps, the call will succeeds and the
-//                             VMs/vApps will be removed.
+//
+//	If the user owns only powered-off VMs/vApps, the call will succeeds and the
+//	VMs/vApps will be removed.
 func (user *OrgUser) Delete(ctx context.Context, takeOwnership bool) error {
 	util.Logger.Printf("[TRACE] Deleting user: %#v (take ownership: %v)", user.User.Name, takeOwnership)
 
@@ -386,9 +394,10 @@ func (user *OrgUser) UpdateSimple(ctx context.Context, userData OrgUserConfigura
 	user.User.DeployedVmQuota = userData.DeployedVmQuota
 	user.User.IsEnabled = userData.IsEnabled
 	user.User.IsLocked = userData.IsLocked
+	user.User.IsExternal = userData.IsExternal
 
 	if userData.RoleName != "" && user.User.Role != nil && user.User.Role.Name != userData.RoleName {
-		newRole, err := user.AdminOrg.GetRoleReference(userData.RoleName)
+		newRole, err := user.AdminOrg.GetRoleReference(ctx, userData.RoleName)
 		if err != nil {
 			return err
 		}
@@ -485,7 +494,7 @@ func (user *OrgUser) ChangeRole(ctx context.Context, roleName string) error {
 		return fmt.Errorf("new role is the same as current role")
 	}
 
-	newRole, err := user.AdminOrg.GetRoleReference(roleName)
+	newRole, err := user.AdminOrg.GetRoleReference(ctx, roleName)
 	if err != nil {
 		return err
 	}
@@ -525,8 +534,12 @@ func validateUserForCreation(user *types.User) error {
 	if user.Name == "" {
 		return fmt.Errorf(missingField, "Name")
 	}
-	if user.Password == "" {
+	if user.Password == "" && !user.IsExternal {
 		return fmt.Errorf(missingField, "Password")
+	}
+	if user.Password != "" && user.IsExternal {
+		// External users don't need to provide a password
+		user.Password = ""
 	}
 	if user.ProviderType != "" {
 		validProviderType := false

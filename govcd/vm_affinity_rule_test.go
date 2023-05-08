@@ -1,4 +1,4 @@
-// +build vdc affinity functional ALL
+//go:build vdc || affinity || functional || ALL
 
 /*
  * Copyright 2020 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -308,7 +308,7 @@ func makeVappGroup(ctx context.Context, label string, vdc *Vdc, groupDefinition 
 		if testVerbose {
 			fmt.Printf("Creating vApp %s\n", vappName)
 		}
-		vapp, err := makeEmptyVapp(ctx, vdc, vappName)
+		vapp, err := makeEmptyVapp(ctx, vdc, vappName, "")
 		if err != nil {
 			return nil, err
 		}

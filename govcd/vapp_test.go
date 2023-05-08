@@ -1,7 +1,7 @@
-// +build vapp functional ALL
+//go:build vapp || functional || ALL
 
 /*
- * Copyright 2019 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
+ * Copyright 2021 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
  */
 
 package govcd
@@ -9,6 +9,7 @@ package govcd
 import (
 	"fmt"
 	"regexp"
+	"time"
 
 	. "gopkg.in/check.v1"
 
@@ -462,7 +463,7 @@ func (vcd *TestVCD) Test_AddNewVMNilNIC(check *C) {
 	vapptemplate, err := catitem.GetVAppTemplate(ctx)
 	check.Assert(err, IsNil)
 
-	vapp, err := createVappForTest(ctx, vcd, "Test_AddNewVMNilNIC")
+	vapp, err := deployVappForTest(ctx, vcd, "Test_AddNewVMNilNIC")
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
 	task, err := vapp.AddNewVM(ctx, check.TestName(), vapptemplate, nil, true)
@@ -517,7 +518,7 @@ func (vcd *TestVCD) Test_AddNewVMMultiNIC(check *C) {
 	vapptemplate, err := catitem.GetVAppTemplate(ctx)
 	check.Assert(err, IsNil)
 
-	vapp, err := createVappForTest(ctx, vcd, "Test_AddNewVMMultiNIC")
+	vapp, err := deployVappForTest(ctx, vcd, "Test_AddNewVMMultiNIC")
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
 
@@ -670,6 +671,22 @@ func (vcd *TestVCD) Test_RemoveAllNetworks(check *C) {
 
 	check.Assert(len(networkConfig.NetworkConfig), Equals, 2)
 
+	// Network removal requires for the vApp to be down therefore attempt to power off vApp before
+	// network removal, but ignore error as it might already be powered off
+	vappStatus, err := vcd.vapp.GetStatus(ctx)
+	check.Assert(err, IsNil)
+
+	if vappStatus != "POWERED_OFF" {
+		task, err := vcd.vapp.Undeploy(ctx)
+		check.Assert(err, IsNil)
+		err = task.WaitTaskCompletion(ctx)
+		check.Assert(err, IsNil)
+	}
+
+	vappStatus, err = vcd.vapp.GetStatus(ctx)
+	check.Assert(err, IsNil)
+	printVerbose("vApp status before network removal: %s\n", vappStatus)
+
 	task, err := vcd.vapp.RemoveAllNetworks(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(ctx)
@@ -689,6 +706,12 @@ func (vcd *TestVCD) Test_RemoveAllNetworks(check *C) {
 
 	}
 	check.Assert(hasNetworks, Equals, false)
+
+	// Power on shared vApp for other tests
+	task, err = vcd.vapp.PowerOn(ctx)
+	check.Assert(err, IsNil)
+	err = task.WaitTaskCompletion(ctx)
+	check.Assert(err, IsNil)
 }
 
 // Test_VappSetProductSectionList sets vApp product section, retrieves it and deeply matches if
@@ -757,7 +780,7 @@ func (vcd *TestVCD) Test_GetVM(check *C) {
 func (vcd *TestVCD) Test_AddAndRemoveIsolatedVappNetwork(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
 
-	vapp, err := createVappForTest(ctx, vcd, "Test_AddAndRemoveIsolatedVappNetwork")
+	vapp, err := deployVappForTest(ctx, vcd, "Test_AddAndRemoveIsolatedVappNetwork")
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
 
@@ -837,6 +860,98 @@ func (vcd *TestVCD) Test_AddAndRemoveIsolatedVappNetwork(check *C) {
 	check.Assert(task.Task.Status, Equals, "success")
 }
 
+// Test_AddAndRemoveIsolatedVappNetworkIpv6 is identical to Test_AddAndRemoveIsolatedVappNetwork,
+// but it uses ipv6 values for network specification.
+func (vcd *TestVCD) Test_AddAndRemoveIsolatedVappNetworkIpv6(check *C) {
+	fmt.Printf("Running: %s\n", check.TestName())
+
+	vapp, err := deployVappForTest(ctx, vcd, "Test_AddAndRemoveIsolatedVappNetwork")
+	check.Assert(err, IsNil)
+	check.Assert(vapp, NotNil)
+
+	// Add Metadata
+	networkName := check.TestName()
+	description := "Created in test"
+	const gateway = "fe80:0:0:0:0:0:0:aaaa"
+	const prefixlength = "100"
+	// VCD API returns ipv6 addresses in expanded format, so this is
+	// needed to compare values properly.
+	const dns1 = "2001:4860:4860:0:0:0:0:8844"
+	const dns2 = "2001:4860:4860:0:0:0:0:8844"
+	const dnsSuffix = "biz.biz"
+	const startAddress = "fe80:0:0:0:0:0:0:aaab"
+	const endAddress = "fe80:0:0:0:0:0:0:bbbb"
+	const dhcpStartAddress = "fe80:0:0:0:0:0:0:cccc"
+	const dhcpEndAddress = "fe80:0:0:0:0:0:0:dddd"
+	const maxLeaseTime = 3500
+	const defaultLeaseTime = 2400
+	var guestVlanAllowed = true
+
+	vappNetworkSettings := &VappNetworkSettings{
+		Name:               networkName,
+		Gateway:            gateway,
+		SubnetPrefixLength: prefixlength,
+		DNS1:               dns1,
+		DNS2:               dns2,
+		DNSSuffix:          dnsSuffix,
+		StaticIPRanges:     []*types.IPRange{{StartAddress: startAddress, EndAddress: endAddress}},
+		DhcpSettings:       &DhcpSettings{IsEnabled: true, MaxLeaseTime: maxLeaseTime, DefaultLeaseTime: defaultLeaseTime, IPRange: &types.IPRange{StartAddress: dhcpStartAddress, EndAddress: dhcpEndAddress}},
+		GuestVLANAllowed:   &guestVlanAllowed,
+		Description:        description,
+	}
+
+	vappNetworkConfig, err := vapp.CreateVappNetwork(ctx, vappNetworkSettings, nil)
+	check.Assert(err, IsNil)
+	check.Assert(vappNetworkConfig, NotNil)
+
+	vappNetworkSettings.NetMask = "255.255.255.0"
+	vappNetworkConfig2, err := vapp.CreateVappNetwork(ctx, vappNetworkSettings, nil)
+	check.Assert(err, NotNil)
+	check.Assert(vappNetworkConfig2, IsNil)
+
+	networkFound := types.VAppNetworkConfiguration{}
+	for _, networkConfig := range vappNetworkConfig.NetworkConfig {
+		if networkConfig.NetworkName == networkName {
+			networkFound = networkConfig
+		}
+	}
+
+	check.Assert(networkFound.Description, Equals, description)
+	check.Assert(networkFound.Configuration.IPScopes.IPScope[0].Gateway, Equals, gateway)
+	check.Assert(networkFound.Configuration.IPScopes.IPScope[0].SubnetPrefixLength, Equals, prefixlength)
+	check.Assert(networkFound.Configuration.IPScopes.IPScope[0].DNS1, Equals, dns1)
+	check.Assert(networkFound.Configuration.IPScopes.IPScope[0].DNS2, Equals, dns2)
+	check.Assert(networkFound.Configuration.IPScopes.IPScope[0].DNSSuffix, Equals, dnsSuffix)
+	check.Assert(networkFound.Configuration.IPScopes.IPScope[0].IPRanges.IPRange[0].StartAddress, Equals, startAddress)
+	check.Assert(networkFound.Configuration.IPScopes.IPScope[0].IPRanges.IPRange[0].EndAddress, Equals, endAddress)
+
+	check.Assert(networkFound.Configuration.Features.DhcpService.IsEnabled, Equals, true)
+	check.Assert(networkFound.Configuration.Features.DhcpService.MaxLeaseTime, Equals, maxLeaseTime)
+	check.Assert(networkFound.Configuration.Features.DhcpService.DefaultLeaseTime, Equals, defaultLeaseTime)
+	check.Assert(networkFound.Configuration.Features.DhcpService.IPRange.StartAddress, Equals, dhcpStartAddress)
+	check.Assert(networkFound.Configuration.Features.DhcpService.IPRange.EndAddress, Equals, dhcpEndAddress)
+
+	err = vapp.Refresh(ctx)
+	check.Assert(err, IsNil)
+	vappNetworkConfig, err = vapp.RemoveNetwork(ctx, networkName)
+	check.Assert(err, IsNil)
+	check.Assert(vappNetworkConfig, NotNil)
+
+	isExist := false
+	for _, networkConfig := range vappNetworkConfig.NetworkConfig {
+		if networkConfig.NetworkName == networkName {
+			isExist = true
+		}
+	}
+	check.Assert(isExist, Equals, false)
+
+	task, err := vapp.Delete(ctx)
+	check.Assert(err, IsNil)
+	err = task.WaitTaskCompletion(ctx)
+	check.Assert(err, IsNil)
+	check.Assert(task.Task.Status, Equals, "success")
+}
+
 func (vcd *TestVCD) Test_AddAndRemoveNatVappNetwork(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
 
@@ -844,7 +959,7 @@ func (vcd *TestVCD) Test_AddAndRemoveNatVappNetwork(check *C) {
 		check.Skip("Skipping test because no network was given")
 	}
 
-	vapp, err := createVappForTest(ctx, vcd, "Test_AddAndRemoveNatVappNetwork")
+	vapp, err := deployVappForTest(ctx, vcd, "Test_AddAndRemoveNatVappNetwork")
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
 
@@ -941,7 +1056,7 @@ func (vcd *TestVCD) Test_UpdateVappNetwork(check *C) {
 		check.Skip("Skipping test because no network was given")
 	}
 
-	vapp, err := createVappForTest(ctx, vcd, "Test_UpdateVappNetwork")
+	vapp, err := deployVappForTest(ctx, vcd, "Test_UpdateVappNetwork")
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
 
@@ -1100,7 +1215,7 @@ func (vcd *TestVCD) Test_UpdateVappNetwork(check *C) {
 func (vcd *TestVCD) Test_AddAndRemoveVappNetworkWithMinimumValues(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
 
-	vapp, err := createVappForTest(ctx, vcd, "Test_AddAndRemoveVappNetworkWithMinimumValues")
+	vapp, err := deployVappForTest(ctx, vcd, "Test_AddAndRemoveVappNetworkWithMinimumValues")
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
 
@@ -1170,7 +1285,7 @@ func (vcd *TestVCD) Test_AddAndRemoveOrgVappNetworkWithMinimumValues(check *C) {
 		check.Skip("Skipping test because no network was given")
 	}
 
-	vapp, err := createVappForTest(ctx, vcd, "Test_AddAndRemoveOrgVappNetworkWithMinimumValues")
+	vapp, err := deployVappForTest(ctx, vcd, "Test_AddAndRemoveOrgVappNetworkWithMinimumValues")
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
 
@@ -1204,7 +1319,7 @@ func (vcd *TestVCD) Test_AddAndRemoveOrgVappNetworkWithMinimumValues(check *C) {
 
 	check.Assert(networkFound.Configuration.ParentNetwork.Name, Equals, vcd.config.VCD.Network.Net1)
 
-	err = vcd.vapp.Refresh(ctx)
+	err = vapp.Refresh(ctx)
 	check.Assert(err, IsNil)
 	vappNetworkConfig, err = vapp.RemoveNetwork(ctx, vcd.config.VCD.Network.Net1)
 	check.Assert(err, IsNil)
@@ -1232,7 +1347,7 @@ func (vcd *TestVCD) Test_AddAndRemoveOrgVappNetwork(check *C) {
 		check.Skip("Skipping test because no network was given")
 	}
 
-	vapp, err := createVappForTest(ctx, vcd, "Test_AddAndRemoveOrgVappNetwork")
+	vapp, err := deployVappForTest(ctx, vcd, "Test_AddAndRemoveOrgVappNetwork")
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
 
@@ -1295,7 +1410,7 @@ func (vcd *TestVCD) Test_UpdateOrgVappNetwork(check *C) {
 		check.Skip("Skipping test because no network was given")
 	}
 
-	vapp, err := createVappForTest(ctx, vcd, "Test_UpdateOrgVappNetwork")
+	vapp, err := deployVappForTest(ctx, vcd, "Test_UpdateOrgVappNetwork")
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
 
@@ -1419,14 +1534,14 @@ func (vcd *TestVCD) Test_AddNewVMFromMultiVmTemplate(check *C) {
 		check.Log("Using `CatalogItemWithMultiVms` for test")
 	}
 
-	vmInTemplateRecord, err := vcd.vdc.QueryVappVmTemplate(ctx, vcd.config.VCD.Catalog.Name, itemName, vcd.config.VCD.Catalog.VmNameInMultiVmItem)
+	vmInTemplateRecord, err := vcd.vdc.QueryVappSynchronizedVmTemplate(ctx, vcd.config.VCD.Catalog.Name, itemName, vcd.config.VCD.Catalog.VmNameInMultiVmItem)
 	check.Assert(err, IsNil)
 
 	// Get VAppTemplate
 	returnedVappTemplate, err := catalog.GetVappTemplateByHref(ctx, vmInTemplateRecord.HREF)
 	check.Assert(err, IsNil)
 
-	vapp, err := createVappForTest(ctx, vcd, "Test_AddNewVMFromMultiVmTemplate")
+	vapp, err := deployVappForTest(ctx, vcd, "Test_AddNewVMFromMultiVmTemplate")
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
 	task, err := vapp.AddNewVM(ctx, check.TestName(), *returnedVappTemplate, nil, true)
@@ -1448,15 +1563,17 @@ func (vcd *TestVCD) Test_AddNewVMFromMultiVmTemplate(check *C) {
 	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
+
+	// Remove catalog item so far other tests don't fail
+	catalogItem, err := catalog.GetCatalogItemByName(ctx, itemName, true)
+	check.Assert(err, IsNil)
+
+	err = catalogItem.Delete(ctx)
+	check.Assert(err, IsNil)
 }
 
 // Test_AddNewVMWithComputeCapacity creates a new VM in vApp with VM using compute capacity
 func (vcd *TestVCD) Test_AddNewVMWithComputeCapacity(check *C) {
-
-	if vcd.client.Client.APIVCDMaxVersionIs(ctx, "< 33.0") {
-		check.Skip(fmt.Sprintf("Test %s requires VCD 10.0 (API version 33) or higher", check.TestName()))
-	}
-
 	if vcd.skipVappTests {
 		check.Skip("Skipping test because vApp was not successfully created at setup")
 	}
@@ -1480,7 +1597,7 @@ func (vcd *TestVCD) Test_AddNewVMWithComputeCapacity(check *C) {
 	vapptemplate, err := catitem.GetVAppTemplate(ctx)
 	check.Assert(err, IsNil)
 
-	vapp, err := createVappForTest(ctx, vcd, "Test_AddNewVMWithComputeCapacity")
+	vapp, err := deployVappForTest(ctx, vcd, "Test_AddNewVMWithComputeCapacity")
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
 
@@ -1489,7 +1606,7 @@ func (vcd *TestVCD) Test_AddNewVMWithComputeCapacity(check *C) {
 		client: vcd.org.client,
 		VdcComputePolicy: &types.VdcComputePolicy{
 			Name:        check.TestName() + "_empty",
-			Description: "Empty policy created by test",
+			Description: takeStringPointer("Empty policy created by test"),
 		},
 	}
 
@@ -1563,5 +1680,176 @@ func (vcd *TestVCD) Test_AddNewVMWithComputeCapacity(check *C) {
 	}
 
 	_, err = adminVdc.SetAssignedComputePolicies(ctx, types.VdcComputePolicyReferences{VdcComputePolicyReference: beforeTestPolicyReferences})
+	check.Assert(err, IsNil)
+}
+
+func (vcd *TestVCD) testUpdateVapp(op string, check *C, vapp *VApp, name, description string, vms []string) {
+
+	var err error
+	switch op {
+	case "update_desc", "remove_desc":
+		printVerbose("[%s] testing vapp.UpdateDescription(\"%s\")\n", op, description)
+		err = vapp.UpdateDescription(ctx, description)
+		check.Assert(err, IsNil)
+	case "update_both":
+		printVerbose("[%s] testing vapp.UpdateNameDescription(\"%s\", \"%s\")\n", op, name, description)
+		err = vapp.UpdateNameDescription(ctx, name, description)
+		check.Assert(err, IsNil)
+	case "rename":
+		printVerbose("[%s] testing vapp.Rename(\"%s\")\n", op, name)
+		err = vapp.Rename(ctx, name)
+		check.Assert(err, IsNil)
+	default:
+		check.Assert("unhandled operation", Equals, "true")
+	}
+
+	if name == "" {
+		name = vapp.VApp.Name
+	}
+
+	// Get a fresh copy of the vApp
+	vapp, err = vcd.vdc.GetVAppByName(ctx, name, true)
+	check.Assert(err, IsNil)
+
+	check.Assert(vapp.VApp.Name, Equals, name)
+	check.Assert(vapp.VApp.Description, Equals, description)
+	// check that the VMs still exist after vApp update
+	for _, vm := range vms {
+		printVerbose("checking VM %s\n", vm)
+		_, err = vapp.GetVMByName(ctx, vm, true)
+		check.Assert(err, IsNil)
+	}
+}
+
+func (vcd *TestVCD) Test_UpdateVappNameDescription(check *C) {
+
+	fmt.Printf("Running: %s\n", check.TestName())
+
+	vappName := check.TestName()
+	vappDescription := vappName + " description"
+	newVappName := vappName + "_new"
+
+	newVappDescription := vappName + " desc"
+	// Compose VApp
+	vapp, err := makeEmptyVapp(ctx, vcd.vdc, vappName, vappDescription)
+	check.Assert(err, IsNil)
+	AddToCleanupList(vappName, "vapp", "", "Test_RenameVapp")
+
+	check.Assert(vapp.VApp.Name, Equals, vappName)
+	check.Assert(vapp.VApp.Description, Equals, vappDescription)
+
+	// Need a slight delay for the vApp to get the links that are needed for renaming
+	time.Sleep(time.Second)
+
+	// change description
+	vcd.testUpdateVapp("update_desc", check, vapp, "", newVappDescription, nil)
+
+	// remove description
+	vcd.testUpdateVapp("remove_desc", check, vapp, vappName, "", nil)
+
+	// restore original
+	vcd.testUpdateVapp("update_both", check, vapp, vappName, vappDescription, nil)
+
+	// change name
+	vcd.testUpdateVapp("rename", check, vapp, newVappName, vappDescription, nil)
+	AddToCleanupList(newVappName, "vapp", "", "Test_RenameVapp")
+	// restore original
+	vcd.testUpdateVapp("update_both", check, vapp, vappName, vappDescription, nil)
+
+	// Add two VMs
+	_, err = makeEmptyVm(ctx, vapp, "vm1")
+	check.Assert(err, IsNil)
+	_, err = makeEmptyVm(ctx, vapp, "vm2")
+	check.Assert(err, IsNil)
+
+	vms := []string{"vm1", "vm2"}
+	// change description after adding VMs
+	vcd.testUpdateVapp("update_desc", check, vapp, "", newVappDescription, vms)
+	vcd.testUpdateVapp("remove_desc", check, vapp, vappName, "", nil)
+	// restore original
+	vcd.testUpdateVapp("update_both", check, vapp, vappName, vappDescription, vms)
+
+	// change name after adding VMs
+	vcd.testUpdateVapp("rename", check, vapp, newVappName, vappDescription, vms)
+	// restore original
+	vcd.testUpdateVapp("update_both", check, vapp, vappName, vappDescription, vms)
+
+	// Remove vApp
+	err = deleteVapp(ctx, vcd, vappName)
+	check.Assert(err, IsNil)
+}
+
+func (vcd *TestVCD) Test_Vapp_LeaseUpdate(check *C) {
+	fmt.Printf("Running: %s\n", check.TestName())
+
+	if vcd.config.VCD.Org == "" {
+		check.Skip("Organization not set in configuration")
+	}
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
+	check.Assert(err, IsNil)
+	orgVappLease := org.AdminOrg.OrgSettings.OrgVAppLeaseSettings
+
+	vappName := check.TestName()
+	vappDescription := vappName + " description"
+
+	vapp, err := makeEmptyVapp(ctx, vcd.vdc, vappName, vappDescription)
+	check.Assert(err, IsNil)
+	AddToCleanupList(vappName, "vapp", "", "Test_Vapp_GetLease")
+
+	lease, err := vapp.GetLease(ctx)
+	check.Assert(err, IsNil)
+	check.Assert(lease, NotNil)
+
+	// Check that lease in vApp is the same as the default lease in the organization
+	check.Assert(lease.StorageLeaseInSeconds, Equals, *orgVappLease.StorageLeaseSeconds)
+	check.Assert(lease.DeploymentLeaseInSeconds, Equals, *orgVappLease.DeploymentLeaseSeconds)
+	if testVerbose {
+		fmt.Printf("lease deployment at Org level: %d\n", *orgVappLease.DeploymentLeaseSeconds)
+		fmt.Printf("lease storage at Org level: %d\n", *orgVappLease.StorageLeaseSeconds)
+		fmt.Printf("lease deployment in vApp before: %d\n", lease.DeploymentLeaseInSeconds)
+		fmt.Printf("lease storage in vApp before: %d\n", lease.StorageLeaseInSeconds)
+	}
+	secondsInDay := 60 * 60 * 24
+
+	// Set lease to 90 days deployment, 7 days storage
+	err = vapp.RenewLease(ctx, secondsInDay*90, secondsInDay*7)
+	check.Assert(err, IsNil)
+
+	// Make sure the vApp internal values were updated
+	check.Assert(vapp.VApp.LeaseSettingsSection.DeploymentLeaseInSeconds, Equals, secondsInDay*90)
+	check.Assert(vapp.VApp.LeaseSettingsSection.StorageLeaseInSeconds, Equals, secondsInDay*7)
+
+	newLease, err := vapp.GetLease(ctx)
+	check.Assert(err, IsNil)
+	check.Assert(newLease, NotNil)
+	check.Assert(newLease.DeploymentLeaseInSeconds, Equals, secondsInDay*90)
+	check.Assert(newLease.StorageLeaseInSeconds, Equals, secondsInDay*7)
+
+	if testVerbose {
+		fmt.Printf("lease deployment in vApp after: %d\n", newLease.DeploymentLeaseInSeconds)
+		fmt.Printf("lease storage in vApp after: %d\n", newLease.StorageLeaseInSeconds)
+	}
+
+	// Set lease to "never expires", which defaults to the Org maximum lease if the Org itself has lower limits
+	err = vapp.RenewLease(ctx, 0, 0)
+	check.Assert(err, IsNil)
+
+	check.Assert(vapp.VApp.LeaseSettingsSection.DeploymentLeaseInSeconds, Equals, *orgVappLease.DeploymentLeaseSeconds)
+
+	check.Assert(vapp.VApp.LeaseSettingsSection.StorageLeaseInSeconds, Equals, *orgVappLease.StorageLeaseSeconds)
+
+	if *orgVappLease.DeploymentLeaseSeconds != 0 {
+		// Check that setting a lease higher than allowed by the Org settings results in the defaults lease being set
+		err = vapp.RenewLease(ctx, *orgVappLease.DeploymentLeaseSeconds+3600,
+			*orgVappLease.StorageLeaseSeconds+3600)
+		check.Assert(err, IsNil)
+
+		check.Assert(vapp.VApp.LeaseSettingsSection.DeploymentLeaseInSeconds, Equals, *orgVappLease.DeploymentLeaseSeconds)
+		check.Assert(vapp.VApp.LeaseSettingsSection.StorageLeaseInSeconds, Equals, *orgVappLease.StorageLeaseSeconds)
+	}
+
+	task, err := vapp.Delete(ctx)
+	check.Assert(err, IsNil)
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 }

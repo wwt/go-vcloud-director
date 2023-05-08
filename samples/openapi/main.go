@@ -61,11 +61,6 @@ func main() {
 		os.Exit(3)
 	}
 
-	if vcdCli.Client.APIVCDMaxVersionIs(ctx, "< 33.0") {
-		fmt.Println("This example requires VCD API to support at least version 33.0 (VCD 10.0) to use '1.0.0/auditTrail' endpoint")
-		os.Exit(4)
-	}
-
 	switch mode {
 	case "1":
 		openAPIGetRawJsonAuditTrail(ctx, vcdCli)
@@ -90,7 +85,7 @@ func openAPIGetRawJsonAuditTrail(ctx context.Context, vcdClient *govcd.VCDClient
 	queryParams.Add("filter", "timestamp=gt="+filterTime)
 
 	allResponses := []json.RawMessage{{}}
-	err = vcdClient.Client.OpenApiGetAllItems(ctx, "33.0", urlRef, queryParams, &allResponses)
+	err = vcdClient.Client.OpenApiGetAllItems(ctx, "35.0", urlRef, queryParams, &allResponses, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -148,7 +143,7 @@ func openAPIGetStructAuditTrail(ctx context.Context, vcdClient *govcd.VCDClient)
 	filterTime := time.Now().Add(-12 * time.Hour).Format(types.FiqlQueryTimestampFormat)
 	queryParams.Add("filter", "timestamp=gt="+filterTime)
 
-	err = vcdClient.Client.OpenApiGetAllItems(ctx, "33.0", urlRef, queryParams, &response)
+	err = vcdClient.Client.OpenApiGetAllItems(ctx, "35.0", urlRef, queryParams, &response, nil)
 	if err != nil {
 		panic(err)
 	}

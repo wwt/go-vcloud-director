@@ -1,4 +1,4 @@
-// +build auth functional ALL
+//go:build auth || functional || ALL
 
 /*
  * Copyright 2020 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -11,7 +11,9 @@ import (
 )
 
 // Test_SamlAdfsAuth checks if SAML ADFS login works using WS-TRUST endpoint
-//  "/adfs/services/trust/13/usernamemixed".
+//
+//	"/adfs/services/trust/13/usernamemixed".
+//
 // Credential variables must be specified in test configuration for it to work
 // The steps of this test are:
 // * Query object using test framework vCD connection
@@ -26,6 +28,7 @@ func (vcd *TestVCD) Test_SamlAdfsAuth(check *C) {
 	if cfg.Provider.SamlUser == "" || cfg.Provider.SamlPassword == "" || cfg.VCD.Org == "" {
 		check.Skip("Skipping test because no Org, SamlUser, SamlPassword and was specified")
 	}
+	vcd.checkSkipWhenApiToken(check)
 
 	// Get vDC details using existing vCD client
 	org, err := vcd.client.GetOrgByName(ctx, cfg.VCD.Org)

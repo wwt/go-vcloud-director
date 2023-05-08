@@ -61,7 +61,7 @@ func (orgVdcNet *OrgVDCNetwork) Delete(ctx context.Context) (Task, error) {
 		return Task{}, fmt.Errorf("error refreshing network: %s", err)
 	}
 	pathArr := strings.Split(orgVdcNet.OrgVDCNetwork.HREF, "/")
-	apiEndpoint, _ := url.ParseRequestURI(orgVdcNet.OrgVDCNetwork.HREF)
+	apiEndpoint := urlParseRequestURI(orgVdcNet.OrgVDCNetwork.HREF)
 	apiEndpoint.Path = "/api/admin/network/" + pathArr[len(pathArr)-1]
 
 	var resp *http.Response
@@ -200,8 +200,8 @@ func (vdc *Vdc) CreateOrgVDCNetwork(ctx context.Context, networkConfig *types.Or
 // GetNetworkList returns a list of networks for the VDC
 func (vdc *Vdc) GetNetworkList(ctx context.Context) ([]*types.QueryResultOrgVdcNetworkRecordType, error) {
 	// Find the list of networks with the wanted name
-	result, err := vdc.client.QueryWithNotEncodedParams(ctx, nil, map[string]string{
-		"type":          "orgVdcNetwork",
+	result, err := vdc.client.cumulativeQuery(ctx, types.QtOrgVdcNetwork, nil, map[string]string{
+		"type":          types.QtOrgVdcNetwork,
 		"filter":        fmt.Sprintf("vdc==%s", url.QueryEscape(vdc.Vdc.ID)),
 		"filterEncoded": "true",
 	})
@@ -216,8 +216,8 @@ func (vdc *Vdc) GetNetworkList(ctx context.Context) ([]*types.QueryResultOrgVdcN
 func (vdc *Vdc) FindEdgeGatewayNameByNetwork(ctx context.Context, networkName string) (string, error) {
 
 	// Find the list of networks with the wanted name
-	result, err := vdc.client.QueryWithNotEncodedParams(ctx, nil, map[string]string{
-		"type":          "orgVdcNetwork",
+	result, err := vdc.client.cumulativeQuery(ctx, types.QtOrgVdcNetwork, nil, map[string]string{
+		"type":          types.QtOrgVdcNetwork,
 		"filter":        fmt.Sprintf("name==%s;vdc==%s", url.QueryEscape(networkName), url.QueryEscape(vdc.Vdc.ID)),
 		"filterEncoded": "true",
 	})

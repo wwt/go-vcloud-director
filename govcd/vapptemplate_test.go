@@ -1,4 +1,4 @@
-// +build vapp functional ALL
+//go:build vapp || functional || ALL
 
 /*
  * Copyright 2018 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -9,7 +9,6 @@ package govcd
 import (
 	"context"
 	"fmt"
-
 	. "gopkg.in/check.v1"
 )
 
@@ -47,4 +46,99 @@ func (vcd *TestVCD) Test_RefreshVAppTemplate(check *C) {
 	check.Assert(oldVAppTemplate.VAppTemplate.ID, Equals, vAppTemplate.VAppTemplate.ID)
 	check.Assert(oldVAppTemplate.VAppTemplate.Name, Equals, vAppTemplate.VAppTemplate.Name)
 	check.Assert(oldVAppTemplate.VAppTemplate.HREF, Equals, vAppTemplate.VAppTemplate.HREF)
+}
+
+func (vcd *TestVCD) Test_UpdateAndDeleteVAppTemplateFromOvaFile(check *C) {
+	testUploadAndDeleteVAppTemplate(vcd, check, false)
+}
+
+func (vcd *TestVCD) Test_UpdateAndDeleteVAppTemplateFromUrl(check *C) {
+	testUploadAndDeleteVAppTemplate(vcd, check, true)
+}
+
+func (vcd *TestVCD) Test_GetInformationFromVAppTemplate(check *C) {
+	fmt.Printf("Running: %s\n", check.TestName())
+	if vcd.config.VCD.Catalog.Name == "" {
+		check.Skip(check.TestName() + ": Catalog not given in testing configuration. Test can't proceed")
+	}
+
+	if vcd.config.VCD.Catalog.CatalogItem == "" {
+		check.Skip(check.TestName() + ": Catalog Item not given in testing configuration. Test can't proceed")
+	}
+
+	catalog, err := vcd.org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
+	check.Assert(err, IsNil)
+	check.Assert(catalog, NotNil)
+	vAppTemplate, err := catalog.GetVAppTemplateByName(ctx, vcd.config.VCD.Catalog.CatalogItem)
+	check.Assert(err, IsNil)
+	check.Assert(vAppTemplate, NotNil)
+
+	catalogName, err := vAppTemplate.GetCatalogName(ctx)
+	check.Assert(err, IsNil)
+	check.Assert(catalogName, Equals, catalog.Catalog.Name)
+
+	vdcId, err := vAppTemplate.GetVdcName(ctx)
+	check.Assert(err, IsNil)
+	check.Assert(vdcId, Equals, vcd.vdc.Vdc.Name)
+}
+
+func testUploadAndDeleteVAppTemplate(vcd *TestVCD, check *C, isOvfLink bool) {
+	fmt.Printf("Running: %s\n", check.TestName())
+	catalog, err := vcd.org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
+	if err != nil {
+		check.Skip(check.TestName() + ": Catalog not found. Test can't proceed")
+		return
+	}
+	check.Assert(catalog, NotNil)
+
+	itemName := check.TestName()
+
+	description := "upload from test"
+
+	if isOvfLink {
+		uploadTask, err := catalog.UploadOvfByLink(ctx, vcd.config.OVA.OvfUrl, itemName, description)
+		check.Assert(err, IsNil)
+		err = uploadTask.WaitTaskCompletion(ctx)
+		check.Assert(err, IsNil)
+	} else {
+		task, err := catalog.UploadOvf(ctx, vcd.config.OVA.OvaPath, itemName, description, 1024)
+		check.Assert(err, IsNil)
+		err = task.WaitTaskCompletion(ctx)
+		check.Assert(err, IsNil)
+	}
+
+	AddToCleanupList(itemName, "catalogItem", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.Name, check.TestName())
+
+	vAppTemplate, err := catalog.GetVAppTemplateByName(ctx, itemName)
+	check.Assert(err, IsNil)
+	check.Assert(vAppTemplate, NotNil)
+	check.Assert(vAppTemplate.VAppTemplate.Name, Equals, itemName)
+
+	// FIXME: Due to bug in OVF Link upload in VCD, this assert is skipped
+	if !isOvfLink {
+		check.Assert(vAppTemplate.VAppTemplate.Description, Equals, description)
+	}
+
+	nameForUpdate := itemName + "updated"
+	descriptionForUpdate := description + "updated"
+
+	AddToCleanupList(nameForUpdate, "catalogItem", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.Name, check.TestName())
+
+	vAppTemplate.VAppTemplate.Name = nameForUpdate
+	vAppTemplate.VAppTemplate.Description = descriptionForUpdate
+	vAppTemplate.VAppTemplate.GoldMaster = true
+
+	_, err = vAppTemplate.Update(ctx)
+	check.Assert(err, IsNil)
+	err = vAppTemplate.Refresh(ctx)
+	check.Assert(err, IsNil)
+	check.Assert(vAppTemplate.VAppTemplate.Name, Equals, nameForUpdate)
+	check.Assert(vAppTemplate.VAppTemplate.Description, Equals, descriptionForUpdate)
+	check.Assert(vAppTemplate.VAppTemplate.GoldMaster, Equals, true)
+
+	err = vAppTemplate.Delete(ctx)
+	check.Assert(err, IsNil)
+	vAppTemplate, err = catalog.GetVAppTemplateByName(ctx, itemName)
+	check.Assert(err, NotNil)
+	check.Assert(vAppTemplate, IsNil)
 }

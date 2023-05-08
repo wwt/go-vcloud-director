@@ -2,7 +2,7 @@
  * Copyright 2021 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
  */
 
-// Package govcd provides a simple binding for vCloud Director REST APIs.
+// Package govcd provides a simple binding for VMware Cloud Director REST APIs.
 package govcd
 
 import (
@@ -12,11 +12,11 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,17 +24,19 @@ import (
 	"github.com/vmware/go-vcloud-director/v2/util"
 )
 
-// Client provides a client to vCloud Director, values can be populated automatically using the Authenticate method.
+// Client provides a client to VMware Cloud Director, values can be populated automatically using the Authenticate method.
 type Client struct {
-	APIVersion    string      // The API version required
-	VCDToken      string      // Access Token (authorization header)
-	VCDAuthHeader string      // Authorization header
-	VCDHREF       url.URL     // VCD API ENDPOINT
-	Http          http.Client // HttpClient is the client to use. Default will be used if not provided.
-	IsSysAdmin    bool        // flag if client is connected as system administrator
+	APIVersion       string      // The API version required
+	VCDToken         string      // Access Token (authorization header)
+	VCDAuthHeader    string      // Authorization header
+	VCDHREF          url.URL     // VCD API ENDPOINT
+	Http             http.Client // HttpClient is the client to use. Default will be used if not provided.
+	IsSysAdmin       bool        // flag if client is connected as system administrator
+	UsingBearerToken bool        // flag if client is using a bearer token
+	UsingAccessToken bool        // flag if client is using an API token
 
 	// MaxRetryTimeout specifies a time limit (in seconds) for retrying requests made by the SDK
-	// where vCloud director may take time to respond and retry mechanism is needed.
+	// where VMware Cloud Director may take time to respond and retry mechanism is needed.
 	// This must be >0 to avoid instant timeout errors.
 	MaxRetryTimeout int
 
@@ -53,20 +55,25 @@ type Client struct {
 	UserAgent string
 
 	supportedVersions SupportedVersions // Versions from /api/versions endpoint
+	customHeader      http.Header
 }
 
 // AuthorizationHeader header key used by default to set the authorization token.
 const AuthorizationHeader = "X-Vcloud-Authorization"
 
 // BearerTokenHeader is the header key containing a bearer token
+// #nosec G101 -- This is not a credential, it's just the header key
 const BearerTokenHeader = "X-Vmware-Vcloud-Access-Token"
+
+const ApiTokenHeader = "API-token"
 
 // General purpose error to be used whenever an entity is not found from a "GET" request
 // Allows a simpler checking of the call result
 // such as
-// if err == ErrorEntityNotFound {
-//    // do what is needed in case of not found
-// }
+//
+//	if err == ErrorEntityNotFound {
+//	   // do what is needed in case of not found
+//	}
 var errorEntityNotFoundMessage = "[ENF] entity not found"
 var ErrorEntityNotFound = fmt.Errorf(errorEntityNotFoundMessage)
 
@@ -75,29 +82,39 @@ var debugShowRequestEnabled = os.Getenv("GOVCD_SHOW_REQ") != ""
 var debugShowResponseEnabled = os.Getenv("GOVCD_SHOW_RESP") != ""
 
 // Enables the debugging hook to show requests as they are processed.
+//
 //lint:ignore U1000 this function is used on request for debugging purposes
 func enableDebugShowRequest() {
 	debugShowRequestEnabled = true
 }
 
 // Disables the debugging hook to show requests as they are processed.
+//
 //lint:ignore U1000 this function is used on request for debugging purposes
 func disableDebugShowRequest() {
 	debugShowRequestEnabled = false
-	_ = os.Setenv("GOVCD_SHOW_REQ", "")
+	err := os.Setenv("GOVCD_SHOW_REQ", "")
+	if err != nil {
+		util.Logger.Printf("[DEBUG - disableDebugShowRequest] error setting environment variable: %s", err)
+	}
 }
 
 // Enables the debugging hook to show responses as they are processed.
+//
 //lint:ignore U1000 this function is used on request for debugging purposes
 func enableDebugShowResponse() {
 	debugShowResponseEnabled = true
 }
 
 // Disables the debugging hook to show responses as they are processed.
+//
 //lint:ignore U1000 this function is used on request for debugging purposes
 func disableDebugShowResponse() {
 	debugShowResponseEnabled = false
-	_ = os.Setenv("GOVCD_SHOW_RESP", "")
+	err := os.Setenv("GOVCD_SHOW_RESP", "")
+	if err != nil {
+		util.Logger.Printf("[DEBUG - disableDebugShowResponse] error setting environment variable: %s", err)
+	}
 }
 
 // On-the-fly debug hook. If either debugShowRequestEnabled or the environment
@@ -137,11 +154,12 @@ func debugShowResponse(resp *http.Response, body []byte) {
 	}
 }
 
-// Convenience function, similar to os.IsNotExist that checks whether a given error
+// IsNotFound is a convenience function, similar to os.IsNotExist that checks whether a given error
 // is a "Not found" error, such as
-// if isNotFound(err) {
-//    // do what is needed in case of not found
-// }
+//
+//	if isNotFound(err) {
+//	   // do what is needed in case of not found
+//	}
 func IsNotFound(err error) bool {
 	return err != nil && err == ErrorEntityNotFound
 }
@@ -154,8 +172,8 @@ func ContainsNotFound(err error) bool {
 }
 
 // NewRequestWitNotEncodedParams allows passing complex values params that shouldn't be encoded like for queries. e.g. /query?filter=name=foo
-func (cli *Client) NewRequestWitNotEncodedParams(ctx context.Context, params map[string]string, notEncodedParams map[string]string, method string, reqUrl url.URL, body io.Reader) *http.Request {
-	return cli.NewRequestWitNotEncodedParamsWithApiVersion(ctx, params, notEncodedParams, method, reqUrl, body, cli.APIVersion)
+func (client *Client) NewRequestWitNotEncodedParams(ctx context.Context, params map[string]string, notEncodedParams map[string]string, method string, reqUrl url.URL, body io.Reader) *http.Request {
+	return client.NewRequestWitNotEncodedParamsWithApiVersion(ctx, params, notEncodedParams, method, reqUrl, body, client.APIVersion)
 }
 
 // NewRequestWitNotEncodedParamsWithApiVersion allows passing complex values params that shouldn't be encoded like for queries. e.g. /query?filter=name=foo
@@ -165,13 +183,14 @@ func (cli *Client) NewRequestWitNotEncodedParams(ctx context.Context, params map
 // * reqUrl - request url
 // * body - request body
 // * apiVersion - provided Api version overrides default Api version value used in request parameter
-func (cli *Client) NewRequestWitNotEncodedParamsWithApiVersion(ctx context.Context, params map[string]string, notEncodedParams map[string]string, method string, reqUrl url.URL, body io.Reader, apiVersion string) *http.Request {
-	return cli.newRequest(ctx, params, notEncodedParams, method, reqUrl, body, apiVersion, nil)
+
+func (client *Client) NewRequestWitNotEncodedParamsWithApiVersion(ctx context.Context, params map[string]string, notEncodedParams map[string]string, method string, reqUrl url.URL, body io.Reader, apiVersion string) *http.Request {
+	return client.newRequest(ctx, params, notEncodedParams, method, reqUrl, body, apiVersion, nil)
 }
 
 // newRequest is the parent of many "specific" "NewRequest" functions.
 // Note. It is kept private to avoid breaking public API on every new field addition.
-func (cli *Client) newRequest(ctx context.Context, params map[string]string, notEncodedParams map[string]string, method string, reqUrl url.URL, body io.Reader, apiVersion string, additionalHeader http.Header) *http.Request {
+func (client *Client) newRequest(ctx context.Context, params map[string]string, notEncodedParams map[string]string, method string, reqUrl url.URL, body io.Reader, apiVersion string, additionalHeader http.Header) *http.Request {
 	reqValues := url.Values{}
 
 	// Build up our request parameters
@@ -191,43 +210,54 @@ func (cli *Client) newRequest(ctx context.Context, params map[string]string, not
 	// If the body contains data - try to read all contents for logging and re-create another
 	// io.Reader with all contents to use it down the line
 	var readBody []byte
+	var err error
 	if body != nil {
-		readBody, _ = ioutil.ReadAll(body)
+		readBody, err = io.ReadAll(body)
+		if err != nil {
+			util.Logger.Printf("[DEBUG - newRequest] error reading body: %s", err)
+		}
 		body = bytes.NewReader(readBody)
 	}
 
-	// Build the request, no point in checking for errors here as we're just
-	// passing a string version of an url.URL struct and http.NewRequest returns
-	// error only if can't process an url.ParseRequestURI().
-	req, _ := http.NewRequestWithContext(ctx, method, reqUrl.String(), body)
-
-	if cli.VCDAuthHeader != "" && cli.VCDToken != "" {
-		// Add the authorization header
-		req.Header.Add(cli.VCDAuthHeader, cli.VCDToken)
+	req, err := http.NewRequestWithContext(ctx, method, reqUrl.String(), body)
+	if err != nil {
+		util.Logger.Printf("[DEBUG - newRequest] error getting new request: %s", err)
 	}
-	if (cli.VCDAuthHeader != "" && cli.VCDToken != "") ||
+
+	if client.VCDAuthHeader != "" && client.VCDToken != "" {
+		// Add the authorization header
+		req.Header.Add(client.VCDAuthHeader, client.VCDToken)
+	}
+	if (client.VCDAuthHeader != "" && client.VCDToken != "") ||
 		(additionalHeader != nil && additionalHeader.Get("Authorization") != "") {
 		// Add the Accept header for VCD
 		req.Header.Add("Accept", "application/*+xml;version="+apiVersion)
 	}
 	// The deprecated authorization token is 32 characters long
 	// The bearer token is 612 characters long
-	if len(cli.VCDToken) > 32 {
+	if len(client.VCDToken) > 32 {
 		req.Header.Add("X-Vmware-Vcloud-Token-Type", "Bearer")
-		req.Header.Add("Authorization", "bearer "+cli.VCDToken)
+		req.Header.Add("Authorization", "bearer "+client.VCDToken)
 	}
 
 	// Merge in additional headers before logging if any where specified in additionalHeader
 	// parameter
-	if additionalHeader != nil && len(additionalHeader) > 0 {
+	if len(additionalHeader) > 0 {
 		for headerName, headerValueSlice := range additionalHeader {
 			for _, singleHeaderValue := range headerValueSlice {
 				req.Header.Add(headerName, singleHeaderValue)
 			}
 		}
 	}
+	if client.customHeader != nil {
+		for k, v := range client.customHeader {
+			for _, v1 := range v {
+				req.Header.Add(k, v1)
+			}
+		}
+	}
 
-	setHttpUserAgent(cli.UserAgent, req)
+	setHttpUserAgent(client.UserAgent, req)
 
 	// Avoids passing data if the logging of requests is disabled
 	if util.LogHttpRequest {
@@ -244,14 +274,14 @@ func (cli *Client) newRequest(ctx context.Context, params map[string]string, not
 }
 
 // NewRequest creates a new HTTP request and applies necessary auth headers if set.
-func (cli *Client) NewRequest(ctx context.Context, params map[string]string, method string, reqUrl url.URL, body io.Reader) *http.Request {
-	return cli.NewRequestWitNotEncodedParams(ctx, params, nil, method, reqUrl, body)
+func (client *Client) NewRequest(ctx context.Context, params map[string]string, method string, reqUrl url.URL, body io.Reader) *http.Request {
+	return client.NewRequestWitNotEncodedParams(ctx, params, nil, method, reqUrl, body)
 }
 
 // NewRequestWithApiVersion creates a new HTTP request and applies necessary auth headers if set.
-// Allows to override default request API Version
-func (cli *Client) NewRequestWithApiVersion(ctx context.Context, params map[string]string, method string, reqUrl url.URL, body io.Reader, apiVersion string) *http.Request {
-	return cli.NewRequestWitNotEncodedParamsWithApiVersion(ctx, params, nil, method, reqUrl, body, apiVersion)
+// Allows overriding default request API Version
+func (client *Client) NewRequestWithApiVersion(ctx context.Context, params map[string]string, method string, reqUrl url.URL, body io.Reader, apiVersion string) *http.Request {
+	return client.NewRequestWitNotEncodedParamsWithApiVersion(ctx, params, nil, method, reqUrl, body, apiVersion)
 }
 
 // ParseErr takes an error XML resp, error interface for unmarshalling and returns a single string for
@@ -273,7 +303,7 @@ func ParseErr(bodyType types.BodyType, resp *http.Response, errType error) error
 
 // decodeBody is used to decode a response body of types.BodyType
 func decodeBody(bodyType types.BodyType, resp *http.Response, out interface{}) error {
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 
 	// In case of JSON, body does not have indents in response therefore it must be indented
 	if bodyType == types.BodyTypeJSON {
@@ -283,7 +313,7 @@ func decodeBody(bodyType types.BodyType, resp *http.Response, out interface{}) e
 		}
 	}
 
-	util.ProcessResponseOutput(util.FuncNameCallStack(), resp, fmt.Sprintf("%s", body))
+	util.ProcessResponseOutput(util.FuncNameCallStack(), resp, string(body))
 	if err != nil {
 		return err
 	}
@@ -380,7 +410,7 @@ func checkRespWithErrType(bodyType types.BodyType, resp *http.Response, err, err
 	}
 }
 
-// Helper function creates request, runs it, checks response and parses task from response.
+// ExecuteTaskRequest helper function creates request, runs it, checks response and parses task from response.
 // pathURL - request URL
 // requestType - HTTP method type
 // contentType - value to set for "Content-Type"
@@ -391,7 +421,7 @@ func (client *Client) ExecuteTaskRequest(ctx context.Context, pathURL, requestTy
 	return client.executeTaskRequest(ctx, pathURL, requestType, contentType, errorMessage, payload, client.APIVersion)
 }
 
-// Helper function creates request, runs it, checks response and parses task from response.
+// ExecuteTaskRequestWithApiVersion helper function creates request, runs it, checks response and parses task from response.
 // pathURL - request URL
 // requestType - HTTP method type
 // contentType - value to set for "Content-Type"
@@ -437,7 +467,7 @@ func (client *Client) executeTaskRequest(ctx context.Context, pathURL, requestTy
 	return *task, nil
 }
 
-// Helper function creates request, runs it, checks response and do not expect any values from it.
+// ExecuteRequestWithoutResponse helper function creates request, runs it, checks response and do not expect any values from it.
 // pathURL - request URL
 // requestType - HTTP method type
 // contentType - value to set for "Content-Type"
@@ -448,7 +478,7 @@ func (client *Client) ExecuteRequestWithoutResponse(ctx context.Context, pathURL
 	return client.executeRequestWithoutResponse(ctx, pathURL, requestType, contentType, errorMessage, payload, client.APIVersion)
 }
 
-// Helper function creates request, runs it, checks response and do not expect any values from it.
+// ExecuteRequestWithoutResponseWithApiVersion helper function creates request, runs it, checks response and do not expect any values from it.
 // pathURL - request URL
 // requestType - HTTP method type
 // contentType - value to set for "Content-Type"
@@ -492,7 +522,7 @@ func (client *Client) executeRequestWithoutResponse(ctx context.Context, pathURL
 	return nil
 }
 
-// Helper function creates request, runs it, check responses and parses out interface from response.
+// ExecuteRequest helper function creates request, runs it, check responses and parses out interface from response.
 // pathURL - request URL
 // requestType - HTTP method type
 // contentType - value to set for "Content-Type"
@@ -505,7 +535,7 @@ func (client *Client) ExecuteRequest(ctx context.Context, pathURL, requestType, 
 	return client.executeRequest(ctx, pathURL, requestType, contentType, errorMessage, payload, out, client.APIVersion)
 }
 
-// Helper function creates request, runs it, check responses and parses out interface from response.
+// ExecuteRequestWithApiVersion helper function creates request, runs it, check responses and parses out interface from response.
 // pathURL - request URL
 // requestType - HTTP method type
 // contentType - value to set for "Content-Type"
@@ -578,12 +608,12 @@ func (client *Client) ExecuteParamRequestWithCustomError(ctx context.Context, pa
 	// read from resp.Body io.Reader for debug output if it has body
 	var bodyBytes []byte
 	if resp.Body != nil {
-		bodyBytes, err = ioutil.ReadAll(resp.Body)
+		bodyBytes, err = io.ReadAll(resp.Body)
 		if err != nil {
 			return &http.Response{}, fmt.Errorf("could not read response body: %s", err)
 		}
 		// Restore the io.ReadCloser to its original state with no-op closer
-		resp.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+		resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 	}
 
 	util.ProcessResponseOutput(util.FuncNameCallStack(), resp, string(bodyBytes))
@@ -599,22 +629,25 @@ func executeRequestWithApiVersion(ctx context.Context, pathURL, requestType, con
 
 // executeRequestCustomErr performs request and unmarshals API error to errType if not 2xx status was returned
 func executeRequestCustomErr(ctx context.Context, pathURL string, params map[string]string, requestType, contentType string, payload interface{}, client *Client, errType error, apiVersion string) (*http.Response, error) {
-	url, _ := url.ParseRequestURI(pathURL)
+	requestURI, err := url.ParseRequestURI(pathURL)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't parse path request URI '%s': %s", pathURL, err)
+	}
 
 	var req *http.Request
-	switch requestType {
-	case http.MethodPost, http.MethodPut:
-
+	switch {
+	// Only send data (and xml.Header) if the payload is actually provided to avoid sending empty body with XML header
+	// (some Web Application Firewalls block requests when empty XML header is set but not body provided)
+	case payload != nil:
 		marshaledXml, err := xml.MarshalIndent(payload, "  ", "    ")
 		if err != nil {
 			return &http.Response{}, fmt.Errorf("error marshalling xml data %s", err)
 		}
 		body := bytes.NewBufferString(xml.Header + string(marshaledXml))
-
-		req = client.NewRequestWithApiVersion(ctx, params, requestType, *url, body, apiVersion)
+		req = client.NewRequestWithApiVersion(ctx, params, requestType, *requestURI, body, apiVersion)
 
 	default:
-		req = client.NewRequestWithApiVersion(ctx, params, requestType, *url, nil, apiVersion)
+		req = client.NewRequestWithApiVersion(ctx, params, requestType, *requestURI, nil, apiVersion)
 	}
 
 	if contentType != "" {
@@ -655,6 +688,13 @@ func combinedTaskErrorMessage(task *types.Task, err error) string {
 	return extendedError
 }
 
+// addrOf is a generic function to return the address of a variable
+// Note: It is mainly meant for converting literal values to pointers (e.g. `addrOf(true)`)
+// and not getting the address of a variable (e.g. `addrOf(variable)`)
+func addrOf[T any](variable T) *T {
+	return &variable
+}
+
 func takeBoolPointer(value bool) *bool {
 	return &value
 }
@@ -677,7 +717,7 @@ func IsUuid(identifier string) bool {
 
 // isUrn validates if supplied identifier is of URN format (e.g. urn:vcloud:nsxtmanager:09722307-aee0-4623-af95-7f8e577c9ebc)
 // it checks for the following criteria:
-// 1. idenfifier is not empty
+// 1. identifier is not empty
 // 2. identifier has 4 elements separated by ':'
 // 3. element 1 is 'urn' and element 4 is valid UUID
 func isUrn(identifier string) bool {
@@ -715,4 +755,161 @@ func BuildUrnWithUuid(urnPrefix, uuid string) (string, error) {
 // takeFloatAddress is a helper that returns the address of an `float64`
 func takeFloatAddress(x float64) *float64 {
 	return &x
+}
+
+// SetCustomHeader adds custom HTTP header values to a client
+func (client *Client) SetCustomHeader(values map[string]string) {
+	if len(client.customHeader) == 0 {
+		client.customHeader = make(http.Header)
+	}
+	for k, v := range values {
+		client.customHeader.Add(k, v)
+	}
+}
+
+// RemoveCustomHeader remove custom header values from the client
+func (client *Client) RemoveCustomHeader() {
+	if client.customHeader != nil {
+		client.customHeader = nil
+	}
+}
+
+// RemoveProvidedCustomHeaders removes custom header values from the client
+func (client *Client) RemoveProvidedCustomHeaders(values map[string]string) {
+	if client.customHeader != nil {
+		for k := range values {
+			client.customHeader.Del(k)
+		}
+	}
+}
+
+// Retrieves the administrator URL of a given HREF
+func getAdminURL(href string) string {
+	adminApi := "/api/admin/"
+	if strings.Contains(href, adminApi) {
+		return href
+	}
+	return strings.ReplaceAll(href, "/api/", adminApi)
+}
+
+// Retrieves the admin extension URL of a given HREF
+func getAdminExtensionURL(href string) string {
+	adminExtensionApi := "/api/admin/extension/"
+	if strings.Contains(href, adminExtensionApi) {
+		return href
+	}
+	return strings.ReplaceAll(getAdminURL(href), "/api/admin/", adminExtensionApi)
+}
+
+// TestConnection calls API to test a connection against a VCD, including SSL handshake and hostname verification.
+func (client *Client) TestConnection(ctx context.Context, testConnection types.TestConnection) (*types.TestConnectionResult, error) {
+	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointTestConnection
+
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	urlRef, err := client.OpenApiBuildEndpoint(endpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	returnTestConnectionResult := &types.TestConnectionResult{
+		TargetProbe: &types.ProbeResult{},
+		ProxyProbe:  &types.ProbeResult{},
+	}
+
+	err = client.OpenApiPostItem(ctx, apiVersion, urlRef, nil, testConnection, returnTestConnectionResult, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error performing test connection: %s", err)
+	}
+
+	return returnTestConnectionResult, nil
+}
+
+// TestConnectionWithDefaults calls TestConnection given a subscriptionURL. The rest of parameters are set as default.
+// It returns whether it could reach the server and establish SSL connection or not.
+func (client *Client) TestConnectionWithDefaults(ctx context.Context, subscriptionURL string) (bool, error) {
+	if subscriptionURL == "" {
+		return false, fmt.Errorf("TestConnectionWithDefaults needs to be passed a host. i.e. my-host.vmware.com")
+	}
+
+	url, err := url.Parse(subscriptionURL)
+	if err != nil {
+		return false, fmt.Errorf("unable to parse URL - %s", err)
+	}
+
+	// Get port
+	var port int
+	if v := url.Port(); v != "" {
+		port, err = strconv.Atoi(v)
+		if err != nil {
+			return false, fmt.Errorf("couldn't parse port provided - %s", err)
+		}
+	} else {
+		switch url.Scheme {
+		case "http":
+			port = 80
+		case "https":
+			port = 443
+		}
+	}
+
+	testConnectionConfig := types.TestConnection{
+		Host:    url.Hostname(),
+		Port:    port,
+		Secure:  takeBoolPointer(true), // Default value used by VCD UI
+		Timeout: 30,                    // Default value used by VCD UI
+	}
+
+	testConnectionResult, err := client.TestConnection(ctx, testConnectionConfig)
+	if err != nil {
+		return false, err
+	}
+
+	if !testConnectionResult.TargetProbe.CanConnect {
+		return false, fmt.Errorf("the remote host is not reachable")
+	}
+
+	if !testConnectionResult.TargetProbe.SSLHandshake {
+		return true, fmt.Errorf("unsupported or unrecognized SSL message")
+	}
+
+	return true, nil
+}
+
+// buildUrl uses the Client base URL to create a customised URL
+func (client *Client) buildUrl(elements ...string) (string, error) {
+	baseUrl := client.VCDHREF.String()
+	if !IsValidUrl(baseUrl) {
+		return "", fmt.Errorf("incorrect URL %s", client.VCDHREF.String())
+	}
+	if strings.HasSuffix(baseUrl, "/") {
+		baseUrl = strings.TrimRight(baseUrl, "/")
+	}
+	if strings.HasSuffix(baseUrl, "/api") {
+		baseUrl = strings.TrimRight(baseUrl, "/api")
+	}
+	return url.JoinPath(baseUrl, elements...)
+}
+
+// ---------------------------------------------------------------------
+// The following functions are needed to avoid strict Coverity warnings
+// ---------------------------------------------------------------------
+
+// urlParseRequestURI returns a URL, discarding the error
+func urlParseRequestURI(href string) *url.URL {
+	apiEndpoint, err := url.ParseRequestURI(href)
+	if err != nil {
+		util.Logger.Printf("[DEBUG - urlParseRequestURI] error parsing request URI: %s", err)
+	}
+	return apiEndpoint
+}
+
+// safeClose closes a file and logs the error, if any. This can be used instead of file.Close()
+func safeClose(file *os.File) {
+	if err := file.Close(); err != nil {
+		util.Logger.Printf("Error closing file: %s\n", err)
+	}
 }

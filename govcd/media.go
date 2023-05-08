@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -63,7 +64,7 @@ func NewMediaRecord(cli *Client) *MediaRecord {
 // Returns errors if any occur during upload from vCD or upload process. On upload fail client may need to
 // remove vCD catalog item which waits for files to be uploaded.
 //
-// Deprecated: This method is broken in API V32.0+. Please use catalog.UploadMediaImage because VCD does not support
+// Deprecated: This method is broken in API V32.0+. Please use catalog.UploadMediaImage because VCD doesn't support
 // uploading directly to VDC anymore.
 func (vdc *Vdc) UploadMediaImage(ctx context.Context, mediaName, mediaDescription, filePath string, uploadPieceSize int64) (UploadTask, error) {
 	util.Logger.Printf("[TRACE] UploadImage: %s, image name: %v \n", mediaName, mediaDescription)
@@ -133,7 +134,17 @@ func executeUpload(ctx context.Context, client *Client, media *types.Media, medi
 		uploadError:              &uploadError,
 	}
 
-	go uploadFile(ctx, client, mediaFilePath, details)
+	// sending upload process to background, this allows not to lock and return task to client
+	// The error should be captured in details.uploadError, but just in case, we add a logging for the
+	// main error
+	go func() {
+		_, err = uploadFile(ctx, client, mediaFilePath, details)
+		if err != nil {
+			util.Logger.Println(strings.Repeat("*", 80))
+			util.Logger.Printf("*** [DEBUG - executeUpload] error calling uploadFile: %s\n", err)
+			util.Logger.Println(strings.Repeat("*", 80))
+		}
+	}()
 
 	var task Task
 	for _, item := range media.Tasks.Task {
@@ -174,7 +185,12 @@ func createMedia(ctx context.Context, client *Client, link, mediaName, mediaDesc
 	if err != nil {
 		return nil, err
 	}
-	defer response.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			util.Logger.Printf("error closing response Body [createMedia]: %s", err)
+		}
+	}(response.Body)
 
 	mediaForUpload := &types.Media{}
 	if err = decodeBody(types.BodyTypeXML, response, mediaForUpload); err != nil {
@@ -252,12 +268,11 @@ func queryMedia(ctx context.Context, client *Client, mediaUrl string, newItemNam
 
 // Verifies provided file header matches standard
 func verifyIso(filePath string) (bool, error) {
-	// #nosec G304 - linter does not like 'filePath' to be a variable. However this is necessary for file uploads.
-	file, err := os.Open(filePath)
+	file, err := os.Open(filepath.Clean(filePath))
 	if err != nil {
 		return false, err
 	}
-	defer file.Close()
+	defer safeClose(file)
 
 	return readHeader(file)
 }
@@ -275,21 +290,32 @@ func readHeader(reader io.Reader) (bool, error) {
 	if headerOk {
 		return true, nil
 	} else {
-		return false, errors.New("file header didn't match ISO standard")
+		return false, errors.New("file header didn't match ISO or UDF standard")
 	}
 }
 
-// Verify file header info: https://www.garykessler.net/library/file_sigs.html
+// Verify file header for ISO or UDF type. Info: https://www.garykessler.net/library/file_sigs.html
 func verifyHeader(buf []byte) bool {
-	// search for CD001(43 44 30 30 31) in specific file places.
-	//This signature usually occurs at byte offset 32769 (0x8001),
-	//34817 (0x8801), or 36865 (0x9001).
+	// ISO verification - search for CD001(43 44 30 30 31) in specific file places.
+	// This signature usually occurs at byte offset 32769 (0x8001),
+	// 34817 (0x8801), or 36865 (0x9001).
+	// UDF verification - search for BEA01(42 45 41 30 31) in specific file places.
+	// This signature usually occurs at byte offset 32769 (0x8001),
+	// 34817 (0x8801), or 36865 (0x9001).
+
 	return (buf[32769] == 0x43 && buf[32770] == 0x44 &&
 		buf[32771] == 0x30 && buf[32772] == 0x30 && buf[32773] == 0x31) ||
 		(buf[34817] == 0x43 && buf[34818] == 0x44 &&
 			buf[34819] == 0x30 && buf[34820] == 0x30 && buf[34821] == 0x31) ||
 		(buf[36865] == 0x43 && buf[36866] == 0x44 &&
-			buf[36867] == 0x30 && buf[36868] == 0x30 && buf[36869] == 0x31)
+			buf[36867] == 0x30 && buf[36868] == 0x30 && buf[36869] == 0x31) ||
+		(buf[32769] == 0x42 && buf[32770] == 0x45 &&
+			buf[32771] == 0x41 && buf[32772] == 0x30 && buf[32773] == 0x31) ||
+		(buf[34817] == 0x42 && buf[34818] == 0x45 &&
+			buf[34819] == 41 && buf[34820] == 0x30 && buf[34821] == 0x31) ||
+		(buf[36865] == 42 && buf[36866] == 45 &&
+			buf[36867] == 41 && buf[36868] == 0x30 && buf[36869] == 0x31)
+
 }
 
 // Reference for API usage http://pubs.vmware.com/vcloud-api-1-5/wwhelp/wwhimpl/js/html/wwhelp.htm#href=api_prog/GUID-9356B99B-E414-474A-853C-1411692AF84C.html
@@ -527,6 +553,7 @@ func (cat *Catalog) GetMediaByNameOrId(ctx context.Context, identifier string, r
 func (adminCatalog *AdminCatalog) GetMediaByHref(ctx context.Context, mediaHref string) (*Media, error) {
 	catalog := NewCatalog(adminCatalog.client)
 	catalog.Catalog = &adminCatalog.AdminCatalog.Catalog
+	catalog.parent = adminCatalog.parent
 	return catalog.GetMediaByHref(ctx, mediaHref)
 }
 
@@ -536,6 +563,7 @@ func (adminCatalog *AdminCatalog) GetMediaByHref(ctx context.Context, mediaHref 
 func (adminCatalog *AdminCatalog) GetMediaByName(ctx context.Context, mediaName string, refresh bool) (*Media, error) {
 	catalog := NewCatalog(adminCatalog.client)
 	catalog.Catalog = &adminCatalog.AdminCatalog.Catalog
+	catalog.parent = adminCatalog.parent
 	return catalog.GetMediaByName(ctx, mediaName, refresh)
 }
 
@@ -545,6 +573,7 @@ func (adminCatalog *AdminCatalog) GetMediaByName(ctx context.Context, mediaName 
 func (adminCatalog *AdminCatalog) GetMediaById(ctx context.Context, mediaId string) (*Media, error) {
 	catalog := NewCatalog(adminCatalog.client)
 	catalog.Catalog = &adminCatalog.AdminCatalog.Catalog
+	catalog.parent = adminCatalog.parent
 	return catalog.GetMediaById(ctx, mediaId)
 }
 
@@ -554,6 +583,7 @@ func (adminCatalog *AdminCatalog) GetMediaById(ctx context.Context, mediaId stri
 func (adminCatalog *AdminCatalog) GetMediaByNameOrId(ctx context.Context, identifier string, refresh bool) (*Media, error) {
 	catalog := NewCatalog(adminCatalog.client)
 	catalog.Catalog = &adminCatalog.AdminCatalog.Catalog
+	catalog.parent = adminCatalog.parent
 	return catalog.GetMediaByNameOrId(ctx, identifier, refresh)
 }
 
@@ -607,7 +637,44 @@ func (catalog *Catalog) QueryMedia(ctx context.Context, mediaName string) (*Medi
 func (adminCatalog *AdminCatalog) QueryMedia(ctx context.Context, mediaName string) (*MediaRecord, error) {
 	catalog := NewCatalog(adminCatalog.client)
 	catalog.Catalog = &adminCatalog.AdminCatalog.Catalog
+	catalog.parent = adminCatalog.parent
 	return catalog.QueryMedia(ctx, mediaName)
+}
+
+// QueryMediaById returns a MediaRecord associated to the given media item URN.
+// Returns ErrorEntityNotFound if it is not found, or an error if there's more than one result.
+func (vcdClient *VCDClient) QueryMediaById(ctx context.Context, mediaId string) (*MediaRecord, error) {
+	if mediaId == "" {
+		return nil, fmt.Errorf("media ID is empty")
+	}
+
+	filterType := types.QtMedia
+	if vcdClient.Client.IsSysAdmin {
+		filterType = types.QtAdminMedia
+	}
+	results, err := vcdClient.Client.QueryWithNotEncodedParams(ctx, nil, map[string]string{
+		"type":          filterType,
+		"filter":        fmt.Sprintf("id==%s", url.QueryEscape(mediaId)),
+		"filterEncoded": "true"})
+	if err != nil {
+		return nil, fmt.Errorf("error querying medias %s", err)
+	}
+	newMediaRecord := NewMediaRecord(&vcdClient.Client)
+
+	mediaResults := results.Results.MediaRecord
+	if vcdClient.Client.IsSysAdmin {
+		mediaResults = results.Results.AdminMediaRecord
+	}
+
+	if len(mediaResults) == 0 {
+		return nil, ErrorEntityNotFound
+	}
+	if len(mediaResults) > 1 {
+		return nil, fmt.Errorf("found %#v results with media ID %s", len(mediaResults), mediaId)
+	}
+
+	newMediaRecord.MediaRecord = mediaResults[0]
+	return newMediaRecord, nil
 }
 
 // Refresh refreshes the media information by href
