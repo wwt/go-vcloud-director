@@ -1374,13 +1374,13 @@ func (vcd *TestVCD) Test_CatalogAccessAsOrgUsersReadOnly(check *C) {
 	fmt.Printf("uploading vApp template into catalog %s\n", catalogName)
 	task, err := catalog1AsOrg1.UploadOvf(vcd.config.OVA.OvaPath, vappTemplateName, vappTemplateName, 1024)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	fmt.Printf("uploading media image into catalog %s\n", catalogName)
 	uploadTask, err := catalog1AsOrg1.UploadMediaImage(mediaName, "upload from test", vcd.config.Media.MediaPath, 1024)
 	check.Assert(err, IsNil)
-	err = uploadTask.WaitTaskCompletion()
+	err = uploadTask.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	vAppTemplateAsSystem, err := catalog1AsOrg1.GetVAppTemplateByName(vappTemplateName)

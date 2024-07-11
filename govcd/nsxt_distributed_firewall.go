@@ -1,6 +1,7 @@
 package govcd
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -50,7 +51,7 @@ func (d DistributedFirewallRule) wrap(inner *types.DistributedFirewallRule) *Dis
 //
 // Note. This function works only with `default` policy as this was the only supported when this
 // functions was created
-func (vdcGroup *VdcGroup) GetDistributedFirewall() (*DistributedFirewall, error) {
+func (vdcGroup *VdcGroup) GetDistributedFirewall(ctx context.Context) (*DistributedFirewall, error) {
 	c := crudConfig{
 		entityLabel:    labelDistributedFirewall,
 		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVdcGroupsDfwRules,
@@ -58,14 +59,14 @@ func (vdcGroup *VdcGroup) GetDistributedFirewall() (*DistributedFirewall, error)
 	}
 
 	outerType := DistributedFirewall{client: vdcGroup.client, VdcGroup: vdcGroup}
-	return getOuterEntity[DistributedFirewall, types.DistributedFirewallRules](vdcGroup.client, outerType, c)
+	return getOuterEntity[DistributedFirewall, types.DistributedFirewallRules](ctx, vdcGroup.client, outerType, c)
 }
 
 // UpdateDistributedFirewall updates Distributed Firewall in a VDC Group
 //
 // Note. This function works only with `default` policy as this was the only supported when this
 // functions was created
-func (vdcGroup *VdcGroup) UpdateDistributedFirewall(dfwRules *types.DistributedFirewallRules) (*DistributedFirewall, error) {
+func (vdcGroup *VdcGroup) UpdateDistributedFirewall(ctx context.Context, dfwRules *types.DistributedFirewallRules) (*DistributedFirewall, error) {
 	c := crudConfig{
 		entityLabel:    labelDistributedFirewall,
 		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVdcGroupsDfwRules,
@@ -73,15 +74,15 @@ func (vdcGroup *VdcGroup) UpdateDistributedFirewall(dfwRules *types.DistributedF
 	}
 
 	outerType := DistributedFirewall{client: vdcGroup.client, VdcGroup: vdcGroup}
-	return updateOuterEntity[DistributedFirewall, types.DistributedFirewallRules](vdcGroup.client, outerType, c, dfwRules)
+	return updateOuterEntity[DistributedFirewall, types.DistributedFirewallRules](ctx, vdcGroup.client, outerType, c, dfwRules)
 }
 
 // DeleteAllDistributedFirewallRules removes all Distributed Firewall rules
 //
 // Note. This function works only with `default` policy as this was the only supported when this
 // functions was created
-func (vdcGroup *VdcGroup) DeleteAllDistributedFirewallRules() error {
-	_, err := vdcGroup.UpdateDistributedFirewall(&types.DistributedFirewallRules{})
+func (vdcGroup *VdcGroup) DeleteAllDistributedFirewallRules(ctx context.Context) error {
+	_, err := vdcGroup.UpdateDistributedFirewall(ctx, &types.DistributedFirewallRules{})
 	return err
 }
 
@@ -89,16 +90,16 @@ func (vdcGroup *VdcGroup) DeleteAllDistributedFirewallRules() error {
 //
 // Note. This function works only with `default` policy as this was the only supported when this
 // functions was created
-func (firewall *DistributedFirewall) DeleteAllRules() error {
+func (firewall *DistributedFirewall) DeleteAllRules(ctx context.Context) error {
 	if firewall.VdcGroup != nil && firewall.VdcGroup.VdcGroup != nil && firewall.VdcGroup.VdcGroup.Id == "" {
 		return errors.New("empty VDC Group ID for parent VDC Group")
 	}
 
-	return firewall.VdcGroup.DeleteAllDistributedFirewallRules()
+	return firewall.VdcGroup.DeleteAllDistributedFirewallRules(ctx)
 }
 
 // GetDistributedFirewallRuleById retrieves single Distributed Firewall Rule by ID
-func (vdcGroup *VdcGroup) GetDistributedFirewallRuleById(id string) (*DistributedFirewallRule, error) {
+func (vdcGroup *VdcGroup) GetDistributedFirewallRuleById(ctx context.Context, id string) (*DistributedFirewallRule, error) {
 	c := crudConfig{
 		entityLabel:    labelDistributedFirewallRule,
 		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVdcGroupsDfwRules,
@@ -106,16 +107,16 @@ func (vdcGroup *VdcGroup) GetDistributedFirewallRuleById(id string) (*Distribute
 	}
 
 	outerType := DistributedFirewallRule{client: vdcGroup.client, VdcGroup: vdcGroup}
-	return getOuterEntity[DistributedFirewallRule, types.DistributedFirewallRule](vdcGroup.client, outerType, c)
+	return getOuterEntity[DistributedFirewallRule, types.DistributedFirewallRule](ctx, vdcGroup.client, outerType, c)
 }
 
 // GetDistributedFirewallRuleByName retrieves single firewall rule by name
-func (vdcGroup *VdcGroup) GetDistributedFirewallRuleByName(name string) (*DistributedFirewallRule, error) {
+func (vdcGroup *VdcGroup) GetDistributedFirewallRuleByName(ctx context.Context, name string) (*DistributedFirewallRule, error) {
 	if name == "" {
 		return nil, fmt.Errorf("name must be specified")
 	}
 
-	dfw, err := vdcGroup.GetDistributedFirewall()
+	dfw, err := vdcGroup.GetDistributedFirewall(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error returning distributed firewall rules: %s", err)
 	}
@@ -125,7 +126,7 @@ func (vdcGroup *VdcGroup) GetDistributedFirewallRuleByName(name string) (*Distri
 		return nil, err
 	}
 
-	return vdcGroup.GetDistributedFirewallRuleById(singleRuleByName.ID)
+	return vdcGroup.GetDistributedFirewallRuleById(ctx, singleRuleByName.ID)
 }
 
 // CreateDistributedFirewallRule is a non-thread safe wrapper around
@@ -151,7 +152,7 @@ func (vdcGroup *VdcGroup) GetDistributedFirewallRuleByName(name string) (*Distri
 //
 // Note. Running this function concurrently will corrupt firewall rules as it uses an endpoint that
 // manages all rules ("vdcGroups/%s/dfwPolicies/%s/rules")
-func (vdcGroup *VdcGroup) CreateDistributedFirewallRule(optionalAboveRuleId string, rule *types.DistributedFirewallRule) (*DistributedFirewall, *DistributedFirewallRule, error) {
+func (vdcGroup *VdcGroup) CreateDistributedFirewallRule(ctx context.Context, optionalAboveRuleId string, rule *types.DistributedFirewallRule) (*DistributedFirewall, *DistributedFirewallRule, error) {
 	// 1. Getting all Distributed Firewall Rules and storing them in private intermediate
 	// type`distributedFirewallRulesRaw` which holds a []json.RawMessage (text) instead of exact types.
 	// This will prevent altering existing rules in any way (for example if a new field appears in
@@ -162,7 +163,7 @@ func (vdcGroup *VdcGroup) CreateDistributedFirewallRule(optionalAboveRuleId stri
 		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVdcGroupsDfwRules,
 		endpointParams: []string{vdcGroup.VdcGroup.Id, types.DistributedFirewallPolicyDefault},
 	}
-	rawJsonExistingFirewallRules, err := getInnerEntity[distributedFirewallRulesRaw](vdcGroup.client, c)
+	rawJsonExistingFirewallRules, err := getInnerEntity[distributedFirewallRulesRaw](ctx, vdcGroup.client, c)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -223,7 +224,7 @@ func (vdcGroup *VdcGroup) CreateDistributedFirewallRule(optionalAboveRuleId stri
 		endpointParams: []string{vdcGroup.VdcGroup.Id, types.DistributedFirewallPolicyDefault},
 	}
 
-	updatedFirewallRules, err := updateInnerEntity(vdcGroup.client, c2, updateRequestPayload)
+	updatedFirewallRules, err := updateInnerEntity(ctx, vdcGroup.client, c2, updateRequestPayload)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -249,24 +250,24 @@ func (vdcGroup *VdcGroup) CreateDistributedFirewallRule(optionalAboveRuleId stri
 }
 
 // Update a single Distributed Firewall Rule
-func (dfwRule *DistributedFirewallRule) Update(rule *types.DistributedFirewallRule) (*DistributedFirewallRule, error) {
+func (dfwRule *DistributedFirewallRule) Update(ctx context.Context, rule *types.DistributedFirewallRule) (*DistributedFirewallRule, error) {
 	c := crudConfig{
 		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVdcGroupsDfwRules,
 		endpointParams: []string{dfwRule.VdcGroup.VdcGroup.Id, types.DistributedFirewallPolicyDefault, "/", dfwRule.Rule.ID},
 		entityLabel:    labelDistributedFirewallRule,
 	}
 	outerType := DistributedFirewallRule{client: dfwRule.client, VdcGroup: dfwRule.VdcGroup}
-	return updateOuterEntity(dfwRule.client, outerType, c, rule)
+	return updateOuterEntity(ctx, dfwRule.client, outerType, c, rule)
 }
 
 // Delete a single Distributed Firewall Rule
-func (dfwRule *DistributedFirewallRule) Delete() error {
+func (dfwRule *DistributedFirewallRule) Delete(ctx context.Context) error {
 	c := crudConfig{
 		entityLabel:    labelDistributedFirewallRule,
 		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVdcGroupsDfwRules,
 		endpointParams: []string{dfwRule.VdcGroup.VdcGroup.Id, types.DistributedFirewallPolicyDefault, "/", dfwRule.Rule.ID},
 	}
-	return deleteEntityById(dfwRule.client, c)
+	return deleteEntityById(ctx, dfwRule.client, c)
 }
 
 // getFirewallRuleIndexById searches for 'firewallRuleId' going through a list of available firewall

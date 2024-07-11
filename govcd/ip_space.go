@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
@@ -38,20 +39,20 @@ func (g IpSpace) wrap(inner *types.IpSpace) *IpSpace {
 }
 
 // CreateIpSpace creates IP Space with desired configuration
-func (vcdClient *VCDClient) CreateIpSpace(ipSpaceConfig *types.IpSpace) (*IpSpace, error) {
+func (vcdClient *VCDClient) CreateIpSpace(ctx context.Context, ipSpaceConfig *types.IpSpace) (*IpSpace, error) {
 	c := crudConfig{
 		endpoint:    types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSpaces,
 		entityLabel: labelIpSpace,
 	}
 	outerType := IpSpace{vcdClient: vcdClient}
-	return createOuterEntity(&vcdClient.Client, outerType, c, ipSpaceConfig)
+	return createOuterEntity(ctx, &vcdClient.Client, outerType, c, ipSpaceConfig)
 }
 
 // GetAllIpSpaceSummaries retrieve summaries of all IP Spaces with an optional filter
 // Note. There is no API endpoint to get multiple IP Spaces with their full definitions. Only
 // "summaries" endpoint exists, but it does not include all fields. To retrieve complete structure
 // one can use `GetIpSpaceById` or `GetIpSpaceByName`
-func (vcdClient *VCDClient) GetAllIpSpaceSummaries(queryParameters url.Values) ([]*IpSpace, error) {
+func (vcdClient *VCDClient) GetAllIpSpaceSummaries(ctx context.Context, queryParameters url.Values) ([]*IpSpace, error) {
 	c := crudConfig{
 		endpoint:        types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSpaceSummaries,
 		entityLabel:     labelIpSpace,
@@ -59,12 +60,12 @@ func (vcdClient *VCDClient) GetAllIpSpaceSummaries(queryParameters url.Values) (
 	}
 
 	outerType := IpSpace{vcdClient: vcdClient}
-	return getAllOuterEntities[IpSpace, types.IpSpace](&vcdClient.Client, outerType, c)
+	return getAllOuterEntities[IpSpace, types.IpSpace](ctx, &vcdClient.Client, outerType, c)
 }
 
 // GetIpSpaceByName retrieves IP Space with a given name
 // Note. It will return an error if multiple IP Spaces exist with the same name
-func (vcdClient *VCDClient) GetIpSpaceByName(name string) (*IpSpace, error) {
+func (vcdClient *VCDClient) GetIpSpaceByName(ctx context.Context, name string) (*IpSpace, error) {
 	if name == "" {
 		return nil, fmt.Errorf("IP Space lookup requires name")
 	}
@@ -72,7 +73,7 @@ func (vcdClient *VCDClient) GetIpSpaceByName(name string) (*IpSpace, error) {
 	queryParams := url.Values{}
 	queryParams.Add("filter", "name=="+name)
 
-	filteredEntities, err := vcdClient.GetAllIpSpaceSummaries(queryParams)
+	filteredEntities, err := vcdClient.GetAllIpSpaceSummaries(ctx, queryParams)
 	if err != nil {
 		return nil, err
 	}
@@ -82,10 +83,10 @@ func (vcdClient *VCDClient) GetIpSpaceByName(name string) (*IpSpace, error) {
 		return nil, err
 	}
 
-	return vcdClient.GetIpSpaceById(singleIpSpace.IpSpace.ID)
+	return vcdClient.GetIpSpaceById(ctx, singleIpSpace.IpSpace.ID)
 }
 
-func (vcdClient *VCDClient) GetIpSpaceById(id string) (*IpSpace, error) {
+func (vcdClient *VCDClient) GetIpSpaceById(ctx context.Context, id string) (*IpSpace, error) {
 	c := crudConfig{
 		entityLabel:    labelIpSpace,
 		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSpaces,
@@ -93,12 +94,12 @@ func (vcdClient *VCDClient) GetIpSpaceById(id string) (*IpSpace, error) {
 	}
 
 	outerType := IpSpace{vcdClient: vcdClient}
-	return getOuterEntity[IpSpace, types.IpSpace](&vcdClient.Client, outerType, c)
+	return getOuterEntity[IpSpace, types.IpSpace](ctx, &vcdClient.Client, outerType, c)
 }
 
 // GetIpSpaceByNameAndOrgId retrieves IP Space with a given name in a particular Org
 // Note. Only PRIVATE IP spaces belong to Orgs
-func (vcdClient *VCDClient) GetIpSpaceByNameAndOrgId(name, orgId string) (*IpSpace, error) {
+func (vcdClient *VCDClient) GetIpSpaceByNameAndOrgId(ctx context.Context, name, orgId string) (*IpSpace, error) {
 	if name == "" || orgId == "" {
 		return nil, fmt.Errorf("IP Space lookup requires name and Org ID")
 	}
@@ -107,7 +108,7 @@ func (vcdClient *VCDClient) GetIpSpaceByNameAndOrgId(name, orgId string) (*IpSpa
 	queryParams.Add("filter", "name=="+name)
 	queryParams = queryParameterFilterAnd("orgRef.id=="+orgId, queryParams)
 
-	filteredEntities, err := vcdClient.GetAllIpSpaceSummaries(queryParams)
+	filteredEntities, err := vcdClient.GetAllIpSpaceSummaries(ctx, queryParams)
 	if err != nil {
 		return nil, err
 	}
@@ -117,26 +118,26 @@ func (vcdClient *VCDClient) GetIpSpaceByNameAndOrgId(name, orgId string) (*IpSpa
 		return nil, err
 	}
 
-	return vcdClient.GetIpSpaceById(singleIpSpace.IpSpace.ID)
+	return vcdClient.GetIpSpaceById(ctx, singleIpSpace.IpSpace.ID)
 }
 
 // Update updates IP Space with new config
-func (ipSpace *IpSpace) Update(ipSpaceConfig *types.IpSpace) (*IpSpace, error) {
+func (ipSpace *IpSpace) Update(ctx context.Context, ipSpaceConfig *types.IpSpace) (*IpSpace, error) {
 	c := crudConfig{
 		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSpaces,
 		endpointParams: []string{ipSpace.IpSpace.ID},
 		entityLabel:    labelIpSpace,
 	}
 	outerType := IpSpace{vcdClient: ipSpace.vcdClient}
-	return updateOuterEntity(&ipSpace.vcdClient.Client, outerType, c, ipSpaceConfig)
+	return updateOuterEntity(ctx, &ipSpace.vcdClient.Client, outerType, c, ipSpaceConfig)
 }
 
 // Delete deletes IP Space
-func (ipSpace *IpSpace) Delete() error {
+func (ipSpace *IpSpace) Delete(ctx context.Context) error {
 	c := crudConfig{
 		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSpaces,
 		endpointParams: []string{ipSpace.IpSpace.ID},
 		entityLabel:    labelIpSpace,
 	}
-	return deleteEntityById(&ipSpace.vcdClient.Client, c)
+	return deleteEntityById(ctx, &ipSpace.vcdClient.Client, c)
 }

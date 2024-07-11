@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
@@ -28,8 +29,8 @@ type DataSolution struct {
 }
 
 // GetAllDataSolutions retrieves all Data Solutions
-func (vcdClient *VCDClient) GetAllDataSolutions(queryParameters url.Values) ([]*DataSolution, error) {
-	allDseInstances, err := vcdClient.GetAllRdes(dataSolutionRdeType[0], dataSolutionRdeType[1], dataSolutionRdeType[2], queryParameters)
+func (vcdClient *VCDClient) GetAllDataSolutions(ctx context.Context, queryParameters url.Values) ([]*DataSolution, error) {
+	allDseInstances, err := vcdClient.GetAllRdes(ctx, dataSolutionRdeType[0], dataSolutionRdeType[1], dataSolutionRdeType[2], queryParameters)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving all Data Solutions: %s", err)
 	}
@@ -52,11 +53,11 @@ func (vcdClient *VCDClient) GetAllDataSolutions(queryParameters url.Values) ([]*
 }
 
 // GetDataSolutionById retrieves Data Solution by ID
-func (vcdClient *VCDClient) GetDataSolutionById(id string) (*DataSolution, error) {
+func (vcdClient *VCDClient) GetDataSolutionById(ctx context.Context, id string) (*DataSolution, error) {
 	if id == "" {
 		return nil, fmt.Errorf("id must be specified")
 	}
-	rde, err := getRdeById(&vcdClient.Client, id)
+	rde, err := getRdeById(ctx, &vcdClient.Client, id)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving Data Solution by ID: %s", err)
 	}
@@ -76,8 +77,8 @@ func (vcdClient *VCDClient) GetDataSolutionById(id string) (*DataSolution, error
 }
 
 // GetDataSolutionByName retrieves Data Solution by Name
-func (vcdClient *VCDClient) GetDataSolutionByName(name string) (*DataSolution, error) {
-	dseEntities, err := vcdClient.GetAllDataSolutions(nil)
+func (vcdClient *VCDClient) GetDataSolutionByName(ctx context.Context, name string) (*DataSolution, error) {
+	dseEntities, err := vcdClient.GetAllDataSolutions(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving Data Solution with name '%s': %s", name, err)
 	}
@@ -91,14 +92,14 @@ func (vcdClient *VCDClient) GetDataSolutionByName(name string) (*DataSolution, e
 }
 
 // Update Data Solution with given configuration
-func (ds *DataSolution) Update(cfg *types.DataSolution) (*DataSolution, error) {
+func (ds *DataSolution) Update(ctx context.Context, cfg *types.DataSolution) (*DataSolution, error) {
 	unmarshalledRdeEntityJson, err := convertAnyToRdeEntity(cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	ds.DefinedEntity.DefinedEntity.Entity = unmarshalledRdeEntityJson
-	err = ds.DefinedEntity.Update(*ds.DefinedEntity.DefinedEntity)
+	err = ds.DefinedEntity.Update(ctx, *ds.DefinedEntity.DefinedEntity)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +126,7 @@ func (ds *DataSolution) Update(cfg *types.DataSolution) (*DataSolution, error) {
 // will install Data Solutions Operator (DSO) to Kubernetes cluster
 // * Publish all templates of the given instance. Note: UI will not show instance templates until the
 // tenant installs Data Solutions Operator (DSO)
-func (ds *DataSolution) Publish(tenantId string) (*types.DefinedEntityAccess, *types.DefinedEntityAccess, []*types.DefinedEntityAccess, error) {
+func (ds *DataSolution) Publish(ctx context.Context, tenantId string) (*types.DefinedEntityAccess, *types.DefinedEntityAccess, []*types.DefinedEntityAccess, error) {
 	if tenantId == "" {
 		return nil, nil, nil, fmt.Errorf("error - tenant ID empty")
 	}
@@ -135,30 +136,30 @@ func (ds *DataSolution) Publish(tenantId string) (*types.DefinedEntityAccess, *t
 	}
 
 	// The operation is idempotent and can be run multiple times which is what the UI does
-	err := ds.PublishRightsBundle([]string{tenantId})
+	err := ds.PublishRightsBundle(ctx, []string{tenantId})
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error publishing Rights Bundle: %s", err)
 	}
 
 	// Publish ACLs to a given Data Solution
-	mainAcl, err := ds.PublishAccessControls(tenantId)
+	mainAcl, err := ds.PublishAccessControls(ctx, tenantId)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error publishing Access Controls to '%s': %s", ds.Name(), err)
 	}
 
 	// Additionally set the same ACL for Data Solutions Operator (DSO)
-	dso, err := ds.vcdClient.GetDataSolutionByName(defaultDsoName)
+	dso, err := ds.vcdClient.GetDataSolutionByName(ctx, defaultDsoName)
 	if err != nil {
 		return mainAcl, nil, nil, err
 	}
 
-	dsoAcl, err := dso.PublishAccessControls(tenantId)
+	dsoAcl, err := dso.PublishAccessControls(ctx, tenantId)
 	if err != nil {
 		return mainAcl, nil, nil, fmt.Errorf("error publishing Access Controls to '%s': %s", dso.Name(), err)
 	}
 
 	// PublishAllInstanceTemplates
-	templateAcls, err := ds.PublishAllInstanceTemplates(tenantId)
+	templateAcls, err := ds.PublishAllInstanceTemplates(ctx, tenantId)
 	if err != nil {
 		return mainAcl, dsoAcl, nil, fmt.Errorf("error publishing all Data Solution Instance Templates: %s", err)
 	}
@@ -176,13 +177,13 @@ func (ds *DataSolution) Publish(tenantId string) (*types.DefinedEntityAccess, *t
 // * Unpublish all Data Solution Templates
 // * Unpublish access for Data Solutions Operator (DSO)
 // * Unpublish rights bundle 'vmware:dataSolutionsRightsBundle'
-func (ds *DataSolution) Unpublish(tenantId string) error {
+func (ds *DataSolution) Unpublish(ctx context.Context, tenantId string) error {
 	if tenantId == "" {
 		return fmt.Errorf("error - tenant ID empty")
 	}
 
 	// ACLs
-	err := ds.UnpublishAccessControls(tenantId)
+	err := ds.UnpublishAccessControls(ctx, tenantId)
 	if err != nil {
 		return fmt.Errorf("failed unpublishing Access Controls for %s: %s", ds.Name(), err)
 	}
@@ -191,14 +192,14 @@ func (ds *DataSolution) Unpublish(tenantId string) error {
 }
 
 // PublishRightsBundle publishes "vmware:dataSolutionsRightsBundle" rights bundle
-func (ds *DataSolution) PublishRightsBundle(tenantIds []string) error {
-	rightsBundle, err := ds.vcdClient.Client.GetRightsBundleByName(dseRightsBundleName)
+func (ds *DataSolution) PublishRightsBundle(ctx context.Context, tenantIds []string) error {
+	rightsBundle, err := ds.vcdClient.Client.GetRightsBundleByName(ctx, dseRightsBundleName)
 	if err != nil {
 		return fmt.Errorf("error retrieving Rights Bundle %s: %s", dseRightsBundleName, err)
 	}
 
 	references := convertSliceOfStringsToOpenApiReferenceIds(tenantIds)
-	err = rightsBundle.PublishTenants(references)
+	err = rightsBundle.PublishTenants(ctx, references)
 	if err != nil {
 		return fmt.Errorf("error publishing Rights Bundle '%s' to Tenants '%s': %s",
 			dseRightsBundleName, strings.Join(tenantIds, ","), err)
@@ -208,14 +209,14 @@ func (ds *DataSolution) PublishRightsBundle(tenantIds []string) error {
 }
 
 // UnpublishRightsBundle removes "vmware:dataSolutionsRightsBundle" rights bundle from tenant
-func (ds *DataSolution) UnpublishRightsBundle(tenantIds []string) error {
-	rightsBundle, err := ds.vcdClient.Client.GetRightsBundleByName(dseRightsBundleName)
+func (ds *DataSolution) UnpublishRightsBundle(ctx context.Context, tenantIds []string) error {
+	rightsBundle, err := ds.vcdClient.Client.GetRightsBundleByName(ctx, dseRightsBundleName)
 	if err != nil {
 		return fmt.Errorf("error retrieving Rights Bundle %s: %s", dseRightsBundleName, err)
 	}
 
 	references := convertSliceOfStringsToOpenApiReferenceIds(tenantIds)
-	err = rightsBundle.UnpublishTenants(references)
+	err = rightsBundle.UnpublishTenants(ctx, references)
 	if err != nil {
 		return fmt.Errorf("error unpublishing %s for Tenants '%s': %s",
 			dseRightsBundleName, strings.Join(tenantIds, ","), err)
@@ -225,7 +226,7 @@ func (ds *DataSolution) UnpublishRightsBundle(tenantIds []string) error {
 }
 
 // PublishAccessControls provisions ACL for a given tenant
-func (ds *DataSolution) PublishAccessControls(tenantId string) (*types.DefinedEntityAccess, error) {
+func (ds *DataSolution) PublishAccessControls(ctx context.Context, tenantId string) (*types.DefinedEntityAccess, error) {
 	acl := &types.DefinedEntityAccess{
 		Tenant:        types.OpenApiReference{ID: tenantId},
 		GrantType:     "MembershipAccessControlGrant",
@@ -233,7 +234,7 @@ func (ds *DataSolution) PublishAccessControls(tenantId string) (*types.DefinedEn
 		MemberID:      tenantId,
 	}
 
-	accessControl, err := ds.DefinedEntity.SetAccessControl(acl)
+	accessControl, err := ds.DefinedEntity.SetAccessControl(ctx, acl)
 	if err != nil {
 		return nil, fmt.Errorf("error setting Access Control for Data Solution '%s', Org ID %s: %s", tenantId, ds.Name(), err)
 	}
@@ -242,14 +243,14 @@ func (ds *DataSolution) PublishAccessControls(tenantId string) (*types.DefinedEn
 }
 
 // UnpublishAccessControls removes ACLs for a given tenant
-func (ds *DataSolution) UnpublishAccessControls(tenantId string) error {
-	acls, err := ds.GetAllAccessControlsForTenant(tenantId)
+func (ds *DataSolution) UnpublishAccessControls(ctx context.Context, tenantId string) error {
+	acls, err := ds.GetAllAccessControlsForTenant(ctx, tenantId)
 	if err != nil {
 		return fmt.Errorf("error retrieving all Access Controls for Tenant '%s': %s", tenantId, err)
 	}
 
 	for _, acl := range acls {
-		err = ds.DefinedEntity.DeleteAccessControl(acl)
+		err = ds.DefinedEntity.DeleteAccessControl(ctx, acl)
 		if err != nil {
 			return fmt.Errorf("error deleting Access Control: %s", err)
 		}
@@ -259,8 +260,8 @@ func (ds *DataSolution) UnpublishAccessControls(tenantId string) error {
 }
 
 // GetAllAccessControls for a Data Solution
-func (ds *DataSolution) GetAllAccessControls(queryParameters url.Values) ([]*types.DefinedEntityAccess, error) {
-	allAcls, err := ds.DefinedEntity.GetAllAccessControls(queryParameters)
+func (ds *DataSolution) GetAllAccessControls(ctx context.Context, queryParameters url.Values) ([]*types.DefinedEntityAccess, error) {
+	allAcls, err := ds.DefinedEntity.GetAllAccessControls(ctx, queryParameters)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving all Access Controls for Data Solution %s: %s", ds.Name(), err)
 	}
@@ -269,14 +270,14 @@ func (ds *DataSolution) GetAllAccessControls(queryParameters url.Values) ([]*typ
 }
 
 // GetAccessControlById retrieves ACL by ID
-func (ds *DataSolution) GetAccessControlById(id string) (*types.DefinedEntityAccess, error) {
-	return ds.DefinedEntity.GetAccessControlById(id)
+func (ds *DataSolution) GetAccessControlById(ctx context.Context, id string) (*types.DefinedEntityAccess, error) {
+	return ds.DefinedEntity.GetAccessControlById(ctx, id)
 }
 
 // GetAllAccessControlsForTenant retrieves all ACLs that apply for a specific Tenant
-func (ds *DataSolution) GetAllAccessControlsForTenant(tenantId string) ([]*types.DefinedEntityAccess, error) {
+func (ds *DataSolution) GetAllAccessControlsForTenant(ctx context.Context, tenantId string) ([]*types.DefinedEntityAccess, error) {
 	util.Logger.Printf("[TRACE] Data Solution '%s' getting Access Controls for tenant '%s'", ds.Name(), tenantId)
-	allAcls, err := ds.GetAllAccessControls(nil)
+	allAcls, err := ds.GetAllAccessControls(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving all Access Controls for Data Solution: %s", err)
 	}

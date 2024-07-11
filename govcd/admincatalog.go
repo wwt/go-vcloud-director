@@ -629,7 +629,7 @@ func (client *Client) GetAdminCatalogByHref(ctx context.Context, catalogHref str
 	org := NewAdminOrg(client)
 	for _, link := range cat.AdminCatalog.Link {
 		if link.Rel == "up" && link.Type == types.MimeAdminOrg {
-			_, err = client.ExecuteRequest(link.HREF, http.MethodGet,
+			_, err = client.ExecuteRequest(ctx, link.HREF, http.MethodGet,
 				"", "error retrieving parent Org: %s", nil, org.AdminOrg)
 			if err != nil {
 				return nil, fmt.Errorf("error retrieving catalog parent: %s", err)

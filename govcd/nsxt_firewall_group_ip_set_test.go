@@ -190,6 +190,6 @@ func (vcd *TestVCD) Test_NsxtIpSet(check *C) {
 	check.Assert(err, IsNil)
 	task, err := vdc.Delete(true, true)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 }

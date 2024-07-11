@@ -87,7 +87,7 @@ func (vcd *TestVCD) Test_VMGetDhcpAddress(check *C) {
 	// err = vm.PowerOnAndForceCustomization()
 	task, err := vapp.PowerOn()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	if testVerbose {
@@ -165,7 +165,7 @@ func (vcd *TestVCD) Test_VMGetDhcpAddress(check *C) {
 	check.Assert(err, IsNil)
 	task, err = network.Delete()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 }
 
@@ -226,7 +226,7 @@ func makeOrgVdcNetworkWithDhcp(vcd *TestVCD, check *C, edgeGateway *EdgeGateway)
 	dhcpPoolConfig[0] = dhcpPool
 	task, err := edgeGateway.AddDhcpPool(network.OrgVDCNetwork, dhcpPoolConfig)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	return network

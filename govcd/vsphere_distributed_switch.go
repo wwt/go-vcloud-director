@@ -1,12 +1,13 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 	"net/url"
 )
 
-func (vcdClient *VCDClient) GetAllVcenterDistributedSwitches(vCenterId string, queryParameters url.Values) ([]*types.VcenterDistributedSwitch, error) {
+func (vcdClient *VCDClient) GetAllVcenterDistributedSwitches(ctx context.Context, vCenterId string, queryParameters url.Values) ([]*types.VcenterDistributedSwitch, error) {
 	if vCenterId == "" {
 		return nil, fmt.Errorf("empty vCenter ID")
 	}
@@ -17,7 +18,7 @@ func (vcdClient *VCDClient) GetAllVcenterDistributedSwitches(vCenterId string, q
 
 	client := vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVCenterDistributedSwitch
-	apiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	apiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +31,7 @@ func (vcdClient *VCDClient) GetAllVcenterDistributedSwitches(vCenterId string, q
 	}
 
 	var typeResponses []*types.VcenterDistributedSwitch
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParams, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParams, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}

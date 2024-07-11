@@ -36,7 +36,7 @@ func (vcd *TestVCD) Test_RefreshOrg(check *C) {
 	// If something fails after this point, the entity will be removed
 	AddToCleanupList(TestRefreshOrg, "org", "", "Test_RefreshOrg")
 
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	// fetch newly created org

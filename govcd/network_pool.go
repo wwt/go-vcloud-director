@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 	"net/url"
@@ -32,10 +33,10 @@ func (np *NetworkPool) GetOpenApiUrl() (string, error) {
 }
 
 // GetNetworkPoolSummaries retrieves the list of all available network pools
-func (vcdClient *VCDClient) GetNetworkPoolSummaries(queryParameters url.Values) ([]*types.NetworkPool, error) {
+func (vcdClient *VCDClient) GetNetworkPoolSummaries(ctx context.Context, queryParameters url.Values) ([]*types.NetworkPool, error) {
 	client := vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointNetworkPoolSummaries
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +46,7 @@ func (vcdClient *VCDClient) GetNetworkPoolSummaries(queryParameters url.Values) 
 		return nil, err
 	}
 	typeResponse := []*types.NetworkPool{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParameters, &typeResponse, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParameters, &typeResponse, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -54,14 +55,14 @@ func (vcdClient *VCDClient) GetNetworkPoolSummaries(queryParameters url.Values) 
 }
 
 // GetNetworkPoolById retrieves Network Pool with a given ID
-func (vcdClient *VCDClient) GetNetworkPoolById(id string) (*NetworkPool, error) {
+func (vcdClient *VCDClient) GetNetworkPoolById(ctx context.Context, id string) (*NetworkPool, error) {
 	if id == "" {
 		return nil, fmt.Errorf("network pool lookup requires ID")
 	}
 
 	client := vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointNetworkPools
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +77,7 @@ func (vcdClient *VCDClient) GetNetworkPoolById(id string) (*NetworkPool, error) 
 		NetworkPool: &types.NetworkPool{},
 	}
 
-	err = client.OpenApiGetItem(apiVersion, urlRef, nil, response.NetworkPool, nil)
+	err = client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, response.NetworkPool, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +87,7 @@ func (vcdClient *VCDClient) GetNetworkPoolById(id string) (*NetworkPool, error) 
 
 // GetNetworkPoolByName retrieves a network pool with a given name
 // Note. It will return an error if multiple network pools exist with the same name
-func (vcdClient *VCDClient) GetNetworkPoolByName(name string) (*NetworkPool, error) {
+func (vcdClient *VCDClient) GetNetworkPoolByName(ctx context.Context, name string) (*NetworkPool, error) {
 	if name == "" {
 		return nil, fmt.Errorf("network pool lookup requires name")
 	}
@@ -94,7 +95,7 @@ func (vcdClient *VCDClient) GetNetworkPoolByName(name string) (*NetworkPool, err
 	queryParameters := url.Values{}
 	queryParameters.Add("filter", "name=="+name)
 
-	filteredNetworkPools, err := vcdClient.GetNetworkPoolSummaries(queryParameters)
+	filteredNetworkPools, err := vcdClient.GetNetworkPoolSummaries(ctx, queryParameters)
 	if err != nil {
 		return nil, fmt.Errorf("error getting network pools: %s", err)
 	}
@@ -107,15 +108,15 @@ func (vcdClient *VCDClient) GetNetworkPoolByName(name string) (*NetworkPool, err
 		return nil, fmt.Errorf("more than one network pool found with name '%s'", name)
 	}
 
-	return vcdClient.GetNetworkPoolById(filteredNetworkPools[0].Id)
+	return vcdClient.GetNetworkPoolById(ctx, filteredNetworkPools[0].Id)
 }
 
 // CreateNetworkPool creates a network pool using the given configuration
 // It can create any type of network pool
-func (vcdClient *VCDClient) CreateNetworkPool(config *types.NetworkPool) (*NetworkPool, error) {
+func (vcdClient *VCDClient) CreateNetworkPool(ctx context.Context, config *types.NetworkPool) (*NetworkPool, error) {
 	client := vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointNetworkPools
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +131,7 @@ func (vcdClient *VCDClient) CreateNetworkPool(config *types.NetworkPool) (*Netwo
 		vcdClient:   vcdClient,
 	}
 
-	err = client.OpenApiPostItem(apiVersion, urlRef, nil, config, result.NetworkPool, nil)
+	err = client.OpenApiPostItem(ctx, apiVersion, urlRef, nil, config, result.NetworkPool, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +140,7 @@ func (vcdClient *VCDClient) CreateNetworkPool(config *types.NetworkPool) (*Netwo
 }
 
 // Update will change all changeable network pool items
-func (np *NetworkPool) Update() error {
+func (np *NetworkPool) Update(ctx context.Context) error {
 	if np == nil || np.NetworkPool == nil || np.NetworkPool.Id == "" {
 		return fmt.Errorf("network pool must have ID")
 	}
@@ -149,7 +150,7 @@ func (np *NetworkPool) Update() error {
 
 	client := np.vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointNetworkPools
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -159,7 +160,7 @@ func (np *NetworkPool) Update() error {
 		return err
 	}
 
-	err = client.OpenApiPutItem(apiVersion, urlRef, nil, np.NetworkPool, np.NetworkPool, nil)
+	err = client.OpenApiPutItem(ctx, apiVersion, urlRef, nil, np.NetworkPool, np.NetworkPool, nil)
 	if err != nil {
 		return err
 	}
@@ -172,7 +173,7 @@ func (np *NetworkPool) Update() error {
 }
 
 // Delete removes a network pool
-func (np *NetworkPool) Delete() error {
+func (np *NetworkPool) Delete(ctx context.Context) error {
 	if np == nil || np.NetworkPool == nil || np.NetworkPool.Id == "" {
 		return fmt.Errorf("network pool must have ID")
 	}
@@ -182,7 +183,7 @@ func (np *NetworkPool) Delete() error {
 
 	client := np.vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointNetworkPools
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -192,7 +193,7 @@ func (np *NetworkPool) Delete() error {
 		return err
 	}
 
-	err = client.OpenApiDeleteItem(apiVersion, urlRef, nil, nil)
+	err = client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -276,8 +277,8 @@ func chooseBackingElement[B any](constraint types.BackingUseConstraint, wantedNa
 // CreateNetworkPoolGeneve creates a network pool of GENEVE type
 // The function retrieves the given NSX-T manager and corresponding transport zone names
 // If the transport zone name is empty, the first available will be used
-func (vcdClient *VCDClient) CreateNetworkPoolGeneve(name, description, nsxtManagerName, transportZoneName string, constraint types.BackingUseConstraint) (*NetworkPool, error) {
-	managers, err := vcdClient.QueryNsxtManagerByName(nsxtManagerName)
+func (vcdClient *VCDClient) CreateNetworkPoolGeneve(ctx context.Context, name, description, nsxtManagerName, transportZoneName string, constraint types.BackingUseConstraint) (*NetworkPool, error) {
+	managers, err := vcdClient.QueryNsxtManagerByName(ctx, nsxtManagerName)
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +292,7 @@ func (vcdClient *VCDClient) CreateNetworkPoolGeneve(name, description, nsxtManag
 	manager := managers[0]
 
 	managerId := "urn:vcloud:nsxtmanager:" + extractUuid(managers[0].HREF)
-	transportZones, err := vcdClient.GetAllNsxtTransportZones(managerId, nil)
+	transportZones, err := vcdClient.GetAllNsxtTransportZones(ctx, managerId, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving transport zones for manager '%s': %s", manager.Name, err)
 	}
@@ -328,20 +329,20 @@ func (vcdClient *VCDClient) CreateNetworkPoolGeneve(name, description, nsxtManag
 			ProviderRef: managingOwner,
 		},
 	}
-	return vcdClient.CreateNetworkPool(config)
+	return vcdClient.CreateNetworkPool(ctx, config)
 }
 
 // CreateNetworkPoolPortGroup creates a network pool of PORTGROUP_BACKED type
 // The function retrieves the given vCenter and corresponding port group names
 // If the port group name is empty, the first available will be used
-func (vcdClient *VCDClient) CreateNetworkPoolPortGroup(name, description, vCenterName string, portgroupNames []string, constraint types.BackingUseConstraint) (*NetworkPool, error) {
-	vCenter, err := vcdClient.GetVCenterByName(vCenterName)
+func (vcdClient *VCDClient) CreateNetworkPoolPortGroup(ctx context.Context, name, description, vCenterName string, portgroupNames []string, constraint types.BackingUseConstraint) (*NetworkPool, error) {
+	vCenter, err := vcdClient.GetVCenterByName(ctx, vCenterName)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving vCenter '%s': %s", vCenterName, err)
 	}
 	var params = make(url.Values)
 	params.Set("filter", "virtualCenter.id=="+vCenter.VSphereVCenter.VcId)
-	portgroups, err := vcdClient.GetAllVcenterImportableDvpgs(params)
+	portgroups, err := vcdClient.GetAllVcenterImportableDvpgs(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving portgroups for vCenter '%s': %s", vCenterName, err)
 	}
@@ -393,19 +394,19 @@ func (vcdClient *VCDClient) CreateNetworkPoolPortGroup(name, description, vCente
 			ProviderRef:   managingOwner,
 		},
 	}
-	return vcdClient.CreateNetworkPool(&config)
+	return vcdClient.CreateNetworkPool(ctx, &config)
 }
 
 // CreateNetworkPoolVlan creates a network pool of VLAN type
 // The function retrieves the given vCenter and corresponding distributed switch names
 // If the distributed switch name is empty, the first available will be used
-func (vcdClient *VCDClient) CreateNetworkPoolVlan(name, description, vCenterName, dsName string, ranges []types.VlanIdRange, constraint types.BackingUseConstraint) (*NetworkPool, error) {
-	vCenter, err := vcdClient.GetVCenterByName(vCenterName)
+func (vcdClient *VCDClient) CreateNetworkPoolVlan(ctx context.Context, name, description, vCenterName, dsName string, ranges []types.VlanIdRange, constraint types.BackingUseConstraint) (*NetworkPool, error) {
+	vCenter, err := vcdClient.GetVCenterByName(ctx, vCenterName)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving vCenter '%s': %s", vCenterName, err)
 	}
 
-	dswitches, err := vcdClient.GetAllVcenterDistributedSwitches(vCenter.VSphereVCenter.VcId, nil)
+	dswitches, err := vcdClient.GetAllVcenterDistributedSwitches(ctx, vCenter.VSphereVCenter.VcId, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving distributed switches for vCenter '%s': %s", vCenterName, err)
 	}
@@ -444,5 +445,5 @@ func (vcdClient *VCDClient) CreateNetworkPoolVlan(name, description, vCenterName
 			ProviderRef: managingOwner,
 		},
 	}
-	return vcdClient.CreateNetworkPool(&config)
+	return vcdClient.CreateNetworkPool(ctx, &config)
 }

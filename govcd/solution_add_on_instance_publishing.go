@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -15,7 +16,7 @@ var addOnInstancePublishBehaviorId = "urn:vcloud:behavior-interface:invoke:vmwar
 
 // Publishing manages publish and Unpublish operations, which are managed in the same API call
 // To unpublish, the `scopeAll` has to be `false and `scope` must be empty
-func (addonInstance *SolutionAddOnInstance) Publishing(scope []string, scopeAll bool) (string, error) {
+func (addonInstance *SolutionAddOnInstance) Publishing(ctx context.Context, scope []string, scopeAll bool) (string, error) {
 	arguments := make(map[string]interface{})
 	arguments["operation"] = "publish instance"
 	arguments["name"] = addonInstance.SolutionAddOnInstance.Name
@@ -31,7 +32,7 @@ func (addonInstance *SolutionAddOnInstance) Publishing(scope []string, scopeAll 
 	}
 
 	parentRde := addonInstance.DefinedEntity
-	result, err := parentRde.InvokeBehavior(addOnInstancePublishBehaviorId, behaviorInvocation)
+	result, err := parentRde.InvokeBehavior(ctx, addOnInstancePublishBehaviorId, behaviorInvocation)
 	if err != nil {
 		return "", fmt.Errorf("error invoking publish behavior of Solution Add-On instance '%s': %s", addonInstance.SolutionAddOnInstance.Name, err)
 	}

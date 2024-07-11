@@ -380,23 +380,23 @@ func createOpenApiOrgVdcNetwork(ctx context.Context, client *Client, OrgVdcNetwo
 }
 
 // GetSegmentProfile retrieves Segment Profile configuration for a single Org VDC Network
-func (orgVdcNet *OpenApiOrgVdcNetwork) GetSegmentProfile() (*types.OrgVdcNetworkSegmentProfiles, error) {
+func (orgVdcNet *OpenApiOrgVdcNetwork) GetSegmentProfile(ctx context.Context) (*types.OrgVdcNetworkSegmentProfiles, error) {
 	c := crudConfig{
 		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointOrgVdcNetworkSegmentProfiles,
 		endpointParams: []string{orgVdcNet.OpenApiOrgVdcNetwork.ID},
 		entityLabel:    labelOrgVdcNetworkSegmentProfile,
 	}
-	return getInnerEntity[types.OrgVdcNetworkSegmentProfiles](orgVdcNet.client, c)
+	return getInnerEntity[types.OrgVdcNetworkSegmentProfiles](ctx, orgVdcNet.client, c)
 }
 
 // UpdateSegmentProfile updates a Segment Profile with a given configuration
-func (orgVdcNet *OpenApiOrgVdcNetwork) UpdateSegmentProfile(entityConfig *types.OrgVdcNetworkSegmentProfiles) (*types.OrgVdcNetworkSegmentProfiles, error) {
+func (orgVdcNet *OpenApiOrgVdcNetwork) UpdateSegmentProfile(ctx context.Context, entityConfig *types.OrgVdcNetworkSegmentProfiles) (*types.OrgVdcNetworkSegmentProfiles, error) {
 	c := crudConfig{
 		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointOrgVdcNetworkSegmentProfiles,
 		endpointParams: []string{orgVdcNet.OpenApiOrgVdcNetwork.ID},
 		entityLabel:    labelOrgVdcNetworkSegmentProfile,
 	}
-	return updateInnerEntity(orgVdcNet.client, c, entityConfig)
+	return updateInnerEntity(ctx, orgVdcNet.client, c, entityConfig)
 }
 
 // GetAllOpenApiOrgVdcNetworks checks all Org VDC networks available to the current user

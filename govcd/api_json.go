@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
@@ -18,7 +19,7 @@ import (
 // executeJsonRequest is a wrapper around regular API call operations, similar to client.ExecuteRequest, but with JSON payback
 // Returns a http.Response object, which, in case of success, has its body still unread
 // Caller function has the responsibility for closing the response body
-func (client Client) executeJsonRequest(href, httpMethod string, inputStructure any, errorMessage string) (*http.Response, error) {
+func (client Client) executeJsonRequest(ctx context.Context, href, httpMethod string, inputStructure any, errorMessage string) (*http.Response, error) {
 
 	text, err := json.MarshalIndent(inputStructure, " ", " ")
 	if err != nil {
@@ -35,7 +36,7 @@ func (client Client) executeJsonRequest(href, httpMethod string, inputStructure 
 	headAccept := http.Header{}
 	headAccept.Set("Accept", fmt.Sprintf("application/*+json;version=%s", apiVersion))
 	headAccept.Set("Content-Type", "application/*+json")
-	request := client.newRequest(nil, nil, httpMethod, *requestHref, body, apiVersion, headAccept)
+	request := client.newRequest(ctx, nil, nil, httpMethod, *requestHref, body, apiVersion, headAccept)
 	resp, err = client.Http.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf(errorMessage, err)

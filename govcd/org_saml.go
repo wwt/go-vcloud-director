@@ -6,6 +6,7 @@ package govcd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -19,7 +20,7 @@ import (
 )
 
 // GetFederationSettings retrieves the current federation (SAML) settings for a given organization
-func (adminOrg *AdminOrg) GetFederationSettings() (*types.OrgFederationSettings, error) {
+func (adminOrg *AdminOrg) GetFederationSettings(ctx context.Context) (*types.OrgFederationSettings, error) {
 	var settings types.OrgFederationSettings
 
 	if adminOrg.AdminOrg.OrgSettings == nil || adminOrg.AdminOrg.OrgSettings.Link == nil {
@@ -30,7 +31,7 @@ func (adminOrg *AdminOrg) GetFederationSettings() (*types.OrgFederationSettings,
 		return nil, fmt.Errorf("no link found for federation settings (SAML: %s) in Org %s", types.MimeFederationSettingsXml, adminOrg.AdminOrg.Name)
 	}
 
-	resp, err := adminOrg.client.ExecuteRequest(fsUrl, http.MethodGet, types.MimeFederationSettingsXml,
+	resp, err := adminOrg.client.ExecuteRequest(ctx, fsUrl, http.MethodGet, types.MimeFederationSettingsXml,
 		"error fetching federation settings: %s", nil, &settings)
 
 	if err != nil {
@@ -46,7 +47,7 @@ func (adminOrg *AdminOrg) GetFederationSettings() (*types.OrgFederationSettings,
 }
 
 // SetFederationSettings creates or replaces federation (SAML) settings for a given organization
-func (adminOrg *AdminOrg) SetFederationSettings(settings *types.OrgFederationSettings) (*types.OrgFederationSettings, error) {
+func (adminOrg *AdminOrg) SetFederationSettings(ctx context.Context, settings *types.OrgFederationSettings) (*types.OrgFederationSettings, error) {
 
 	if adminOrg.AdminOrg.OrgSettings == nil || adminOrg.AdminOrg.OrgSettings.Link == nil {
 		return nil, fmt.Errorf("no Org settings links found in Org %s", adminOrg.AdminOrg.Name)
@@ -75,7 +76,7 @@ func (adminOrg *AdminOrg) SetFederationSettings(settings *types.OrgFederationSet
 	// imitate it and use JSON payload and results for this operation
 	headAccept.Set("Accept", types.JSONMime)
 	headAccept.Set("Content-Type", types.MimeFederationSettingsJson)
-	request := adminOrg.client.newRequest(nil, nil, http.MethodPut, *setUrl, body, apiVersion, headAccept)
+	request := adminOrg.client.newRequest(ctx, nil, nil, http.MethodPut, *setUrl, body, apiVersion, headAccept)
 	request.Header.Set("Accept", fmt.Sprintf("application/*+json;version=%s", apiVersion))
 	request.Header.Set("Content-Type", types.MimeFederationSettingsJson)
 
@@ -103,26 +104,26 @@ func (adminOrg *AdminOrg) SetFederationSettings(settings *types.OrgFederationSet
 		return nil, err
 	}
 
-	return adminOrg.GetFederationSettings()
+	return adminOrg.GetFederationSettings(ctx)
 }
 
 // UnsetFederationSettings removes federation (SAML) settings for a given organization
-func (adminOrg *AdminOrg) UnsetFederationSettings() error {
-	settings, err := adminOrg.GetFederationSettings()
+func (adminOrg *AdminOrg) UnsetFederationSettings(ctx context.Context) error {
+	settings, err := adminOrg.GetFederationSettings(ctx)
 	if err != nil {
 		return fmt.Errorf("[UnsetFederationSettings] error getting SAML settings for Org %s: %s", adminOrg.AdminOrg.Name, err)
 	}
 
 	settings.SAMLMetadata = ""
 	settings.Enabled = false
-	_, err = adminOrg.SetFederationSettings(settings)
+	_, err = adminOrg.SetFederationSettings(ctx, settings)
 	return err
 }
 
 // GetServiceProviderSamlMetadata retrieves the service provider SAML metadata of the given Org
-func (adminOrg *AdminOrg) GetServiceProviderSamlMetadata() (*types.VcdSamlMetadata, error) {
+func (adminOrg *AdminOrg) GetServiceProviderSamlMetadata(ctx context.Context) (*types.VcdSamlMetadata, error) {
 
-	metadataText, err := adminOrg.RetrieveServiceProviderSamlMetadata()
+	metadataText, err := adminOrg.RetrieveServiceProviderSamlMetadata(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -137,9 +138,9 @@ func (adminOrg *AdminOrg) GetServiceProviderSamlMetadata() (*types.VcdSamlMetada
 }
 
 // RetrieveServiceProviderSamlMetadata retrieves the SAML metadata of the given Org
-func (adminOrg *AdminOrg) RetrieveServiceProviderSamlMetadata() (string, error) {
+func (adminOrg *AdminOrg) RetrieveServiceProviderSamlMetadata(ctx context.Context) (string, error) {
 
-	settings, err := adminOrg.GetFederationSettings()
+	settings, err := adminOrg.GetFederationSettings(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -148,7 +149,7 @@ func (adminOrg *AdminOrg) RetrieveServiceProviderSamlMetadata() (string, error) 
 		return "", fmt.Errorf("[RetrieveRemoteDocument] no URL found for metadata retrieval (%s) in org %s", types.MimeSamlMetadata, adminOrg.AdminOrg.Name)
 	}
 
-	metadataText, err := adminOrg.client.RetrieveRemoteDocument(metadataUrl)
+	metadataText, err := adminOrg.client.RetrieveRemoteDocument(ctx, metadataUrl)
 	if err != nil {
 		return "", fmt.Errorf("[RetrieveRemoteDocument] error retrieving SAML metadata from %s: %s", metadataUrl, err)
 	}
@@ -188,13 +189,13 @@ var (
 )
 
 // RetrieveRemoteDocument gets the contents of a given URL
-func (client *Client) RetrieveRemoteDocument(metadataUrl string) ([]byte, error) {
+func (client *Client) RetrieveRemoteDocument(ctx context.Context, metadataUrl string) ([]byte, error) {
 
 	retrieveUrl, err := url.Parse(metadataUrl)
 	if err != nil {
 		return nil, err
 	}
-	request := client.newRequest(nil, nil, http.MethodGet, *retrieveUrl, nil, client.APIVersion, nil)
+	request := client.newRequest(ctx, nil, nil, http.MethodGet, *retrieveUrl, nil, client.APIVersion, nil)
 
 	resp, err := client.Http.Do(request)
 

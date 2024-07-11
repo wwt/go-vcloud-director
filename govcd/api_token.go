@@ -136,7 +136,7 @@ func (vcdClient *VCDClient) RegisterToken(ctx context.Context, org string, token
 	client := vcdClient.Client
 
 	if client.APIVCDMaxVersionIs(ctx, "< 36.1") {
-		version, err := client.GetVcdFullVersion()
+		version, err := client.GetVcdFullVersion(ctx)
 		if err == nil {
 			return nil, fmt.Errorf("minimum version for Token registration is 10.3.1 - Version detected: %s", version.Version)
 		}
@@ -170,7 +170,7 @@ func (vcdClient *VCDClient) RegisterToken(ctx context.Context, org string, token
 }
 
 // getAccessToken gets the access token structure containing the bearer token
-func (client *Client) getAccessToken(org, funcName string, payloadMap map[string]string) (*types.ApiTokenRefresh, error) {
+func (client *Client) getAccessToken(ctx context.Context, org, funcName string, payloadMap map[string]string) (*types.ApiTokenRefresh, error) {
 	userDef := "tenant/" + org
 	if strings.EqualFold(org, "system") {
 		userDef = "provider"
@@ -185,7 +185,7 @@ func (client *Client) getAccessToken(org, funcName string, payloadMap map[string
 	newToken := &types.ApiTokenRefresh{}
 
 	// Not an OpenAPI endpoint so hardcoding the API token minimal version
-	err = client.OpenApiPostUrlEncoded("36.1", urlRef, nil, payloadMap, &newToken, nil)
+	err = client.OpenApiPostUrlEncoded(ctx, "36.1", urlRef, nil, payloadMap, &newToken, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error authorizing service account: %s", err)
 	}
@@ -194,7 +194,7 @@ func (client *Client) getAccessToken(org, funcName string, payloadMap map[string
 }
 
 // GetInitialApiToken gets the initial API token, usable only once per token.
-func (token *Token) GetInitialApiToken() (*types.ApiTokenRefresh, error) {
+func (token *Token) GetInitialApiToken(ctx context.Context) (*types.ApiTokenRefresh, error) {
 	client := token.client
 	uuid := extractUuid(token.Token.ID)
 	data := map[string]string{
@@ -203,7 +203,7 @@ func (token *Token) GetInitialApiToken() (*types.ApiTokenRefresh, error) {
 		"client_id":  uuid,
 	}
 
-	refreshToken, err := client.getAccessToken(token.Token.Org.Name, "CreateApiToken", data)
+	refreshToken, err := client.getAccessToken(ctx, token.Token.Org.Name, "CreateApiToken", data)
 	if err != nil {
 		return nil, fmt.Errorf("error getting token: %s", err)
 	}
@@ -237,7 +237,7 @@ func (token *Token) Delete(ctx context.Context) error {
 // SetApiToken behaves similarly to SetToken, with the difference that it will
 // return full information about the bearer token, so that the caller can make decisions about token expiration
 func (vcdClient *VCDClient) SetApiToken(ctx context.Context, org, apiToken string) (*types.ApiTokenRefresh, error) {
-	tokenRefresh, err := vcdClient.GetBearerTokenFromApiToken(org, apiToken)
+	tokenRefresh, err := vcdClient.GetBearerTokenFromApiToken(ctx, org, apiToken)
 	if err != nil {
 		return nil, err
 	}
@@ -250,12 +250,12 @@ func (vcdClient *VCDClient) SetApiToken(ctx context.Context, org, apiToken strin
 
 // GetBearerTokenFromApiToken uses an API token to retrieve a bearer token
 // using the refresh token operation.
-func (vcdClient *VCDClient) GetBearerTokenFromApiToken(org, token string) (*types.ApiTokenRefresh, error) {
+func (vcdClient *VCDClient) GetBearerTokenFromApiToken(ctx context.Context, org, token string) (*types.ApiTokenRefresh, error) {
 	data := map[string]string{
 		"grant_type":    "refresh_token",
 		"refresh_token": token,
 	}
-	tokenDef, err := vcdClient.Client.getAccessToken(org, "GetBearerTokenFromApiToken", data)
+	tokenDef, err := vcdClient.Client.getAccessToken(ctx, org, "GetBearerTokenFromApiToken", data)
 	if err != nil {
 		return nil, fmt.Errorf("error getting bearer token: %s", err)
 	}

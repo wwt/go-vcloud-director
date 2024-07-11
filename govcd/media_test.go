@@ -39,7 +39,7 @@ func (vcd *TestVCD) Test_DeleteMedia(check *C) {
 	itemName := "TestDeleteMedia"
 	uploadTask, err := catalog.UploadMediaImage(itemName, "upload from test", vcd.config.Media.MediaPath, 1024)
 	check.Assert(err, IsNil)
-	err = uploadTask.WaitTaskCompletion()
+	err = uploadTask.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	AddToCleanupList(itemName, "mediaCatalogImage", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.Name, check.TestName())
@@ -51,7 +51,7 @@ func (vcd *TestVCD) Test_DeleteMedia(check *C) {
 
 	task, err := media.Delete()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	_, err = catalog.GetMediaByName(itemName, true)
@@ -86,7 +86,7 @@ func (vcd *TestVCD) Test_UploadAnyMediaFile(check *C) {
 	// Upload the source file of the current test as a media item
 	uploadTask, err := catalog.UploadMediaFile(itemName, "Text file uploaded from test", itemPath, 1024, false)
 	check.Assert(err, IsNil)
-	err = uploadTask.WaitTaskCompletion()
+	err = uploadTask.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	AddToCleanupList(itemName, "mediaCatalogImage", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.Name, check.TestName())
@@ -118,7 +118,7 @@ func (vcd *TestVCD) Test_UploadAnyMediaFile(check *C) {
 
 	task, err := media.Delete()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	_, err = catalog.GetMediaByName(itemName, true)

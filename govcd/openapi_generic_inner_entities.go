@@ -1,6 +1,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -67,12 +68,12 @@ func (c crudConfig) validate() error {
 // * `client` is a *Client
 // * `c` holds settings for performing API call
 // * `innerConfig` is the new entity type
-func createInnerEntity[I any](client *Client, c crudConfig, innerConfig *I) (*I, error) {
+func createInnerEntity[I any](ctx context.Context, client *Client, c crudConfig, innerConfig *I) (*I, error) {
 	if err := c.validate(); err != nil {
 		return nil, err
 	}
 
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(c.endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, c.endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error getting API version for creating entity '%s': %s", c.entityLabel, err)
 	}
@@ -88,7 +89,7 @@ func createInnerEntity[I any](client *Client, c crudConfig, innerConfig *I) (*I,
 	}
 
 	createdInnerEntityConfig := new(I)
-	err = client.OpenApiPostItem(apiVersion, urlRef, c.queryParameters, innerConfig, createdInnerEntityConfig, c.additionalHeader)
+	err = client.OpenApiPostItem(ctx, apiVersion, urlRef, c.queryParameters, innerConfig, createdInnerEntityConfig, c.additionalHeader)
 	if err != nil {
 		return nil, fmt.Errorf("error creating entity of type '%s': %s", c.entityLabel, err)
 	}
@@ -101,9 +102,9 @@ func createInnerEntity[I any](client *Client, c crudConfig, innerConfig *I) (*I,
 // * `client` is a *Client
 // * `c` holds settings for performing API call
 // * `innerConfig` is the new entity type
-func updateInnerEntity[I any](client *Client, c crudConfig, innerConfig *I) (*I, error) {
+func updateInnerEntity[I any](ctx context.Context, client *Client, c crudConfig, innerConfig *I) (*I, error) {
 	// Discarding returned headers to better match return signature for most common cases
-	updatedInnerEntity, _, err := updateInnerEntityWithHeaders(client, c, innerConfig)
+	updatedInnerEntity, _, err := updateInnerEntityWithHeaders(ctx, client, c, innerConfig)
 	return updatedInnerEntity, err
 }
 
@@ -112,12 +113,12 @@ func updateInnerEntity[I any](client *Client, c crudConfig, innerConfig *I) (*I,
 // * `client` is a *Client
 // * `c` holds settings for performing API call
 // * `innerConfig` is the new entity type
-func updateInnerEntityWithHeaders[I any](client *Client, c crudConfig, innerConfig *I) (*I, http.Header, error) {
+func updateInnerEntityWithHeaders[I any](ctx context.Context, client *Client, c crudConfig, innerConfig *I) (*I, http.Header, error) {
 	if err := c.validate(); err != nil {
 		return nil, nil, err
 	}
 
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(c.endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, c.endpoint)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error getting API version for updating entity '%s': %s", c.entityLabel, err)
 	}
@@ -133,7 +134,7 @@ func updateInnerEntityWithHeaders[I any](client *Client, c crudConfig, innerConf
 	}
 
 	updatedInnerEntityConfig := new(I)
-	headers, err := client.OpenApiPutItemAndGetHeaders(apiVersion, urlRef, c.queryParameters, innerConfig, updatedInnerEntityConfig, c.additionalHeader)
+	headers, err := client.OpenApiPutItemAndGetHeaders(ctx, apiVersion, urlRef, c.queryParameters, innerConfig, updatedInnerEntityConfig, c.additionalHeader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error updating entity of type '%s': %s", c.entityLabel, err)
 	}
@@ -146,9 +147,9 @@ func updateInnerEntityWithHeaders[I any](client *Client, c crudConfig, innerConf
 // Parameters:
 // * `client` is a *Client
 // * `c` holds settings for performing API call
-func getInnerEntity[I any](client *Client, c crudConfig) (*I, error) {
+func getInnerEntity[I any](ctx context.Context, client *Client, c crudConfig) (*I, error) {
 	// Discarding returned headers to better match return signature for most common cases
-	innerEntity, _, err := getInnerEntityWithHeaders[I](client, c)
+	innerEntity, _, err := getInnerEntityWithHeaders[I](ctx, client, c)
 	return innerEntity, err
 }
 
@@ -157,12 +158,12 @@ func getInnerEntity[I any](client *Client, c crudConfig) (*I, error) {
 // Parameters:
 // * `client` is a *Client
 // * `c` holds settings for performing API call
-func getInnerEntityWithHeaders[I any](client *Client, c crudConfig) (*I, http.Header, error) {
+func getInnerEntityWithHeaders[I any](ctx context.Context, client *Client, c crudConfig) (*I, http.Header, error) {
 	if err := c.validate(); err != nil {
 		return nil, nil, err
 	}
 
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(c.endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, c.endpoint)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error getting API version for entity '%s': %s", c.entityLabel, err)
 	}
@@ -178,7 +179,7 @@ func getInnerEntityWithHeaders[I any](client *Client, c crudConfig) (*I, http.He
 	}
 
 	typeResponse := new(I)
-	headers, err := client.OpenApiGetItemAndHeaders(apiVersion, urlRef, c.queryParameters, typeResponse, c.additionalHeader)
+	headers, err := client.OpenApiGetItemAndHeaders(ctx, apiVersion, urlRef, c.queryParameters, typeResponse, c.additionalHeader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error retrieving entity of type '%s': %s", c.entityLabel, err)
 	}
@@ -192,12 +193,12 @@ func getInnerEntityWithHeaders[I any](client *Client, c crudConfig) (*I, http.He
 // Parameters:
 // * `client` is a *Client
 // * `c` holds settings for performing API call
-func getAllInnerEntities[I any](client *Client, c crudConfig) ([]*I, error) {
+func getAllInnerEntities[I any](ctx context.Context, client *Client, c crudConfig) ([]*I, error) {
 	if err := c.validate(); err != nil {
 		return nil, err
 	}
 
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(c.endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, c.endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error getting API version for entity '%s': %s", c.entityLabel, err)
 	}
@@ -213,7 +214,7 @@ func getAllInnerEntities[I any](client *Client, c crudConfig) ([]*I, error) {
 	}
 
 	typeResponses := make([]*I, 0)
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, c.queryParameters, &typeResponses, c.additionalHeader)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, c.queryParameters, &typeResponses, c.additionalHeader)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving all entities of type '%s': %s", c.entityLabel, err)
 	}
@@ -227,12 +228,12 @@ func getAllInnerEntities[I any](client *Client, c crudConfig) ([]*I, error) {
 // Parameters:
 // * `client` is a *Client
 // * `c` holds settings for performing API call
-func deleteEntityById(client *Client, c crudConfig) error {
+func deleteEntityById(ctx context.Context, client *Client, c crudConfig) error {
 	if err := c.validate(); err != nil {
 		return err
 	}
 
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(c.endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, c.endpoint)
 	if err != nil {
 		return err
 	}
@@ -247,7 +248,7 @@ func deleteEntityById(client *Client, c crudConfig) error {
 		return err
 	}
 
-	err = client.OpenApiDeleteItem(apiVersion, urlRef, c.queryParameters, c.additionalHeader)
+	err = client.OpenApiDeleteItem(ctx, apiVersion, urlRef, c.queryParameters, c.additionalHeader)
 
 	if err != nil {
 		return fmt.Errorf("error deleting %s: %s", c.entityLabel, err)

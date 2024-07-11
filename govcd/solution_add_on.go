@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -104,7 +105,7 @@ func createSolutionAddOnValidator(cfg SolutionAddOnConfig) error {
 // and trust it if it wasn't already trusted
 // * Lookup RDE type 'vmware:solutions_add_on:1.0.0'
 // * Create an RDE entity with payload from the 'isoFilePath' contents
-func (vcdClient *VCDClient) CreateSolutionAddOn(cfg SolutionAddOnConfig) (*SolutionAddOn, error) {
+func (vcdClient *VCDClient) CreateSolutionAddOn(ctx context.Context, cfg SolutionAddOnConfig) (*SolutionAddOn, error) {
 	err := createSolutionAddOnValidator(cfg)
 	if err != nil {
 		return nil, err
@@ -131,13 +132,13 @@ func (vcdClient *VCDClient) CreateSolutionAddOn(cfg SolutionAddOnConfig) (*Solut
 			return nil, fmt.Errorf("error extracting Certificate from Add-On image: %s", err)
 		}
 		isoFileName := filepath.Base(cfg.IsoFilePath)
-		err = vcdClient.TrustAddOnImageCertificate(certificateText, isoFileName)
+		err = vcdClient.TrustAddOnImageCertificate(ctx, certificateText, isoFileName)
 		if err != nil {
 			return nil, fmt.Errorf("certificate trust was request, but it failed: %s", err)
 		}
 	}
 
-	rdeType, err := vcdClient.GetRdeType(slzAddOnRdeType[0], slzAddOnRdeType[1], slzAddOnRdeType[2])
+	rdeType, err := vcdClient.GetRdeType(ctx, slzAddOnRdeType[0], slzAddOnRdeType[1], slzAddOnRdeType[2])
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving RDE Type for Solution Add-On: %s", err)
 	}
@@ -154,12 +155,12 @@ func (vcdClient *VCDClient) CreateSolutionAddOn(cfg SolutionAddOnConfig) (*Solut
 		Entity:     unmarshalledRdeEntityJson,
 	}
 
-	createdRdeEntity, err := rdeType.CreateRde(*entityCfg, nil)
+	createdRdeEntity, err := rdeType.CreateRde(ctx, *entityCfg, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating RDE entity: %s", err)
 	}
 
-	err = createdRdeEntity.Resolve()
+	err = createdRdeEntity.Resolve(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error resolving Solutions Add-On after creating: %s", err)
 	}
@@ -179,8 +180,8 @@ func (vcdClient *VCDClient) CreateSolutionAddOn(cfg SolutionAddOnConfig) (*Solut
 }
 
 // GetAllSolutionAddons retrieves all Solution Add-Ons with a given filter
-func (vcdClient *VCDClient) GetAllSolutionAddons(queryParameters url.Values) ([]*SolutionAddOn, error) {
-	allAddons, err := vcdClient.GetAllRdes(slzAddOnRdeType[0], slzAddOnRdeType[1], slzAddOnRdeType[2], queryParameters)
+func (vcdClient *VCDClient) GetAllSolutionAddons(ctx context.Context, queryParameters url.Values) ([]*SolutionAddOn, error) {
+	allAddons, err := vcdClient.GetAllRdes(ctx, slzAddOnRdeType[0], slzAddOnRdeType[1], slzAddOnRdeType[2], queryParameters)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving all Solution Add-ons: %s", err)
 	}
@@ -203,11 +204,11 @@ func (vcdClient *VCDClient) GetAllSolutionAddons(queryParameters url.Values) ([]
 }
 
 // GetSolutionAddonById retrieves Solution Add-On by ID
-func (vcdClient *VCDClient) GetSolutionAddonById(id string) (*SolutionAddOn, error) {
+func (vcdClient *VCDClient) GetSolutionAddonById(ctx context.Context, id string) (*SolutionAddOn, error) {
 	if id == "" {
 		return nil, fmt.Errorf("id must be specified")
 	}
-	rde, err := getRdeById(&vcdClient.Client, id)
+	rde, err := getRdeById(ctx, &vcdClient.Client, id)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving Solution Add-On by ID: %s", err)
 	}
@@ -228,14 +229,14 @@ func (vcdClient *VCDClient) GetSolutionAddonById(id string) (*SolutionAddOn, err
 
 // GetSolutionAddonByName retrieves Solution Add-Ons by name
 // Example name: "vmware.ds-1.4.0-23376809"
-func (vcdClient *VCDClient) GetSolutionAddonByName(name string) (*SolutionAddOn, error) {
+func (vcdClient *VCDClient) GetSolutionAddonByName(ctx context.Context, name string) (*SolutionAddOn, error) {
 	if name == "" {
 		return nil, fmt.Errorf("name must be specified")
 	}
 
 	queryParams := url.Values{}
 	queryParams.Add("filter", fmt.Sprintf("name==%s", name))
-	results, err := vcdClient.GetAllSolutionAddons(queryParams)
+	results, err := vcdClient.GetAllSolutionAddons(ctx, queryParams)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving Solution Add-Ons: %s", err)
 	}
@@ -243,19 +244,19 @@ func (vcdClient *VCDClient) GetSolutionAddonByName(name string) (*SolutionAddOn,
 	return oneOrError("name", name, results)
 }
 
-func (s *SolutionAddOn) Update(saoCfg *types.SolutionAddOn) (*SolutionAddOn, error) {
+func (s *SolutionAddOn) Update(ctx context.Context, saoCfg *types.SolutionAddOn) (*SolutionAddOn, error) {
 	unmarshalledRdeEntityJson, err := convertAnyToRdeEntity(saoCfg)
 	if err != nil {
 		return nil, err
 	}
 
-	newStructure, err := s.vcdClient.GetSolutionAddonById(s.RdeId())
+	newStructure, err := s.vcdClient.GetSolutionAddonById(ctx, s.RdeId())
 	if err != nil {
 		return nil, fmt.Errorf("error creating a copy of Solution Add-On: %s", err)
 	}
 
 	newStructure.DefinedEntity.DefinedEntity.Entity = unmarshalledRdeEntityJson
-	err = newStructure.DefinedEntity.Update(*newStructure.DefinedEntity.DefinedEntity)
+	err = newStructure.DefinedEntity.Update(ctx, *newStructure.DefinedEntity.DefinedEntity)
 	if err != nil {
 		return nil, err
 	}
@@ -268,11 +269,11 @@ func (s *SolutionAddOn) Update(saoCfg *types.SolutionAddOn) (*SolutionAddOn, err
 	return newStructure, nil
 }
 
-func (s *SolutionAddOn) Delete() error {
+func (s *SolutionAddOn) Delete(ctx context.Context) error {
 	if s.DefinedEntity == nil {
 		return fmt.Errorf("error - parent Defined Entity is nil")
 	}
-	return s.DefinedEntity.Delete()
+	return s.DefinedEntity.Delete(ctx)
 }
 
 // RdeId is a shortcut of SolutionEntity.DefinedEntity.DefinedEntity.ID
@@ -286,7 +287,7 @@ func (s *SolutionAddOn) RdeId() string {
 
 // TrustAddOnImageCertificate will check if a given certificate is trusted by VCD and trust it if it
 // is not there yet
-func (vcdClient *VCDClient) TrustAddOnImageCertificate(certificateText, source string) error {
+func (vcdClient *VCDClient) TrustAddOnImageCertificate(ctx context.Context, certificateText, source string) error {
 	if certificateText == "" {
 		return fmt.Errorf("certificate field is empty")
 	}
@@ -295,7 +296,7 @@ func (vcdClient *VCDClient) TrustAddOnImageCertificate(certificateText, source s
 		return fmt.Errorf("source field is empty")
 	}
 
-	foundCertificateInLibrary, err := vcdClient.Client.CountMatchingCertificates(certificateText)
+	foundCertificateInLibrary, err := vcdClient.Client.CountMatchingCertificates(ctx, certificateText)
 	if err != nil {
 		return err
 	}
@@ -307,7 +308,7 @@ func (vcdClient *VCDClient) TrustAddOnImageCertificate(certificateText, source s
 			Certificate: certificateText,
 			Description: "certificate retrieved from " + source,
 		}
-		_, err = vcdClient.Client.AddCertificateToLibrary(&certificateConfig)
+		_, err = vcdClient.Client.AddCertificateToLibrary(ctx, &certificateConfig)
 		if err != nil {
 			return fmt.Errorf("error adding certificate '%s' to library: %s", addonCertificateName, err)
 		}

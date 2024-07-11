@@ -142,7 +142,7 @@ func (vcd *TestVCD) TestMediaRecordMetadata(check *C) {
 		deleteTask, err := media.Delete()
 		check.Assert(err, IsNil)
 		check.Assert(deleteTask, NotNil)
-		err = deleteTask.WaitTaskCompletion()
+		err = deleteTask.WaitTaskCompletion(context.Background())
 		check.Assert(err, IsNil)
 	}()
 
@@ -264,7 +264,7 @@ func (vcd *TestVCD) TestDiskMetadata(check *C) {
 
 	task, err = disk.Delete()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 }
 

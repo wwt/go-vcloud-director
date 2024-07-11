@@ -1230,20 +1230,20 @@ func QueryOrgVdcStorageProfileByID(ctx context.Context, vcdCli *VCDClient, id st
 }
 
 // GetGlobalDefaultSegmentProfileTemplates retrieves VCD global configuration for Segment Profile Templates
-func (vcdClient *VCDClient) GetGlobalDefaultSegmentProfileTemplates() (*types.NsxtGlobalDefaultSegmentProfileTemplate, error) {
+func (vcdClient *VCDClient) GetGlobalDefaultSegmentProfileTemplates(ctx context.Context) (*types.NsxtGlobalDefaultSegmentProfileTemplate, error) {
 	c := crudConfig{
 		endpoint:    types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointNsxtGlobalDefaultSegmentProfileTemplates,
 		entityLabel: labelGlobalDefaultSegmentProfileTemplate,
 	}
 
-	return getInnerEntity[types.NsxtGlobalDefaultSegmentProfileTemplate](&vcdClient.Client, c)
+	return getInnerEntity[types.NsxtGlobalDefaultSegmentProfileTemplate](ctx, &vcdClient.Client, c)
 }
 
 // UpdateGlobalDefaultSegmentProfileTemplates updates VCD global configuration for Segment Profile Templates
-func (vcdClient *VCDClient) UpdateGlobalDefaultSegmentProfileTemplates(entityConfig *types.NsxtGlobalDefaultSegmentProfileTemplate) (*types.NsxtGlobalDefaultSegmentProfileTemplate, error) {
+func (vcdClient *VCDClient) UpdateGlobalDefaultSegmentProfileTemplates(ctx context.Context, entityConfig *types.NsxtGlobalDefaultSegmentProfileTemplate) (*types.NsxtGlobalDefaultSegmentProfileTemplate, error) {
 	c := crudConfig{
 		endpoint:    types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointNsxtGlobalDefaultSegmentProfileTemplates,
 		entityLabel: labelGlobalDefaultSegmentProfileTemplate,
 	}
-	return updateInnerEntity(&vcdClient.Client, c, entityConfig)
+	return updateInnerEntity(ctx, &vcdClient.Client, c, entityConfig)
 }

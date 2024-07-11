@@ -1,6 +1,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 )
@@ -19,12 +20,12 @@ type outerEntityWrapper[O any, I any] interface {
 }
 
 // createOuterEntity creates an outer entity with given inner entity config
-func createOuterEntity[O outerEntityWrapper[O, I], I any](client *Client, outerEntity O, c crudConfig, innerEntityConfig *I) (*O, error) {
+func createOuterEntity[O outerEntityWrapper[O, I], I any](ctx context.Context, client *Client, outerEntity O, c crudConfig, innerEntityConfig *I) (*O, error) {
 	if innerEntityConfig == nil {
 		return nil, fmt.Errorf("entity config '%s' cannot be empty for create operation", c.entityLabel)
 	}
 
-	createdInnerEntity, err := createInnerEntity(client, c, innerEntityConfig)
+	createdInnerEntity, err := createInnerEntity(ctx, client, c, innerEntityConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -33,12 +34,12 @@ func createOuterEntity[O outerEntityWrapper[O, I], I any](client *Client, outerE
 }
 
 // updateOuterEntity updates an outer entity with given inner entity config
-func updateOuterEntity[O outerEntityWrapper[O, I], I any](client *Client, outerEntity O, c crudConfig, innerEntityConfig *I) (*O, error) {
+func updateOuterEntity[O outerEntityWrapper[O, I], I any](ctx context.Context, client *Client, outerEntity O, c crudConfig, innerEntityConfig *I) (*O, error) {
 	if innerEntityConfig == nil {
 		return nil, fmt.Errorf("entity config '%s' cannot be empty for update operation", c.entityLabel)
 	}
 
-	updatedInnerEntity, err := updateInnerEntity(client, c, innerEntityConfig)
+	updatedInnerEntity, err := updateInnerEntity(ctx, client, c, innerEntityConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -47,8 +48,8 @@ func updateOuterEntity[O outerEntityWrapper[O, I], I any](client *Client, outerE
 }
 
 // getOuterEntity retrieves a single outer entity
-func getOuterEntity[O outerEntityWrapper[O, I], I any](client *Client, outerEntity O, c crudConfig) (*O, error) {
-	retrievedInnerEntity, err := getInnerEntity[I](client, c)
+func getOuterEntity[O outerEntityWrapper[O, I], I any](ctx context.Context, client *Client, outerEntity O, c crudConfig) (*O, error) {
+	retrievedInnerEntity, err := getInnerEntity[I](ctx, client, c)
 	if err != nil {
 		return nil, err
 	}
@@ -57,8 +58,8 @@ func getOuterEntity[O outerEntityWrapper[O, I], I any](client *Client, outerEnti
 }
 
 // getOuterEntity retrieves a single outer entity
-func getOuterEntityWithHeaders[O outerEntityWrapper[O, I], I any](client *Client, outerEntity O, c crudConfig) (*O, http.Header, error) {
-	retrievedInnerEntity, headers, err := getInnerEntityWithHeaders[I](client, c)
+func getOuterEntityWithHeaders[O outerEntityWrapper[O, I], I any](ctx context.Context, client *Client, outerEntity O, c crudConfig) (*O, http.Header, error) {
+	retrievedInnerEntity, headers, err := getInnerEntityWithHeaders[I](ctx, client, c)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -67,8 +68,8 @@ func getOuterEntityWithHeaders[O outerEntityWrapper[O, I], I any](client *Client
 }
 
 // getAllOuterEntities retrieves all outer entities
-func getAllOuterEntities[O outerEntityWrapper[O, I], I any](client *Client, outerEntity O, c crudConfig) ([]*O, error) {
-	retrievedAllInnerEntities, err := getAllInnerEntities[I](client, c)
+func getAllOuterEntities[O outerEntityWrapper[O, I], I any](ctx context.Context, client *Client, outerEntity O, c crudConfig) ([]*O, error) {
+	retrievedAllInnerEntities, err := getAllInnerEntities[I](ctx, client, c)
 	if err != nil {
 		return nil, err
 	}

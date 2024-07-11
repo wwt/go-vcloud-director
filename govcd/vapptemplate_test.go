@@ -173,7 +173,7 @@ func (vcd *TestVCD) Test_VappTemplateLeaseUpdate(check *C) {
 
 	task, err := catalog.UploadOvf(vcd.config.OVA.OvaPath, itemName, description, 1024)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	AddToCleanupList(itemName, "catalogItem", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.NsxtBackedCatalogName, check.TestName())

@@ -1,6 +1,7 @@
 package govcd
 
 import (
+	"context"
 	"encoding/xml"
 	"fmt"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
@@ -28,13 +29,13 @@ The associations come in two flavors:
 // -----------------------------------------------------------------------------------------------------------------
 
 // GetSite retrieves the data for the current site (VCD)
-func (client Client) GetSite() (*types.Site, error) {
+func (client Client) GetSite(ctx context.Context) (*types.Site, error) {
 	href, err := url.JoinPath(client.VCDHREF.String(), "site")
 	if err != nil {
 		return nil, fmt.Errorf("error setting the URL path for site: %s", err)
 	}
 	var site types.Site
-	_, err = client.ExecuteRequest(href, http.MethodGet, "application/*+xml",
+	_, err = client.ExecuteRequest(ctx, href, http.MethodGet, "application/*+xml",
 		"error retrieving site: %s", nil, &site)
 	if err != nil {
 		return nil, err
@@ -48,12 +49,12 @@ func (client Client) GetSite() (*types.Site, error) {
 // -----------------------------------------------------------------------------------------------------------------
 
 // QueryAllSiteAssociations retrieves all site associations for the current site
-func (client Client) QueryAllSiteAssociations(params, notEncodedParams map[string]string) ([]*types.QueryResultSiteAssociationRecord, error) {
+func (client Client) QueryAllSiteAssociations(ctx context.Context, params, notEncodedParams map[string]string) ([]*types.QueryResultSiteAssociationRecord, error) {
 	if !client.IsSysAdmin {
 		return nil, fmt.Errorf("system administrator privileges are needed to handle site associations")
 	}
 
-	result, err := client.cumulativeQuery(types.QtSiteAssociation, params, notEncodedParams)
+	result, err := client.cumulativeQuery(ctx, types.QtSiteAssociation, params, notEncodedParams)
 	if err != nil {
 		return nil, err
 	}
@@ -63,13 +64,13 @@ func (client Client) QueryAllSiteAssociations(params, notEncodedParams map[strin
 
 // GetSiteAssociationData retrieves the structured data needed to start an association with another site
 // This is useful when we have control of both sites from the same client
-func (client Client) GetSiteAssociationData() (*types.SiteAssociationMember, error) {
+func (client Client) GetSiteAssociationData(ctx context.Context) (*types.SiteAssociationMember, error) {
 	href, err := url.JoinPath(client.VCDHREF.String(), "site", "associations", "localAssociationData")
 	if err != nil {
 		return nil, fmt.Errorf("error setting the URL path for localAssociationData: %s", err)
 	}
 	var associationData types.SiteAssociationMember
-	_, err = client.ExecuteRequest(href, http.MethodGet, types.MimeSiteAssociation,
+	_, err = client.ExecuteRequest(ctx, href, http.MethodGet, types.MimeSiteAssociation,
 		"error retrieving site associations: %s", nil, &associationData)
 	if err != nil {
 		return nil, err
@@ -80,24 +81,24 @@ func (client Client) GetSiteAssociationData() (*types.SiteAssociationMember, err
 
 // GetSiteRawAssociationData retrieves the raw (XML) data needed to start an association with another site
 // This is useful when we want to save this data to a file for future use
-func (client Client) GetSiteRawAssociationData() ([]byte, error) {
+func (client Client) GetSiteRawAssociationData(ctx context.Context) ([]byte, error) {
 	href, err := url.JoinPath(client.VCDHREF.String(), "site", "associations", "localAssociationData")
 	if err != nil {
 		return nil, fmt.Errorf("error setting the URL path for site/associations/localAssociationData: %s", err)
 	}
-	return client.RetrieveRemoteDocument(href)
+	return client.RetrieveRemoteDocument(ctx, href)
 }
 
 // GetSiteAssociations retrieves all current site associations
 // If no associations are available, it returns an empty slice with no error
-func (client Client) GetSiteAssociations() ([]*types.SiteAssociationMember, error) {
+func (client Client) GetSiteAssociations(ctx context.Context) ([]*types.SiteAssociationMember, error) {
 
 	href, err := url.JoinPath(client.VCDHREF.String(), "site", "associations")
 	if err != nil {
 		return nil, fmt.Errorf("error setting the URL path for site/associations: %s", err)
 	}
 	var associations types.SiteAssociations
-	_, err = client.ExecuteRequest(href, http.MethodGet, types.MimeSiteAssociation,
+	_, err = client.ExecuteRequest(ctx, href, http.MethodGet, types.MimeSiteAssociation,
 		"error retrieving site associations: %s", nil, &associations)
 	if err != nil {
 		return nil, err
@@ -108,8 +109,8 @@ func (client Client) GetSiteAssociations() ([]*types.SiteAssociationMember, erro
 
 // GetSiteAssociationBySiteId retrieves a single site association by the ID of the associated site
 // Note that there could be only one association between two sites
-func (client Client) GetSiteAssociationBySiteId(siteId string) (*types.SiteAssociationMember, error) {
-	associations, err := client.GetSiteAssociations()
+func (client Client) GetSiteAssociationBySiteId(ctx context.Context, siteId string) (*types.SiteAssociationMember, error) {
+	associations, err := client.GetSiteAssociations(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving associations for current site: %s", err)
 	}
@@ -124,7 +125,7 @@ func (client Client) GetSiteAssociationBySiteId(siteId string) (*types.SiteAssoc
 
 // CheckSiteAssociation polls the state of a given site association until it becomes active, or a timeout is reached.
 // Note: this method should be called only after both sides have performed the data association upload.
-func (client Client) CheckSiteAssociation(siteId string, timeout time.Duration) (string, time.Duration, error) {
+func (client Client) CheckSiteAssociation(ctx context.Context, siteId string, timeout time.Duration) (string, time.Duration, error) {
 	startTime := time.Now()
 
 	foundStatus := ""
@@ -132,7 +133,7 @@ func (client Client) CheckSiteAssociation(siteId string, timeout time.Duration) 
 	for elapsed < timeout {
 		time.Sleep(time.Second)
 		elapsed = time.Since(startTime)
-		siteAssociation, err := client.GetSiteAssociationBySiteId(siteId)
+		siteAssociation, err := client.GetSiteAssociationBySiteId(ctx, siteId)
 		if err != nil {
 			return foundStatus, elapsed, fmt.Errorf("error getting site association by ID '%s': %s", siteId, err)
 		}
@@ -149,13 +150,13 @@ func (client Client) CheckSiteAssociation(siteId string, timeout time.Duration) 
 // -----------------------------------------------------------------------------------------------------------------
 
 // SetSiteAssociationAsync sets a new site association without waiting for completion
-func (client Client) SetSiteAssociationAsync(associationData types.SiteAssociationMember) (Task, error) {
+func (client Client) SetSiteAssociationAsync(ctx context.Context, associationData types.SiteAssociationMember) (Task, error) {
 	href, err := url.JoinPath(client.VCDHREF.String(), "site", "associations")
 	if err != nil {
 		return Task{}, fmt.Errorf("error setting the URL path for site/associations: %s", err)
 	}
 	associationData.Xmlns = types.XMLNamespaceVCloud
-	task, err := client.ExecuteTaskRequest(href, http.MethodPost, "application/*+xml",
+	task, err := client.ExecuteTaskRequest(ctx, href, http.MethodPost, "application/*+xml",
 		"error setting site association: %s", &associationData)
 	if err != nil {
 		return Task{}, err
@@ -165,17 +166,17 @@ func (client Client) SetSiteAssociationAsync(associationData types.SiteAssociati
 }
 
 // SetSiteAssociation sets a new site association, waiting for completion
-func (client Client) SetSiteAssociation(associationData types.SiteAssociationMember) error {
-	task, err := client.SetSiteAssociationAsync(associationData)
+func (client Client) SetSiteAssociation(ctx context.Context, associationData types.SiteAssociationMember) error {
+	task, err := client.SetSiteAssociationAsync(ctx, associationData)
 	if err != nil {
 		return err
 	}
-	return task.WaitTaskCompletion()
+	return task.WaitTaskCompletion(ctx)
 }
 
 // RemoveSiteAssociationAsync removes a site association without waiting for completion
-func (client Client) RemoveSiteAssociationAsync(associationHref string) (Task, error) {
-	task, err := client.ExecuteTaskRequest(associationHref, http.MethodDelete, "",
+func (client Client) RemoveSiteAssociationAsync(ctx context.Context, associationHref string) (Task, error) {
+	task, err := client.ExecuteTaskRequest(ctx, associationHref, http.MethodDelete, "",
 		"error removing site association: %s", nil)
 	if err != nil {
 		return Task{}, err
@@ -185,12 +186,12 @@ func (client Client) RemoveSiteAssociationAsync(associationHref string) (Task, e
 }
 
 // RemoveSiteAssociation removes a site association, waiting for completion
-func (client Client) RemoveSiteAssociation(associationHref string) error {
-	task, err := client.RemoveSiteAssociationAsync(associationHref)
+func (client Client) RemoveSiteAssociation(ctx context.Context, associationHref string) error {
+	task, err := client.RemoveSiteAssociationAsync(ctx, associationHref)
 	if err != nil {
 		return err
 	}
-	return task.WaitTaskCompletion()
+	return task.WaitTaskCompletion(ctx)
 }
 
 // -----------------------------------------------------------------------------------------------------------------
@@ -198,12 +199,12 @@ func (client Client) RemoveSiteAssociation(associationHref string) error {
 // -----------------------------------------------------------------------------------------------------------------
 
 // QueryAllOrgAssociations retrieve all site associations with optional search parameters
-func (client Client) QueryAllOrgAssociations(params, notEncodedParams map[string]string) ([]*types.QueryResultOrgAssociationRecord, error) {
+func (client Client) QueryAllOrgAssociations(ctx context.Context, params, notEncodedParams map[string]string) ([]*types.QueryResultOrgAssociationRecord, error) {
 	if !client.IsSysAdmin {
 		return nil, fmt.Errorf("system administrator privileges are needed to handle Org associations")
 	}
 
-	result, err := client.cumulativeQuery(types.QtOrgAssociation, params, notEncodedParams)
+	result, err := client.cumulativeQuery(ctx, types.QtOrgAssociation, params, notEncodedParams)
 	if err != nil {
 		return nil, err
 	}
@@ -212,13 +213,13 @@ func (client Client) QueryAllOrgAssociations(params, notEncodedParams map[string
 }
 
 // GetOrgAssociations retrieves all associations available for the given Org
-func (org AdminOrg) GetOrgAssociations() ([]*types.OrgAssociationMember, error) {
+func (org AdminOrg) GetOrgAssociations(ctx context.Context) ([]*types.OrgAssociationMember, error) {
 	href, err := org.getAssociationLink(false)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving association URL: %s", err)
 	}
 	var associations types.OrgAssociations
-	_, err = org.client.ExecuteRequest(href, http.MethodGet, types.MimeOrgAssociation,
+	_, err = org.client.ExecuteRequest(ctx, href, http.MethodGet, types.MimeOrgAssociation,
 		"error retrieving org associations: %s", nil, &associations)
 	if err != nil {
 		return nil, err
@@ -229,8 +230,8 @@ func (org AdminOrg) GetOrgAssociations() ([]*types.OrgAssociationMember, error) 
 
 // GetOrgAssociationByOrgId retrieves a single Org association by the ID of the associated Org
 // Note that there could be only one association between two organization
-func (org AdminOrg) GetOrgAssociationByOrgId(orgId string) (*types.OrgAssociationMember, error) {
-	associations, err := org.GetOrgAssociations()
+func (org AdminOrg) GetOrgAssociationByOrgId(ctx context.Context, orgId string) (*types.OrgAssociationMember, error) {
+	associations, err := org.GetOrgAssociations(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving associations for org '%s': %s", org.AdminOrg.Name, err)
 	}
@@ -245,13 +246,13 @@ func (org AdminOrg) GetOrgAssociationByOrgId(orgId string) (*types.OrgAssociatio
 
 // GetOrgAssociationData retrieves the structured data needed to start an association with another Org
 // This is useful when we have control of both Orgs from the same client
-func (org AdminOrg) GetOrgAssociationData() (*types.OrgAssociationMember, error) {
+func (org AdminOrg) GetOrgAssociationData(ctx context.Context) (*types.OrgAssociationMember, error) {
 	href, err := org.getAssociationLink(true)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving association URL: %s", err)
 	}
 	var associationData types.OrgAssociationMember
-	_, err = org.client.ExecuteRequest(href, http.MethodGet, types.MimeOrgAssociation,
+	_, err = org.client.ExecuteRequest(ctx, href, http.MethodGet, types.MimeOrgAssociation,
 		"error retrieving org association data: %s", nil, &associationData)
 	if err != nil {
 		return nil, err
@@ -262,17 +263,17 @@ func (org AdminOrg) GetOrgAssociationData() (*types.OrgAssociationMember, error)
 
 // GetOrgRawAssociationData retrieves the raw (XML) data needed to start an association with another Org
 // This is useful when we want to save this data to a file for future use
-func (org AdminOrg) GetOrgRawAssociationData() ([]byte, error) {
+func (org AdminOrg) GetOrgRawAssociationData(ctx context.Context) ([]byte, error) {
 	href, err := org.getAssociationLink(true)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving association URL: %s", err)
 	}
-	return org.client.RetrieveRemoteDocument(href)
+	return org.client.RetrieveRemoteDocument(ctx, href)
 }
 
 // CheckOrgAssociation polls the state of a given Org association until it becomes active, or a timeout is reached.
 // Note: this method should be called only after both sides have performed the data association upload.
-func (org AdminOrg) CheckOrgAssociation(orgId string, timeout time.Duration) (string, time.Duration, error) {
+func (org AdminOrg) CheckOrgAssociation(ctx context.Context, orgId string, timeout time.Duration) (string, time.Duration, error) {
 	startTime := time.Now()
 
 	foundStatus := ""
@@ -280,7 +281,7 @@ func (org AdminOrg) CheckOrgAssociation(orgId string, timeout time.Duration) (st
 	for elapsed < timeout {
 		time.Sleep(time.Second)
 		elapsed = time.Since(startTime)
-		orgAssociation, err := org.GetOrgAssociationByOrgId(orgId)
+		orgAssociation, err := org.GetOrgAssociationByOrgId(ctx, orgId)
 		if err != nil {
 			return foundStatus, elapsed, fmt.Errorf("error getting org association by ID '%s': %s", orgId, err)
 		}
@@ -297,13 +298,13 @@ func (org AdminOrg) CheckOrgAssociation(orgId string, timeout time.Duration) (st
 // -----------------------------------------------------------------------------------------------------------------
 
 // SetOrgAssociationAsync sets a new Org association without waiting for completion
-func (org *AdminOrg) SetOrgAssociationAsync(associationData types.OrgAssociationMember) (Task, error) {
+func (org *AdminOrg) SetOrgAssociationAsync(ctx context.Context, associationData types.OrgAssociationMember) (Task, error) {
 	href, err := org.getAssociationLink(false)
 	if err != nil {
 		return Task{}, fmt.Errorf("error retrieving association URL: %s", err)
 	}
 	associationData.Xmlns = types.XMLNamespaceVCloud
-	task, err := org.client.ExecuteTaskRequest(href, http.MethodPost, "application/*+xml",
+	task, err := org.client.ExecuteTaskRequest(ctx, href, http.MethodPost, "application/*+xml",
 		"error setting org association: %s", &associationData)
 	if err != nil {
 		return Task{}, err
@@ -313,17 +314,17 @@ func (org *AdminOrg) SetOrgAssociationAsync(associationData types.OrgAssociation
 }
 
 // SetOrgAssociation sets a new Org association, waiting for completion
-func (org *AdminOrg) SetOrgAssociation(associationData types.OrgAssociationMember) error {
-	task, err := org.SetOrgAssociationAsync(associationData)
+func (org *AdminOrg) SetOrgAssociation(ctx context.Context, associationData types.OrgAssociationMember) error {
+	task, err := org.SetOrgAssociationAsync(ctx, associationData)
 	if err != nil {
 		return err
 	}
-	return task.WaitTaskCompletion()
+	return task.WaitTaskCompletion(ctx)
 }
 
 // RemoveOrgAssociationAsync removes an Org association without waiting for completion
-func (org *AdminOrg) RemoveOrgAssociationAsync(associationHref string) (Task, error) {
-	task, err := org.client.ExecuteTaskRequest(associationHref, http.MethodDelete, "",
+func (org *AdminOrg) RemoveOrgAssociationAsync(ctx context.Context, associationHref string) (Task, error) {
+	task, err := org.client.ExecuteTaskRequest(ctx, associationHref, http.MethodDelete, "",
 		"error removing org association: %s", nil)
 	if err != nil {
 		return Task{}, err
@@ -333,12 +334,12 @@ func (org *AdminOrg) RemoveOrgAssociationAsync(associationHref string) (Task, er
 }
 
 // RemoveOrgAssociation removes an Org association, waiting for completion
-func (org *AdminOrg) RemoveOrgAssociation(associationHref string) error {
-	task, err := org.RemoveOrgAssociationAsync(associationHref)
+func (org *AdminOrg) RemoveOrgAssociation(ctx context.Context, associationHref string) error {
+	task, err := org.RemoveOrgAssociationAsync(ctx, associationHref)
 	if err != nil {
 		return err
 	}
-	return task.WaitTaskCompletion()
+	return task.WaitTaskCompletion(ctx)
 }
 
 // -----------------------------------------------------------------------------------------------------------------

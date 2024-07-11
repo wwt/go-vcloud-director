@@ -225,7 +225,7 @@ func (vcd *TestVCD) Test_VmAffinityRule(check *C) {
 			}
 			task, err := vapp.Delete()
 			if err == nil {
-				_ = task.WaitTaskCompletion()
+				_ = task.WaitTaskCompletion(context.Background())
 			}
 		}
 	}()

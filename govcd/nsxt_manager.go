@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -18,8 +19,8 @@ type NsxtManager struct {
 
 // GetNsxtManagerByName searches for NSX-T managers available in VCD and returns the one that
 // matches name
-func (vcdClient *VCDClient) GetNsxtManagerByName(name string) (*NsxtManager, error) {
-	nsxtManagers, err := vcdClient.QueryNsxtManagerByName(name)
+func (vcdClient *VCDClient) GetNsxtManagerByName(ctx context.Context, name string) (*NsxtManager, error) {
+	nsxtManagers, err := vcdClient.QueryNsxtManagerByName(ctx, name)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving NSX-T Manager by name '%s': %s", name, err)
 	}
@@ -30,7 +31,7 @@ func (vcdClient *VCDClient) GetNsxtManagerByName(name string) (*NsxtManager, err
 		return nil, err
 	}
 
-	resp, err := vcdClient.Client.executeJsonRequest(singleNsxtManager.HREF, http.MethodGet, nil, "error retrieving NSX-T Manager: %s")
+	resp, err := vcdClient.Client.executeJsonRequest(ctx, singleNsxtManager.HREF, http.MethodGet, nil, "error retrieving NSX-T Manager: %s")
 	if err != nil {
 		return nil, err
 	}

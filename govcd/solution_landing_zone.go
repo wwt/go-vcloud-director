@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
@@ -33,9 +34,9 @@ type SolutionLandingZone struct {
 //
 // 1. Creates Solution Landing Zone RDE based on type urn:vcloud:type:vmware:solutions_organization:1.0.0
 // 2. Resolves the RDE
-func (vcdClient *VCDClient) CreateSolutionLandingZone(slzCfg *types.SolutionLandingZoneType) (*SolutionLandingZone, error) {
+func (vcdClient *VCDClient) CreateSolutionLandingZone(ctx context.Context, slzCfg *types.SolutionLandingZoneType) (*SolutionLandingZone, error) {
 	// 1. Check that RDE type exists
-	rdeType, err := vcdClient.GetRdeType(slzRdeType[0], slzRdeType[1], slzRdeType[2])
+	rdeType, err := vcdClient.GetRdeType(ctx, slzRdeType[0], slzRdeType[1], slzRdeType[2])
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving RDE Type for Solution Landing zone: %s", err)
 	}
@@ -56,19 +57,19 @@ func (vcdClient *VCDClient) CreateSolutionLandingZone(slzCfg *types.SolutionLand
 	}
 
 	// 4. Create RDE
-	createdRdeEntity, err := rdeType.CreateRde(*entityCfg, nil)
+	createdRdeEntity, err := rdeType.CreateRde(ctx, *entityCfg, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating RDE entity: %s", err)
 	}
 
 	// 5. Resolve RDE
-	err = createdRdeEntity.Resolve()
+	err = createdRdeEntity.Resolve(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error resolving Solutions add-on after creating: %s", err)
 	}
 
 	// 6. Reload RDE
-	err = createdRdeEntity.Refresh()
+	err = createdRdeEntity.Refresh(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error refreshing RDE after resolving: %s", err)
 	}
@@ -90,8 +91,8 @@ func (vcdClient *VCDClient) CreateSolutionLandingZone(slzCfg *types.SolutionLand
 // GetAllSolutionLandingZones retrieves all Solution Landing Zones
 //
 // Note: Up to VCD 10.5.1.1 there can be only a single RDE entry (one SLZ per VCD)
-func (vcdClient *VCDClient) GetAllSolutionLandingZones(queryParameters url.Values) ([]*SolutionLandingZone, error) {
-	allSlzs, err := vcdClient.GetAllRdes(slzRdeType[0], slzRdeType[1], slzRdeType[2], queryParameters)
+func (vcdClient *VCDClient) GetAllSolutionLandingZones(ctx context.Context, queryParameters url.Values) ([]*SolutionLandingZone, error) {
+	allSlzs, err := vcdClient.GetAllRdes(ctx, slzRdeType[0], slzRdeType[1], slzRdeType[2], queryParameters)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving all SLZs: %s", err)
 	}
@@ -117,8 +118,8 @@ func (vcdClient *VCDClient) GetAllSolutionLandingZones(queryParameters url.Value
 // GetExactlyOneSolutionLandingZone will get single Solution Landing Zone RDE or fail.
 // There can be only one Solution Landing Zone in VCD, but because it is backed by RDE - it can
 // occur that due to some error there is more than one RDE Entity
-func (vcdClient *VCDClient) GetExactlyOneSolutionLandingZone() (*SolutionLandingZone, error) {
-	allSlzs, err := vcdClient.GetAllSolutionLandingZones(nil)
+func (vcdClient *VCDClient) GetExactlyOneSolutionLandingZone(ctx context.Context) (*SolutionLandingZone, error) {
+	allSlzs, err := vcdClient.GetAllSolutionLandingZones(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving all Solution Landing Zones: %s", err)
 	}
@@ -130,11 +131,11 @@ func (vcdClient *VCDClient) GetExactlyOneSolutionLandingZone() (*SolutionLanding
 //
 // Note: defined entity ID must be used that can be accessed either by `SolutionLandingZone.Id()`
 // method or directly in `SolutionLandingZone.DefinedEntity.DefinedEntity.ID` field
-func (vcdClient *VCDClient) GetSolutionLandingZoneById(id string) (*SolutionLandingZone, error) {
+func (vcdClient *VCDClient) GetSolutionLandingZoneById(ctx context.Context, id string) (*SolutionLandingZone, error) {
 	if id == "" {
 		return nil, fmt.Errorf("id must be specified")
 	}
-	rde, err := getRdeById(&vcdClient.Client, id)
+	rde, err := getRdeById(ctx, &vcdClient.Client, id)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving RDE by ID: %s", err)
 	}
@@ -154,8 +155,8 @@ func (vcdClient *VCDClient) GetSolutionLandingZoneById(id string) (*SolutionLand
 }
 
 // Refresh reloads parent RDE data
-func (slz *SolutionLandingZone) Refresh() error {
-	err := slz.DefinedEntity.Refresh()
+func (slz *SolutionLandingZone) Refresh(ctx context.Context) error {
+	err := slz.DefinedEntity.Refresh(ctx)
 	if err != nil {
 		return err
 	}
@@ -181,7 +182,7 @@ func (slz *SolutionLandingZone) RdeId() string {
 }
 
 // Update Solution Landing Zone
-func (slz *SolutionLandingZone) Update(slzCfg *types.SolutionLandingZoneType) (*SolutionLandingZone, error) {
+func (slz *SolutionLandingZone) Update(ctx context.Context, slzCfg *types.SolutionLandingZoneType) (*SolutionLandingZone, error) {
 	unmarshalledRdeEntityJson, err := convertAnyToRdeEntity(slzCfg)
 	if err != nil {
 		return nil, err
@@ -189,7 +190,7 @@ func (slz *SolutionLandingZone) Update(slzCfg *types.SolutionLandingZoneType) (*
 
 	slz.DefinedEntity.DefinedEntity.Entity = unmarshalledRdeEntityJson
 
-	err = slz.DefinedEntity.Update(*slz.DefinedEntity.DefinedEntity)
+	err = slz.DefinedEntity.Update(ctx, *slz.DefinedEntity.DefinedEntity)
 	if err != nil {
 		return nil, err
 	}
@@ -209,6 +210,6 @@ func (slz *SolutionLandingZone) Update(slzCfg *types.SolutionLandingZoneType) (*
 }
 
 // Delete removes the RDE that defines Solution Landing Zone
-func (slz *SolutionLandingZone) Delete() error {
-	return slz.DefinedEntity.Delete()
+func (slz *SolutionLandingZone) Delete(ctx context.Context) error {
+	return slz.DefinedEntity.Delete(ctx)
 }

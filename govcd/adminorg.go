@@ -47,16 +47,16 @@ func (adminOrg *AdminOrg) CreateCatalog(ctx context.Context, name, description s
 	}
 	adminCatalog.parent = adminOrg
 
-	err = adminCatalog.Refresh()
+	err = adminCatalog.Refresh(ctx)
 	if err != nil {
 		return AdminCatalog{}, err
 	}
 	// Make sure that the creation task is finished
-	err = adminCatalog.WaitForTasks()
+	err = adminCatalog.WaitForTasks(ctx)
 	if err != nil {
 		return AdminCatalog{}, err
 	}
-	err = adminCatalog.WaitForTasks()
+	err = adminCatalog.WaitForTasks(ctx)
 	if err != nil {
 		return AdminCatalog{}, err
 	}

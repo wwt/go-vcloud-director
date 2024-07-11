@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
@@ -18,23 +19,23 @@ type NsxtEdgeGatewayDns struct {
 }
 
 // GetDnsConfig retrieves the DNS configuration for the underlying edge gateway
-func (egw *NsxtEdgeGateway) GetDnsConfig() (*NsxtEdgeGatewayDns, error) {
-	return getDnsConfig(egw.client, egw.EdgeGateway.ID)
+func (egw *NsxtEdgeGateway) GetDnsConfig(ctx context.Context) (*NsxtEdgeGatewayDns, error) {
+	return getDnsConfig(ctx, egw.client, egw.EdgeGateway.ID)
 }
 
 // UpdateDnsConfig updates the DNS configuration for the Edge Gateway
-func (egw *NsxtEdgeGateway) UpdateDnsConfig(updatedConfig *types.NsxtEdgeGatewayDns) (*NsxtEdgeGatewayDns, error) {
-	return updateDnsConfig(updatedConfig, egw.client, egw.EdgeGateway.ID)
+func (egw *NsxtEdgeGateway) UpdateDnsConfig(ctx context.Context, updatedConfig *types.NsxtEdgeGatewayDns) (*NsxtEdgeGatewayDns, error) {
+	return updateDnsConfig(ctx, updatedConfig, egw.client, egw.EdgeGateway.ID)
 }
 
 // Update updates the DNS configuration for the underlying Edge Gateway
-func (dns *NsxtEdgeGatewayDns) Update(updatedConfig *types.NsxtEdgeGatewayDns) (*NsxtEdgeGatewayDns, error) {
-	return updateDnsConfig(updatedConfig, dns.client, dns.EdgeGatewayId)
+func (dns *NsxtEdgeGatewayDns) Update(ctx context.Context, updatedConfig *types.NsxtEdgeGatewayDns) (*NsxtEdgeGatewayDns, error) {
+	return updateDnsConfig(ctx, updatedConfig, dns.client, dns.EdgeGatewayId)
 }
 
 // Refresh refreshes the DNS configuration for the Edge Gateway
-func (dns *NsxtEdgeGatewayDns) Refresh() error {
-	updatedDns, err := getDnsConfig(dns.client, dns.EdgeGatewayId)
+func (dns *NsxtEdgeGatewayDns) Refresh(ctx context.Context) error {
+	updatedDns, err := getDnsConfig(ctx, dns.client, dns.EdgeGatewayId)
 	if err != nil {
 		return err
 	}
@@ -44,10 +45,10 @@ func (dns *NsxtEdgeGatewayDns) Refresh() error {
 }
 
 // Delete deletes the DNS configuration for the Edge Gateway
-func (dns *NsxtEdgeGatewayDns) Delete() error {
+func (dns *NsxtEdgeGatewayDns) Delete(ctx context.Context) error {
 	client := dns.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeGatewayDns
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -57,7 +58,7 @@ func (dns *NsxtEdgeGatewayDns) Delete() error {
 		return err
 	}
 
-	err = client.OpenApiDeleteItem(apiVersion, urlRef, nil, nil)
+	err = client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -65,9 +66,9 @@ func (dns *NsxtEdgeGatewayDns) Delete() error {
 	return nil
 }
 
-func getDnsConfig(client *Client, edgeGatewayId string) (*NsxtEdgeGatewayDns, error) {
+func getDnsConfig(ctx context.Context, client *Client, edgeGatewayId string) (*NsxtEdgeGatewayDns, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeGatewayDns
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +82,7 @@ func getDnsConfig(client *Client, edgeGatewayId string) (*NsxtEdgeGatewayDns, er
 		client:        client,
 		EdgeGatewayId: edgeGatewayId,
 	}
-	err = client.OpenApiGetItem(apiVersion, urlRef, nil, &dnsConfig.NsxtEdgeGatewayDns, nil)
+	err = client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, &dnsConfig.NsxtEdgeGatewayDns, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -90,9 +91,9 @@ func getDnsConfig(client *Client, edgeGatewayId string) (*NsxtEdgeGatewayDns, er
 
 }
 
-func updateDnsConfig(updatedConfig *types.NsxtEdgeGatewayDns, client *Client, edgeGatewayId string) (*NsxtEdgeGatewayDns, error) {
+func updateDnsConfig(ctx context.Context, updatedConfig *types.NsxtEdgeGatewayDns, client *Client, edgeGatewayId string) (*NsxtEdgeGatewayDns, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeGatewayDns
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +107,7 @@ func updateDnsConfig(updatedConfig *types.NsxtEdgeGatewayDns, client *Client, ed
 		client:        client,
 		EdgeGatewayId: edgeGatewayId,
 	}
-	err = client.OpenApiPutItem(apiVersion, urlRef, nil, updatedConfig, &dns.NsxtEdgeGatewayDns, nil)
+	err = client.OpenApiPutItem(ctx, apiVersion, urlRef, nil, updatedConfig, &dns.NsxtEdgeGatewayDns, nil)
 	if err != nil {
 		return nil, err
 	}

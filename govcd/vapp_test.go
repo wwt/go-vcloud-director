@@ -63,7 +63,7 @@ func (vcd *TestVCD) Test_PowerOn(check *C) {
 	}
 	task, err := vcd.vapp.PowerOn()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 }
@@ -76,11 +76,11 @@ func (vcd *TestVCD) Test_Reboot(check *C) {
 	}
 	task, err := vcd.vapp.PowerOn()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	task, err = vcd.vapp.Reboot()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
@@ -105,14 +105,14 @@ func (vcd *TestVCD) Test_BlockWhileStatus(check *C) {
 	check.Assert(err, IsNil)
 
 	// Ensure the powerOn operation succeeded
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
 	// Clean up and leave it down
 	task, err = vcd.vapp.PowerOff()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 }
@@ -127,7 +127,7 @@ func (vcd *TestVCD) Test_SetOvf(check *C) {
 	task, err := vcd.vapp.SetOvf(test)
 
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
@@ -141,7 +141,7 @@ func (vcd *TestVCD) Test_RunCustomizationScript(check *C) {
 	// Run Script on Test Vapp
 	task, err := vcd.vapp.RunCustomizationScript("computername", "this is my script")
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 }
@@ -153,7 +153,7 @@ func (vcd *TestVCD) Test_ChangeCPUcount(check *C) {
 	}
 	task, err := vcd.vapp.ChangeCPUCount(1)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 }
@@ -182,7 +182,7 @@ func (vcd *TestVCD) Test_ChangeCPUCountWithCore(check *C) {
 	cpuCount := int64(4)
 	task, err := vcd.vapp.ChangeCPUCountWithCore(int(cpuCount), &cores)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
@@ -204,7 +204,7 @@ func (vcd *TestVCD) Test_ChangeCPUCountWithCore(check *C) {
 	// return tu previous value
 	task, err = vcd.vapp.ChangeCPUCountWithCore(int(currentCpus), &currentCores)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 }
@@ -217,7 +217,7 @@ func (vcd *TestVCD) Test_ChangeMemorySize(check *C) {
 	task, err := vcd.vapp.ChangeMemorySize(512)
 
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 }
@@ -238,7 +238,7 @@ func (vcd *TestVCD) Test_ChangeStorageProfile(check *C) {
 		check.Skip("Skipping test because second storage profile not found")
 	}
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 }
 
@@ -249,7 +249,7 @@ func (vcd *TestVCD) Test_ChangeVMName(check *C) {
 	}
 	task, err := vcd.vapp.ChangeVMName("My-vm")
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 }
@@ -262,11 +262,11 @@ func (vcd *TestVCD) Test_Reset(check *C) {
 	}
 	task, err := vcd.vapp.PowerOn()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	task, err = vcd.vapp.Reset()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 }
@@ -279,11 +279,11 @@ func (vcd *TestVCD) Test_Suspend(check *C) {
 	}
 	task, err := vcd.vapp.PowerOn()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	task, err = vcd.vapp.Suspend()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
@@ -297,11 +297,11 @@ func (vcd *TestVCD) Test_Shutdown(check *C) {
 	}
 	task, err := vcd.vapp.PowerOn()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	task, err = vcd.vapp.Shutdown()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
@@ -314,7 +314,7 @@ func (vcd *TestVCD) Test_Deploy(check *C) {
 	// Deploy
 	task, err := vcd.vapp.Deploy()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 }
@@ -327,11 +327,11 @@ func (vcd *TestVCD) Test_PowerOff(check *C) {
 	}
 	task, err := vcd.vapp.PowerOn()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	task, err = vcd.vapp.PowerOff()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 }
@@ -347,13 +347,13 @@ func (vcd *TestVCD) Test_Undeploy(check *C) {
 	if !vcd.vapp.VApp.Deployed {
 		task, err := vcd.vapp.Deploy()
 		check.Assert(err, IsNil)
-		err = task.WaitTaskCompletion()
+		err = task.WaitTaskCompletion(context.Background())
 		check.Assert(err, IsNil)
 	}
 	// Undeploy
 	task, err := vcd.vapp.Undeploy()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 	// Deploy
@@ -361,7 +361,7 @@ func (vcd *TestVCD) Test_Undeploy(check *C) {
 	// TODO: EVENTUALLY REMOVE THIS REDEPLOY
 	task, err = vcd.vapp.Deploy()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 }
@@ -399,7 +399,7 @@ func (vcd *TestVCD) Test_AddAndRemoveIsolatedNetwork(check *C) {
 
 	task, err := vcd.vapp.AddIsolatedNetwork(vappNetworkSettings)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
@@ -431,7 +431,7 @@ func (vcd *TestVCD) Test_AddAndRemoveIsolatedNetwork(check *C) {
 
 	task, err = vcd.vapp.RemoveIsolatedNetwork(networkName)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
@@ -482,7 +482,7 @@ func (vcd *TestVCD) Test_AddNewVMNilNIC(check *C) {
 
 	check.Assert(err, IsNil)
 
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
@@ -494,7 +494,7 @@ func (vcd *TestVCD) Test_AddNewVMNilNIC(check *C) {
 	check.Assert(err, IsNil)
 	task, err = vapp.Delete()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 }
@@ -594,7 +594,7 @@ func (vcd *TestVCD) Test_AddNewVMMultiNIC(check *C) {
 
 	check.Assert(err, IsNil)
 
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
@@ -632,11 +632,11 @@ func (vcd *TestVCD) Test_AddNewVMMultiNIC(check *C) {
 	// Ensure network is detached from vApp to avoid conflicts in other tests
 	task, err = vapp.RemoveAllNetworks()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	task, err = vapp.Delete()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 }
@@ -719,7 +719,7 @@ func (vcd *TestVCD) Test_RemoveAllNetworks(check *C) {
 	if vappStatus != "POWERED_OFF" {
 		task, err := vcd.vapp.Undeploy()
 		check.Assert(err, IsNil)
-		err = task.WaitTaskCompletion()
+		err = task.WaitTaskCompletion(context.Background())
 		check.Assert(err, IsNil)
 	}
 
@@ -729,7 +729,7 @@ func (vcd *TestVCD) Test_RemoveAllNetworks(check *C) {
 
 	task, err := vcd.vapp.RemoveAllNetworks()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
@@ -750,7 +750,7 @@ func (vcd *TestVCD) Test_RemoveAllNetworks(check *C) {
 	// Power on shared vApp for other tests
 	task, err = vcd.vapp.PowerOn()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 }
 
@@ -895,7 +895,7 @@ func (vcd *TestVCD) Test_AddAndRemoveIsolatedVappNetwork(check *C) {
 
 	task, err := vapp.Delete()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 }

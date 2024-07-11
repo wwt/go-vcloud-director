@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 	"github.com/vmware/go-vcloud-director/v2/util"
@@ -18,10 +19,10 @@ type ResourcePool struct {
 }
 
 // GetAllResourcePools retrieves all resource pools for a given vCenter
-func (vcenter VCenter) GetAllResourcePools(queryParams url.Values) ([]*ResourcePool, error) {
+func (vcenter VCenter) GetAllResourcePools(ctx context.Context, queryParams url.Values) ([]*ResourcePool, error) {
 	client := vcenter.client.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointResourcePoolsBrowseAll
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +34,7 @@ func (vcenter VCenter) GetAllResourcePools(queryParams url.Values) ([]*ResourceP
 
 	retrieved := []*types.ResourcePool{{}}
 
-	err = client.OpenApiGetAllItems(minimumApiVersion, urlRef, queryParams, &retrieved, nil)
+	err = client.OpenApiGetAllItems(ctx, minimumApiVersion, urlRef, queryParams, &retrieved, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error getting resource pool list: %s", err)
 	}
@@ -57,11 +58,11 @@ func (vcenter VCenter) GetAllResourcePools(queryParams url.Values) ([]*ResourceP
 // GetAvailableHardwareVersions finds the hardware versions of a given resource pool
 // In addition to proper resource pools, this method also works for any entity that is retrieved as a resource pool,
 // such as provider VDCs and Org VDCs
-func (rp ResourcePool) GetAvailableHardwareVersions() (*types.OpenApiSupportedHardwareVersions, error) {
+func (rp ResourcePool) GetAvailableHardwareVersions(ctx context.Context) (*types.OpenApiSupportedHardwareVersions, error) {
 
 	client := rp.client.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointResourcePoolHardware
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +73,7 @@ func (rp ResourcePool) GetAvailableHardwareVersions() (*types.OpenApiSupportedHa
 	}
 
 	retrieved := types.OpenApiSupportedHardwareVersions{}
-	err = client.OpenApiGetItem(minimumApiVersion, urlRef, nil, &retrieved, nil)
+	err = client.OpenApiGetItem(ctx, minimumApiVersion, urlRef, nil, &retrieved, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error getting resource pool hardware versions: %s", err)
 	}
@@ -82,9 +83,9 @@ func (rp ResourcePool) GetAvailableHardwareVersions() (*types.OpenApiSupportedHa
 
 // GetDefaultHardwareVersion retrieves the default hardware version for a given resource pool.
 // The default version is usually the highest available, but it's not guaranteed
-func (rp ResourcePool) GetDefaultHardwareVersion() (string, error) {
+func (rp ResourcePool) GetDefaultHardwareVersion(ctx context.Context) (string, error) {
 
-	versions, err := rp.GetAvailableHardwareVersions()
+	versions, err := rp.GetAvailableHardwareVersions(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -98,8 +99,8 @@ func (rp ResourcePool) GetDefaultHardwareVersion() (string, error) {
 }
 
 // GetResourcePoolById retrieves a resource pool by its ID (Moref)
-func (vcenter VCenter) GetResourcePoolById(id string) (*ResourcePool, error) {
-	resourcePools, err := vcenter.GetAllResourcePools(nil)
+func (vcenter VCenter) GetResourcePoolById(ctx context.Context, id string) (*ResourcePool, error) {
+	resourcePools, err := vcenter.GetAllResourcePools(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -113,8 +114,8 @@ func (vcenter VCenter) GetResourcePoolById(id string) (*ResourcePool, error) {
 
 // GetResourcePoolByName retrieves a resource pool by name.
 // It may fail if there are several resource pools with the same name
-func (vcenter VCenter) GetResourcePoolByName(name string) (*ResourcePool, error) {
-	resourcePools, err := vcenter.GetAllResourcePools(nil)
+func (vcenter VCenter) GetResourcePoolByName(ctx context.Context, name string) (*ResourcePool, error) {
+	resourcePools, err := vcenter.GetAllResourcePools(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -138,15 +139,15 @@ func (vcenter VCenter) GetResourcePoolByName(name string) (*ResourcePool, error)
 }
 
 // GetAllResourcePools retrieves all available resource pool, across all vCenters
-func (vcdClient *VCDClient) GetAllResourcePools(queryParams url.Values) ([]*ResourcePool, error) {
+func (vcdClient *VCDClient) GetAllResourcePools(ctx context.Context, queryParams url.Values) ([]*ResourcePool, error) {
 
-	vcenters, err := vcdClient.GetAllVCenters(queryParams)
+	vcenters, err := vcdClient.GetAllVCenters(ctx, queryParams)
 	if err != nil {
 		return nil, err
 	}
 	var result []*ResourcePool
 	for _, vc := range vcenters {
-		resourcePools, err := vc.GetAllResourcePools(queryParams)
+		resourcePools, err := vc.GetAllResourcePools(ctx, queryParams)
 		if err != nil {
 			return nil, err
 		}
@@ -156,7 +157,7 @@ func (vcdClient *VCDClient) GetAllResourcePools(queryParams url.Values) ([]*Reso
 }
 
 // ResourcePoolsFromIds returns a slice of resource pools from a slice of resource pool IDs
-func (vcdClient *VCDClient) ResourcePoolsFromIds(resourcePoolIds []string) ([]*ResourcePool, error) {
+func (vcdClient *VCDClient) ResourcePoolsFromIds(ctx context.Context, resourcePoolIds []string) ([]*ResourcePool, error) {
 	if len(resourcePoolIds) == 0 {
 		return nil, nil
 	}
@@ -179,7 +180,7 @@ func (vcdClient *VCDClient) ResourcePoolsFromIds(resourcePoolIds []string) ([]*R
 	}
 
 	// 2. get all resource pools
-	resourcePools, err := vcdClient.GetAllResourcePools(nil)
+	resourcePools, err := vcdClient.GetAllResourcePools(ctx, nil)
 	if err != nil {
 		return nil, err
 	}

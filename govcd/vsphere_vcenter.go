@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 	"net/url"
@@ -15,10 +16,10 @@ type VCenter struct {
 	client         *VCDClient
 }
 
-func (vcdClient *VCDClient) GetAllVCenters(queryParams url.Values) ([]*VCenter, error) {
+func (vcdClient *VCDClient) GetAllVCenters(ctx context.Context, queryParams url.Values) ([]*VCenter, error) {
 	client := vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVirtualCenters
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +31,7 @@ func (vcdClient *VCDClient) GetAllVCenters(queryParams url.Values) ([]*VCenter, 
 
 	var retrieved []*types.VSphereVirtualCenter
 
-	err = client.OpenApiGetAllItems(minimumApiVersion, urlRef, queryParams, &retrieved, nil)
+	err = client.OpenApiGetAllItems(ctx, minimumApiVersion, urlRef, queryParams, &retrieved, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error getting vCenters list: %s", err)
 	}
@@ -49,8 +50,8 @@ func (vcdClient *VCDClient) GetAllVCenters(queryParams url.Values) ([]*VCenter, 
 	return returnList, nil
 }
 
-func (vcdClient *VCDClient) GetVCenterByName(name string) (*VCenter, error) {
-	vcenters, err := vcdClient.GetAllVCenters(nil)
+func (vcdClient *VCDClient) GetVCenterByName(ctx context.Context, name string) (*VCenter, error) {
+	vcenters, err := vcdClient.GetAllVCenters(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -62,10 +63,10 @@ func (vcdClient *VCDClient) GetVCenterByName(name string) (*VCenter, error) {
 	return nil, fmt.Errorf("vcenter %s not found: %s", name, ErrorEntityNotFound)
 }
 
-func (vcdClient *VCDClient) GetVCenterById(id string) (*VCenter, error) {
+func (vcdClient *VCDClient) GetVCenterById(ctx context.Context, id string) (*VCenter, error) {
 	client := vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVirtualCenters
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +81,7 @@ func (vcdClient *VCDClient) GetVCenterById(id string) (*VCenter, error) {
 		client:         vcdClient,
 	}
 
-	err = client.OpenApiGetItem(minimumApiVersion, urlRef, nil, returnObject.VSphereVCenter, nil)
+	err = client.OpenApiGetItem(ctx, minimumApiVersion, urlRef, nil, returnObject.VSphereVCenter, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error getting vCenter: %s", err)
 	}

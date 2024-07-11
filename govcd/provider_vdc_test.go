@@ -419,6 +419,6 @@ func testProviderVdcCreation(client *VCDClient, check *C, creationElements provi
 	printVerbose("  removing provider VDC '%s'\n", providerVdcName)
 	task, err = retrievedPvdc.Delete()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 }

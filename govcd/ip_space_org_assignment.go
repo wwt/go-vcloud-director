@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
@@ -28,10 +29,10 @@ type IpSpaceOrgAssignment struct {
 //
 // Note. Org assignments are implicitly created after NSX-T Edge Gateway backed by Provider gateway
 // using IP Spaces is being created.
-func (ipSpace *IpSpace) GetAllOrgAssignments(queryParameters url.Values) ([]*IpSpaceOrgAssignment, error) {
+func (ipSpace *IpSpace) GetAllOrgAssignments(ctx context.Context, queryParameters url.Values) ([]*IpSpaceOrgAssignment, error) {
 	client := ipSpace.vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSpaceOrgAssignments
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +43,7 @@ func (ipSpace *IpSpace) GetAllOrgAssignments(queryParameters url.Values) ([]*IpS
 	}
 	queryParams := queryParameterFilterAnd(fmt.Sprintf("ipSpaceRef.id==%s", ipSpace.IpSpace.ID), queryParameters)
 	typeResponses := []*types.IpSpaceOrgAssignment{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParams, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParams, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -61,14 +62,14 @@ func (ipSpace *IpSpace) GetAllOrgAssignments(queryParameters url.Values) ([]*IpS
 }
 
 // GetOrgAssignmentById retrieves IP Space Org Assignment with a given ID
-func (ipSpace *IpSpace) GetOrgAssignmentById(id string) (*IpSpaceOrgAssignment, error) {
+func (ipSpace *IpSpace) GetOrgAssignmentById(ctx context.Context, id string) (*IpSpaceOrgAssignment, error) {
 	if id == "" {
 		return nil, fmt.Errorf("IP Space Org Assignment lookup requires ID")
 	}
 
 	client := ipSpace.vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSpaceOrgAssignments
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +85,7 @@ func (ipSpace *IpSpace) GetOrgAssignmentById(id string) (*IpSpaceOrgAssignment, 
 		vcdClient:            ipSpace.vcdClient,
 	}
 
-	err = client.OpenApiGetItem(apiVersion, urlRef, nil, response.IpSpaceOrgAssignment, nil)
+	err = client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, response.IpSpaceOrgAssignment, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -93,12 +94,12 @@ func (ipSpace *IpSpace) GetOrgAssignmentById(id string) (*IpSpaceOrgAssignment, 
 }
 
 // GetOrgAssignmentById retrieves IP Space Org Assignment with a given Org Name
-func (ipSpace *IpSpace) GetOrgAssignmentByOrgName(orgName string) (*IpSpaceOrgAssignment, error) {
+func (ipSpace *IpSpace) GetOrgAssignmentByOrgName(ctx context.Context, orgName string) (*IpSpaceOrgAssignment, error) {
 	if orgName == "" {
 		return nil, fmt.Errorf("name of Org is required")
 	}
 	queryParams := queryParameterFilterAnd(fmt.Sprintf("orgRef.name==%s", orgName), nil)
-	results, err := ipSpace.GetAllOrgAssignments(queryParams)
+	results, err := ipSpace.GetAllOrgAssignments(ctx, queryParams)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving IP Space Org Assignments by Org Name: %s", err)
 	}
@@ -112,12 +113,12 @@ func (ipSpace *IpSpace) GetOrgAssignmentByOrgName(orgName string) (*IpSpaceOrgAs
 }
 
 // GetOrgAssignmentById retrieves IP Space Org Assignment with a given Org ID
-func (ipSpace *IpSpace) GetOrgAssignmentByOrgId(orgId string) (*IpSpaceOrgAssignment, error) {
+func (ipSpace *IpSpace) GetOrgAssignmentByOrgId(ctx context.Context, orgId string) (*IpSpaceOrgAssignment, error) {
 	if orgId == "" {
 		return nil, fmt.Errorf("organization ID is required")
 	}
 	queryParams := queryParameterFilterAnd(fmt.Sprintf("orgRef.id==%s", orgId), nil)
-	results, err := ipSpace.GetAllOrgAssignments(queryParams)
+	results, err := ipSpace.GetAllOrgAssignments(ctx, queryParams)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving IP Space Org Assignments by Org ID: %s", err)
 	}
@@ -131,10 +132,10 @@ func (ipSpace *IpSpace) GetOrgAssignmentByOrgId(orgId string) (*IpSpaceOrgAssign
 }
 
 // Update Org Assignment
-func (ipSpaceOrgAssignment *IpSpaceOrgAssignment) Update(ipSpaceOrgAssignmentConfig *types.IpSpaceOrgAssignment) (*IpSpaceOrgAssignment, error) {
+func (ipSpaceOrgAssignment *IpSpaceOrgAssignment) Update(ctx context.Context, ipSpaceOrgAssignmentConfig *types.IpSpaceOrgAssignment) (*IpSpaceOrgAssignment, error) {
 	client := ipSpaceOrgAssignment.vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSpaceOrgAssignments
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +152,7 @@ func (ipSpaceOrgAssignment *IpSpaceOrgAssignment) Update(ipSpaceOrgAssignmentCon
 		vcdClient:            ipSpaceOrgAssignment.vcdClient,
 	}
 
-	err = client.OpenApiPutItem(apiVersion, urlRef, nil, ipSpaceOrgAssignmentConfig, result.IpSpaceOrgAssignment, nil)
+	err = client.OpenApiPutItem(ctx, apiVersion, urlRef, nil, ipSpaceOrgAssignmentConfig, result.IpSpaceOrgAssignment, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error updating IP Space Org Assignment: %s", err)
 	}

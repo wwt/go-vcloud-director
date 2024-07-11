@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 	"net/http"
@@ -18,31 +19,31 @@ type VdcTemplate struct {
 }
 
 // CreateVdcTemplate creates a VDC Template with the given settings.
-func (vcdClient *VCDClient) CreateVdcTemplate(input types.VMWVdcTemplate) (*VdcTemplate, error) {
+func (vcdClient *VCDClient) CreateVdcTemplate(ctx context.Context, input types.VMWVdcTemplate) (*VdcTemplate, error) {
 	href := vcdClient.Client.VCDHREF
 	href.Path += "/admin/extension/vdcTemplates"
 
-	return genericVdcTemplateRequest(&vcdClient.Client, input, &href, http.MethodPost)
+	return genericVdcTemplateRequest(ctx, &vcdClient.Client, input, &href, http.MethodPost)
 }
 
 // Update updates an existing VDC Template with the given settings.
 // Returns the updated VDC Template.
-func (vdcTemplate *VdcTemplate) Update(input types.VMWVdcTemplate) (*VdcTemplate, error) {
+func (vdcTemplate *VdcTemplate) Update(ctx context.Context, input types.VMWVdcTemplate) (*VdcTemplate, error) {
 	href := vdcTemplate.client.VCDHREF
 	href.Path += fmt.Sprintf("/admin/extension/vdcTemplate/%s", extractUuid(vdcTemplate.VdcTemplate.ID))
 
-	return genericVdcTemplateRequest(vdcTemplate.client, input, &href, http.MethodPut)
+	return genericVdcTemplateRequest(ctx, vdcTemplate.client, input, &href, http.MethodPut)
 }
 
 // genericVdcTemplateRequest creates or updates a VDC Template with the given settings
-func genericVdcTemplateRequest(client *Client, input types.VMWVdcTemplate, href *url.URL, method string) (*VdcTemplate, error) {
+func genericVdcTemplateRequest(ctx context.Context, client *Client, input types.VMWVdcTemplate, href *url.URL, method string) (*VdcTemplate, error) {
 	if !client.IsSysAdmin {
 		return nil, fmt.Errorf("functionality requires System Administrator privileges")
 	}
 
 	result := &types.VMWVdcTemplate{}
 
-	resp, err := client.executeJsonRequest(href.String(), method, input, "error when performing a "+method+" for VDC Template: %s")
+	resp, err := client.executeJsonRequest(ctx, href.String(), method, input, "error when performing a "+method+" for VDC Template: %s")
 	if err != nil {
 		return nil, err
 	}
@@ -62,12 +63,12 @@ func genericVdcTemplateRequest(client *Client, input types.VMWVdcTemplate, href 
 }
 
 // GetVdcTemplateById retrieves the VDC Template with the given ID
-func (vcdClient *VCDClient) GetVdcTemplateById(id string) (*VdcTemplate, error) {
+func (vcdClient *VCDClient) GetVdcTemplateById(ctx context.Context, id string) (*VdcTemplate, error) {
 	href := vcdClient.Client.VCDHREF
 	href.Path += "/admin/extension/vdcTemplate/" + extractUuid(id)
 
 	result := &types.VMWVdcTemplate{}
-	resp, err := vcdClient.Client.executeJsonRequest(href.String(), http.MethodGet, nil, "error getting VDC Template: %s")
+	resp, err := vcdClient.Client.executeJsonRequest(ctx, href.String(), http.MethodGet, nil, "error getting VDC Template: %s")
 	if err != nil {
 		if strings.Contains(err.Error(), "RESOURCE_NOT_FOUND") || strings.Contains(err.Error(), "not exist") {
 			return nil, fmt.Errorf("%s: %s", ErrorEntityNotFound, err)
@@ -92,12 +93,12 @@ func (vcdClient *VCDClient) GetVdcTemplateById(id string) (*VdcTemplate, error) 
 // GetVdcTemplateByName retrieves the VDC Template with the given name.
 // NOTE: System administrators must use the name as seen by System administrators (VMWVdcTemplate.Name), while Tenants must use the
 // name as seen by tenants (VMWVdcTemplate.TenantName)
-func (vcdClient *VCDClient) GetVdcTemplateByName(name string) (*VdcTemplate, error) {
+func (vcdClient *VCDClient) GetVdcTemplateByName(ctx context.Context, name string) (*VdcTemplate, error) {
 	queryType := types.QtOrgVdcTemplate
 	if vcdClient.Client.IsSysAdmin {
 		queryType = types.QtAdminOrgVdcTemplate
 	}
-	results, err := vcdClient.QueryWithNotEncodedParams(nil, map[string]string{
+	results, err := vcdClient.QueryWithNotEncodedParams(ctx, nil, map[string]string{
 		"type":         queryType,
 		"filter":       fmt.Sprintf("name==%s", url.QueryEscape(name)),
 		"filterEncode": "true",
@@ -112,7 +113,7 @@ func (vcdClient *VCDClient) GetVdcTemplateByName(name string) (*VdcTemplate, err
 		if len(results.Results.AdminOrgVdcTemplateRecord) > 1 {
 			return nil, fmt.Errorf("expected one VDC Template with name '%s', but got %d", name, len(results.Results.AdminOrgVdcTemplateRecord))
 		}
-		return vcdClient.GetVdcTemplateById(results.Results.AdminOrgVdcTemplateRecord[0].HREF)
+		return vcdClient.GetVdcTemplateById(ctx, results.Results.AdminOrgVdcTemplateRecord[0].HREF)
 	} else {
 		if len(results.Results.OrgVdcTemplateRecord) == 0 {
 			return nil, fmt.Errorf("could not find any VDC Template with name '%s': %s", name, ErrorEntityNotFound)
@@ -120,17 +121,17 @@ func (vcdClient *VCDClient) GetVdcTemplateByName(name string) (*VdcTemplate, err
 		if len(results.Results.OrgVdcTemplateRecord) > 1 {
 			return nil, fmt.Errorf("expected one VDC Template with name '%s', but got %d", name, len(results.Results.OrgVdcTemplateRecord))
 		}
-		return vcdClient.GetVdcTemplateById(results.Results.OrgVdcTemplateRecord[0].HREF)
+		return vcdClient.GetVdcTemplateById(ctx, results.Results.OrgVdcTemplateRecord[0].HREF)
 	}
 }
 
 // QueryAdminVdcTemplates gets the list of VDC Templates as System Administrator
-func (vcdClient *VCDClient) QueryAdminVdcTemplates() ([]*types.QueryResultAdminOrgVdcTemplateRecordType, error) {
+func (vcdClient *VCDClient) QueryAdminVdcTemplates(ctx context.Context) ([]*types.QueryResultAdminOrgVdcTemplateRecordType, error) {
 	if !vcdClient.Client.IsSysAdmin {
 		return nil, fmt.Errorf("querying %s requires System administrator privileges", types.QtAdminOrgVdcTemplate)
 	}
 
-	results, err := vcdClient.Client.cumulativeQuery(types.QtAdminOrgVdcTemplate, nil, nil)
+	results, err := vcdClient.Client.cumulativeQuery(ctx, types.QtAdminOrgVdcTemplate, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -138,8 +139,8 @@ func (vcdClient *VCDClient) QueryAdminVdcTemplates() ([]*types.QueryResultAdminO
 }
 
 // QueryVdcTemplates gets the list of VDC Templates from the receiver Org, as a tenant
-func (org *Org) QueryVdcTemplates() ([]*types.QueryResultOrgVdcTemplateRecordType, error) {
-	results, err := org.client.cumulativeQueryWithHeaders(types.QtOrgVdcTemplate, nil, nil, getTenantContextHeader(&TenantContext{
+func (org *Org) QueryVdcTemplates(ctx context.Context) ([]*types.QueryResultOrgVdcTemplateRecordType, error) {
+	results, err := org.client.cumulativeQueryWithHeaders(ctx, types.QtOrgVdcTemplate, nil, nil, getTenantContextHeader(&TenantContext{
 		OrgId:   org.Org.ID,
 		OrgName: org.Org.Name,
 	}))
@@ -150,7 +151,7 @@ func (org *Org) QueryVdcTemplates() ([]*types.QueryResultOrgVdcTemplateRecordTyp
 }
 
 // Delete deletes the receiver VDC Template
-func (vdcTemplate *VdcTemplate) Delete() error {
+func (vdcTemplate *VdcTemplate) Delete(ctx context.Context) error {
 	if !vdcTemplate.client.IsSysAdmin {
 		return fmt.Errorf("functionality requires System Administrator privileges")
 	}
@@ -158,7 +159,7 @@ func (vdcTemplate *VdcTemplate) Delete() error {
 		return fmt.Errorf("cannot delete the VDC Template, its HREF is empty")
 	}
 
-	_, err := vdcTemplate.client.ExecuteRequest(vdcTemplate.VdcTemplate.HREF, http.MethodDelete, "", "error deleting VDC Template: %s", nil, nil)
+	_, err := vdcTemplate.client.ExecuteRequest(ctx, vdcTemplate.VdcTemplate.HREF, http.MethodDelete, "", "error deleting VDC Template: %s", nil, nil)
 	if err != nil {
 		return err
 	}
@@ -167,7 +168,7 @@ func (vdcTemplate *VdcTemplate) Delete() error {
 
 // SetAccessControl sets the Access control configuration for the receiver VDC Template,
 // which specifies which Organizations can read it.
-func (vdcTemplate *VdcTemplate) SetAccessControl(organizationIds []string) error {
+func (vdcTemplate *VdcTemplate) SetAccessControl(ctx context.Context, organizationIds []string) error {
 	if !vdcTemplate.client.IsSysAdmin {
 		return fmt.Errorf("functionality requires System Administrator privileges")
 	}
@@ -184,12 +185,12 @@ func (vdcTemplate *VdcTemplate) SetAccessControl(organizationIds []string) error
 	}
 	payload := &types.ControlAccessParams{AccessSettings: &types.AccessSettingList{AccessSetting: accessSettings}}
 
-	return vdcTemplate.client.setAccessControlWithHttpMethod(http.MethodPut, payload, vdcTemplate.VdcTemplate.HREF, "VDC Template", vdcTemplate.VdcTemplate.Name, nil)
+	return vdcTemplate.client.setAccessControlWithHttpMethod(ctx, http.MethodPut, payload, vdcTemplate.VdcTemplate.HREF, "VDC Template", vdcTemplate.VdcTemplate.Name, nil)
 }
 
 // GetAccessControl retrieves the Access control configuration for the receiver VDC Template, which
 // contains the Organizations that can read it.
-func (vdcTemplate *VdcTemplate) GetAccessControl() (*types.ControlAccessParams, error) {
+func (vdcTemplate *VdcTemplate) GetAccessControl(ctx context.Context) (*types.ControlAccessParams, error) {
 	if !vdcTemplate.client.IsSysAdmin {
 		return nil, fmt.Errorf("functionality requires System Administrator privileges")
 	}
@@ -198,7 +199,7 @@ func (vdcTemplate *VdcTemplate) GetAccessControl() (*types.ControlAccessParams, 
 	}
 	result := &types.ControlAccessParams{}
 	href := fmt.Sprintf("%s/controlAccess", vdcTemplate.VdcTemplate.HREF)
-	_, err := vdcTemplate.client.ExecuteRequest(href, http.MethodGet, types.AnyXMLMime, "error getting the Access control of VDC Template: %s", nil, result)
+	_, err := vdcTemplate.client.ExecuteRequest(ctx, href, http.MethodGet, types.AnyXMLMime, "error getting the Access control of VDC Template: %s", nil, result)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +209,7 @@ func (vdcTemplate *VdcTemplate) GetAccessControl() (*types.ControlAccessParams, 
 // InstantiateVdcAsync creates a new VDC by instantiating the receiver VDC Template. This method finishes immediately after
 // requesting the VDC instance, by returning the Task associated to the VDC instantiation process. If there's any error
 // during the process, returns a nil Task and an error.
-func (vdcTemplate *VdcTemplate) InstantiateVdcAsync(vdcName, description, organizationId string) (*Task, error) {
+func (vdcTemplate *VdcTemplate) InstantiateVdcAsync(ctx context.Context, vdcName, description, organizationId string) (*Task, error) {
 	if vdcName == "" {
 		return nil, fmt.Errorf("the VDC name is required to instantiate VDC Template '%s'", vdcTemplate.VdcTemplate.Name)
 	}
@@ -230,7 +231,7 @@ func (vdcTemplate *VdcTemplate) InstantiateVdcAsync(vdcName, description, organi
 
 	href := vdcTemplate.client.VCDHREF
 	href.Path += fmt.Sprintf("/org/%s/action/instantiate", extractUuid(organizationId))
-	task, err := vdcTemplate.client.ExecuteTaskRequest(href.String(), http.MethodPost, types.MimeVdcTemplateInstantiate, "error instantiating the VDC Template: %s", payload)
+	task, err := vdcTemplate.client.ExecuteTaskRequest(ctx, href.String(), http.MethodPost, types.MimeVdcTemplateInstantiate, "error instantiating the VDC Template: %s", payload)
 	if err != nil {
 		return nil, err
 	}
@@ -239,19 +240,19 @@ func (vdcTemplate *VdcTemplate) InstantiateVdcAsync(vdcName, description, organi
 
 // InstantiateVdc creates a new VDC by instantiating the receiver VDC Template. This method waits for the associated Task
 // to complete and returns the instantiated VDC. If there's any error during the process or in the Task, returns a nil VDC and an error.
-func (vdcTemplate *VdcTemplate) InstantiateVdc(vdcName, description, organizationId string) (*Vdc, error) {
-	task, err := vdcTemplate.InstantiateVdcAsync(vdcName, description, organizationId)
+func (vdcTemplate *VdcTemplate) InstantiateVdc(ctx context.Context, vdcName, description, organizationId string) (*Vdc, error) {
+	task, err := vdcTemplate.InstantiateVdcAsync(ctx, vdcName, description, organizationId)
 	if err != nil {
 		return nil, err
 	}
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed instantiating the VDC Template: %s", err)
 	}
 	if task.Task.Owner == nil || task.Task.Owner.HREF == "" {
 		return nil, fmt.Errorf("the VDC was instantiated but could not retrieve its ID from the finished task")
 	}
-	vdc, err := getVDCByHref(vdcTemplate.client, task.Task.Owner.HREF)
+	vdc, err := getVDCByHref(ctx, vdcTemplate.client, task.Task.Owner.HREF)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve the VDC from Task's HREF '%s': %s", task.Task.Owner.HREF, err)
 	}

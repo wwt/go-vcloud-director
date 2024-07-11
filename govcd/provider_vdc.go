@@ -190,7 +190,7 @@ func getProviderVdcByName(ctx context.Context, vcdClient *VCDClient, providerVdc
 }
 
 // CreateProviderVdc creates a new provider VDC using the passed parameters
-func (vcdClient *VCDClient) CreateProviderVdc(params *types.ProviderVdcCreation) (*ProviderVdcExtended, error) {
+func (vcdClient *VCDClient) CreateProviderVdc(ctx context.Context, params *types.ProviderVdcCreation) (*ProviderVdcExtended, error) {
 	if !vcdClient.Client.IsSysAdmin {
 		return nil, fmt.Errorf("functionality requires System Administrator privileges")
 	}
@@ -209,7 +209,7 @@ func (vcdClient *VCDClient) CreateProviderVdc(params *types.ProviderVdcCreation)
 	pvdcCreateHREF := vcdClient.Client.VCDHREF
 	pvdcCreateHREF.Path += "/admin/extension/providervdcsparams"
 
-	resp, err := vcdClient.Client.executeJsonRequest(pvdcCreateHREF.String(), http.MethodPost, params, "error creating provider VDC: %s")
+	resp, err := vcdClient.Client.executeJsonRequest(ctx, pvdcCreateHREF.String(), http.MethodPost, params, "error creating provider VDC: %s")
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +219,7 @@ func (vcdClient *VCDClient) CreateProviderVdc(params *types.ProviderVdcCreation)
 
 	defer closeBody(resp)
 
-	pvdc, err := vcdClient.GetProviderVdcExtendedByName(params.Name)
+	pvdc, err := vcdClient.GetProviderVdcExtendedByName(ctx, params.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +227,7 @@ func (vcdClient *VCDClient) CreateProviderVdc(params *types.ProviderVdcCreation)
 	// At this stage, the provider VDC is created, but the task may be still working.
 	// Thus, we retrieve the associated tasks, and wait for their completion.
 	if pvdc.VMWProviderVdc.Tasks == nil {
-		err = pvdc.Refresh()
+		err = pvdc.Refresh(ctx)
 		if err != nil {
 			return pvdc, fmt.Errorf("error refreshing provider VDC %s: %s", params.Name, err)
 		}
@@ -240,18 +240,18 @@ func (vcdClient *VCDClient) CreateProviderVdc(params *types.ProviderVdcCreation)
 			Task:   taskInProgress,
 			client: pvdc.client,
 		}
-		err = task.WaitTaskCompletion()
+		err = task.WaitTaskCompletion(ctx)
 		if err != nil {
 			return pvdc, fmt.Errorf("provider VDC %s was created, but it is not ready: %s", params.Name, err)
 		}
 	}
 
-	err = pvdc.Refresh()
+	err = pvdc.Refresh(ctx)
 	return pvdc, err
 }
 
 // Disable changes the Provider VDC state from enabled to disabled
-func (pvdc *ProviderVdcExtended) Disable() error {
+func (pvdc *ProviderVdcExtended) Disable(ctx context.Context) error {
 	util.Logger.Printf("[TRACE] ProviderVdc.Disable")
 
 	href, err := url.JoinPath(pvdc.VMWProviderVdc.HREF, "action", "disable")
@@ -260,11 +260,11 @@ func (pvdc *ProviderVdcExtended) Disable() error {
 		return err
 	}
 
-	err = pvdc.client.ExecuteRequestWithoutResponse(href, http.MethodPost, "", "error disabling provider VDC: %s", nil)
+	err = pvdc.client.ExecuteRequestWithoutResponse(ctx, href, http.MethodPost, "", "error disabling provider VDC: %s", nil)
 	if err != nil {
 		return err
 	}
-	err = pvdc.Refresh()
+	err = pvdc.Refresh(ctx)
 	if err != nil {
 		return err
 	}
@@ -283,7 +283,7 @@ func (pvdc *ProviderVdcExtended) IsEnabled() bool {
 }
 
 // Enable changes the Provider VDC state from disabled to enabled
-func (pvdc *ProviderVdcExtended) Enable() error {
+func (pvdc *ProviderVdcExtended) Enable(ctx context.Context) error {
 	util.Logger.Printf("[TRACE] ProviderVdc.Enable")
 
 	href, err := url.JoinPath(pvdc.VMWProviderVdc.HREF, "action", "enable")
@@ -292,12 +292,12 @@ func (pvdc *ProviderVdcExtended) Enable() error {
 		return err
 	}
 
-	err = pvdc.client.ExecuteRequestWithoutResponse(href, http.MethodPost, "",
+	err = pvdc.client.ExecuteRequestWithoutResponse(ctx, href, http.MethodPost, "",
 		"error enabling provider VDC: %s", nil)
 	if err != nil {
 		return err
 	}
-	err = pvdc.Refresh()
+	err = pvdc.Refresh(ctx)
 	if err != nil {
 		return err
 	}
@@ -310,23 +310,24 @@ func (pvdc *ProviderVdcExtended) Enable() error {
 // Delete removes a Provider VDC
 // The provider VDC must be disabled for deletion to succeed
 // Deletion will also fail if the Provider VDC is backing other resources, such as organization VDCs
-func (pvdc *ProviderVdcExtended) Delete() (Task, error) {
+func (pvdc *ProviderVdcExtended) Delete(ctx context.Context) (Task, error) {
 	util.Logger.Printf("[TRACE] ProviderVdc.Delete")
 
 	if pvdc.IsEnabled() {
 		return Task{}, fmt.Errorf("provider VDC %s is enabled - can't delete", pvdc.VMWProviderVdc.Name)
 	}
 	// Return the task
-	return pvdc.client.ExecuteTaskRequest(pvdc.VMWProviderVdc.HREF, http.MethodDelete,
+	return pvdc.client.ExecuteTaskRequest(ctx, pvdc.VMWProviderVdc.HREF, http.MethodDelete,
 		"", "error deleting provider VDC: %s", nil)
 }
 
 // Update can change some of the provider VDC internals
 // In practical terms, only name and description are guaranteed to be changed through this method.
 // The other admitted changes need to go through separate API calls
-func (pvdc *ProviderVdcExtended) Update() error {
+func (pvdc *ProviderVdcExtended) Update(ctx context.Context) error {
 
-	resp, err := pvdc.client.executeJsonRequest(pvdc.VMWProviderVdc.HREF, http.MethodPut, pvdc.VMWProviderVdc,
+	resp, err := pvdc.client.executeJsonRequest(ctx,
+		pvdc.VMWProviderVdc.HREF, http.MethodPut, pvdc.VMWProviderVdc,
 		"error updating provider VDC: %s")
 
 	if err != nil {
@@ -334,21 +335,21 @@ func (pvdc *ProviderVdcExtended) Update() error {
 	}
 	defer closeBody(resp)
 
-	return pvdc.checkProgress("updating")
+	return pvdc.checkProgress(ctx, "updating")
 }
 
 // Rename changes name and/or description from a provider VDC
-func (pvdc *ProviderVdcExtended) Rename(name, description string) error {
+func (pvdc *ProviderVdcExtended) Rename(ctx context.Context, name, description string) error {
 	if name == "" {
 		return fmt.Errorf("provider VDC name cannot be empty")
 	}
 	pvdc.VMWProviderVdc.Name = name
 	pvdc.VMWProviderVdc.Description = description
-	return pvdc.Update()
+	return pvdc.Update(ctx)
 }
 
 // AddResourcePools adds resource pools to the Provider VDC
-func (pvdc *ProviderVdcExtended) AddResourcePools(resourcePools []*ResourcePool) error {
+func (pvdc *ProviderVdcExtended) AddResourcePools(ctx context.Context, resourcePools []*ResourcePool) error {
 	util.Logger.Printf("[TRACE] ProviderVdc.AddResourcePools")
 
 	href, err := url.JoinPath(pvdc.VMWProviderVdc.HREF, "action", "updateResourcePools")
@@ -378,7 +379,7 @@ func (pvdc *ProviderVdcExtended) AddResourcePools(resourcePools []*ResourcePool)
 
 	input := types.AddResourcePool{VimObjectRef: items}
 
-	resp, err := pvdc.client.executeJsonRequest(href, http.MethodPost, input, "error updating provider VDC resource pools: %s")
+	resp, err := pvdc.client.executeJsonRequest(ctx, href, http.MethodPost, input, "error updating provider VDC resource pools: %s")
 	if err != nil {
 		return err
 	}
@@ -389,15 +390,15 @@ func (pvdc *ProviderVdcExtended) AddResourcePools(resourcePools []*ResourcePool)
 	}
 
 	defer closeBody(resp)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(ctx)
 	if err != nil {
 		return err
 	}
-	return pvdc.Refresh()
+	return pvdc.Refresh(ctx)
 }
 
 // DeleteResourcePools removes resource pools from the Provider VDC
-func (pvdc *ProviderVdcExtended) DeleteResourcePools(resourcePools []*ResourcePool) error {
+func (pvdc *ProviderVdcExtended) DeleteResourcePools(ctx context.Context, resourcePools []*ResourcePool) error {
 	util.Logger.Printf("[TRACE] ProviderVdc.DeleteResourcePools")
 
 	href, err := url.JoinPath(pvdc.VMWProviderVdc.HREF, "action", "updateResourcePools")
@@ -405,7 +406,7 @@ func (pvdc *ProviderVdcExtended) DeleteResourcePools(resourcePools []*ResourcePo
 		return err
 	}
 
-	usedResourcePools, err := pvdc.GetResourcePools()
+	usedResourcePools, err := pvdc.GetResourcePools(ctx)
 	if err != nil {
 		return fmt.Errorf("error retrieving used resource pools: %s", err)
 	}
@@ -429,7 +430,7 @@ func (pvdc *ProviderVdcExtended) DeleteResourcePools(resourcePools []*ResourcePo
 				rp.ResourcePool.Name, rp.ResourcePool.Moref, pvdc.VMWProviderVdc.Name)
 		}
 		if foundUsed.IsEnabled {
-			err = disableResourcePool(pvdc.client, foundUsed.HREF)
+			err = disableResourcePool(ctx, pvdc.client, foundUsed.HREF)
 			if err != nil {
 				return fmt.Errorf("error disabling resource pool %s: %s", foundUsed.Name, err)
 			}
@@ -446,7 +447,7 @@ func (pvdc *ProviderVdcExtended) DeleteResourcePools(resourcePools []*ResourcePo
 
 	input := types.DeleteResourcePool{ResourcePoolRefs: items}
 
-	resp, err := pvdc.client.executeJsonRequest(href, http.MethodPost, input, "error removing resource pools from provider VDC: %s")
+	resp, err := pvdc.client.executeJsonRequest(ctx, href, http.MethodPost, input, "error removing resource pools from provider VDC: %s")
 	if err != nil {
 		return err
 	}
@@ -456,16 +457,16 @@ func (pvdc *ProviderVdcExtended) DeleteResourcePools(resourcePools []*ResourcePo
 	if err != nil {
 		return err
 	}
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(ctx)
 	if err != nil {
 		return err
 	}
-	return pvdc.Refresh()
+	return pvdc.Refresh(ctx)
 }
 
 // GetResourcePools returns the Resource Pools belonging to this provider VDC
-func (pvdc *ProviderVdcExtended) GetResourcePools() ([]*types.QueryResultResourcePoolRecordType, error) {
-	resourcePools, err := pvdc.client.cumulativeQuery(types.QtResourcePool, nil, map[string]string{
+func (pvdc *ProviderVdcExtended) GetResourcePools(ctx context.Context) ([]*types.QueryResultResourcePoolRecordType, error) {
+	resourcePools, err := pvdc.client.cumulativeQuery(ctx, types.QtResourcePool, nil, map[string]string{
 		"type":          types.QtResourcePool,
 		"filter":        fmt.Sprintf("providerVdc==%s", url.QueryEscape(extractUuid(pvdc.VMWProviderVdc.HREF))),
 		"filterEncoded": "true",
@@ -478,16 +479,16 @@ func (pvdc *ProviderVdcExtended) GetResourcePools() ([]*types.QueryResultResourc
 
 // disableResourcePool disables a resource pool while it is assigned to a provider VDC
 // Calling this function is a prerequisite to removing a resource pool from a provider VDC
-func disableResourcePool(client *Client, resourcePoolHref string) error {
+func disableResourcePool(ctx context.Context, client *Client, resourcePoolHref string) error {
 	href, err := url.JoinPath(resourcePoolHref, "action", "disable")
 	if err != nil {
 		return err
 	}
-	return client.ExecuteRequestWithoutResponse(href, http.MethodPost, "", "error disabling resource pool: %s", nil)
+	return client.ExecuteRequestWithoutResponse(ctx, href, http.MethodPost, "", "error disabling resource pool: %s", nil)
 }
 
 // AddStorageProfiles adds the given storage profiles in this provider VDC
-func (pvdc *ProviderVdcExtended) AddStorageProfiles(storageProfileNames []string) error {
+func (pvdc *ProviderVdcExtended) AddStorageProfiles(ctx context.Context, storageProfileNames []string) error {
 	href, err := url.JoinPath(pvdc.VMWProviderVdc.HREF, "storageProfiles")
 	if err != nil {
 		return err
@@ -495,7 +496,7 @@ func (pvdc *ProviderVdcExtended) AddStorageProfiles(storageProfileNames []string
 
 	addStorageProfiles := &types.AddStorageProfiles{AddStorageProfile: storageProfileNames}
 
-	resp, err := pvdc.client.executeJsonRequest(href, http.MethodPost, addStorageProfiles,
+	resp, err := pvdc.client.executeJsonRequest(ctx, href, http.MethodPost, addStorageProfiles,
 		"error adding storage profiles to provider VDC: %s")
 	if err != nil {
 		return err
@@ -503,21 +504,21 @@ func (pvdc *ProviderVdcExtended) AddStorageProfiles(storageProfileNames []string
 
 	defer closeBody(resp)
 
-	return pvdc.checkProgress("adding storage profiles")
+	return pvdc.checkProgress(ctx, "adding storage profiles")
 }
 
-func (pvdc *ProviderVdcExtended) checkProgress(label string) error {
+func (pvdc *ProviderVdcExtended) checkProgress(ctx context.Context, label string) error {
 	// Let's keep this timeout as a precaution against an infinite wait
 	timeout := 2 * time.Minute
 	start := time.Now()
-	err := pvdc.Refresh()
+	err := pvdc.Refresh(ctx)
 	if err != nil {
 		return err
 	}
 
 	var elapsed time.Duration
 	for ResourceInProgress(pvdc.VMWProviderVdc.Tasks) {
-		err = pvdc.Refresh()
+		err = pvdc.Refresh(ctx)
 		if err != nil {
 			return fmt.Errorf("error %s: %s", label, err)
 		}
@@ -534,9 +535,9 @@ func (pvdc *ProviderVdcExtended) checkProgress(label string) error {
 
 // disableStorageProfile disables a storage profile while it is assigned to a provider VDC
 // Calling this function is a prerequisite to removing a storage profile from a provider VDC
-func disableStorageProfile(client *Client, storageProfileHref string) error {
+func disableStorageProfile(ctx context.Context, client *Client, storageProfileHref string) error {
 	disablePayload := &types.EnableStorageProfile{Enabled: false}
-	resp, err := client.executeJsonRequest(storageProfileHref, http.MethodPut, disablePayload,
+	resp, err := client.executeJsonRequest(ctx, storageProfileHref, http.MethodPut, disablePayload,
 		"error disabling storage profile in provider VDC: %s")
 
 	defer closeBody(resp)
@@ -544,7 +545,7 @@ func disableStorageProfile(client *Client, storageProfileHref string) error {
 }
 
 // DeleteStorageProfiles removes storage profiles from the Provider VDC
-func (pvdc *ProviderVdcExtended) DeleteStorageProfiles(storageProfiles []string) error {
+func (pvdc *ProviderVdcExtended) DeleteStorageProfiles(ctx context.Context, storageProfiles []string) error {
 	util.Logger.Printf("[TRACE] ProviderVdc.DeleteStorageProfiles")
 
 	href, err := url.JoinPath(pvdc.VMWProviderVdc.HREF, "storageProfiles")
@@ -571,14 +572,14 @@ func (pvdc *ProviderVdcExtended) DeleteStorageProfiles(storageProfiles []string)
 	}
 
 	for _, sp := range toBeDeleted {
-		err = disableStorageProfile(pvdc.client, sp.HREF)
+		err = disableStorageProfile(ctx, pvdc.client, sp.HREF)
 		if err != nil {
 			return fmt.Errorf("error disabling storage profile %s from provider VDC %s: %s", sp.Name, pvdc.VMWProviderVdc.Name, err)
 		}
 	}
 	input := &types.RemoveStorageProfile{RemoveStorageProfile: toBeDeleted}
 
-	resp, err := pvdc.client.executeJsonRequest(href, http.MethodPost, input, "error removing storage profiles from provider VDC: %s")
+	resp, err := pvdc.client.executeJsonRequest(ctx, href, http.MethodPost, input, "error removing storage profiles from provider VDC: %s")
 	if err != nil {
 		return err
 	}
@@ -588,9 +589,9 @@ func (pvdc *ProviderVdcExtended) DeleteStorageProfiles(storageProfiles []string)
 	if err != nil {
 		return err
 	}
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(ctx)
 	if err != nil {
 		return err
 	}
-	return pvdc.Refresh()
+	return pvdc.Refresh(ctx)
 }

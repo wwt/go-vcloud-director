@@ -471,14 +471,16 @@ func buildFilterTextWithLogicalOr(filter map[string]string) string {
 // Advertisement being spun up (name="ipSpaceUplinkRouteAdvertisementSync"). When such task is
 // running - other operations may fail so it is best to wait for completion of such task before
 // triggering any other jobs.
-func (client *Client) WaitForRouteAdvertisementTasks() error {
+func (client *Client) WaitForRouteAdvertisementTasks(ctx context.Context) error {
 	name := "ipSpaceUplinkRouteAdvertisementSync"
 
 	util.Logger.Printf("[TRACE] WaitForRouteAdvertisementTasks attempting to search for unfinished tasks with name='%s'", name)
-	allTasks, err := client.QueryTaskList(map[string]string{
-		"status": "running,preRunning,queued",
-		"name":   name,
-	})
+	allTasks, err := client.QueryTaskList(
+		ctx,
+		map[string]string{
+			"status": "running,preRunning,queued",
+			"name":   name,
+		})
 	if err != nil {
 		return fmt.Errorf("error retrieving all running '%s' tasks: %s", name, err)
 	}
@@ -488,7 +490,7 @@ func (client *Client) WaitForRouteAdvertisementTasks() error {
 		task := NewTask(client)
 		task.Task.HREF = singleQueryTask.HREF
 
-		err = task.WaitTaskCompletion()
+		err = task.WaitTaskCompletion(ctx)
 		if err != nil {
 			return fmt.Errorf("error waiting for task '%s' of type '%s' to finish: %s", singleQueryTask.HREF, name, err)
 		}

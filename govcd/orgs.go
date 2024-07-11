@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 	"net/url"
 )
@@ -26,7 +27,7 @@ func (org OpenApiOrg) wrap(inner *types.OpenApiOrg) *OpenApiOrg {
 
 // GetAllOrgs retrieve all organizations visible to the user
 // When 'multiSite' is set, it will also check the organizations available from associated sites
-func (vcdClient *VCDClient) GetAllOrgs(queryParameters url.Values, multiSite bool) ([]*OpenApiOrg, error) {
+func (vcdClient *VCDClient) GetAllOrgs(ctx context.Context, queryParameters url.Values, multiSite bool) ([]*OpenApiOrg, error) {
 	c := crudConfig{
 		endpoint:        types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointOrgs,
 		entityLabel:     LabelOrgs,
@@ -37,5 +38,5 @@ func (vcdClient *VCDClient) GetAllOrgs(queryParameters url.Values, multiSite boo
 	}
 
 	outerType := OpenApiOrg{vcdClient: vcdClient}
-	return getAllOuterEntities[OpenApiOrg, types.OpenApiOrg](&vcdClient.Client, outerType, c)
+	return getAllOuterEntities[OpenApiOrg, types.OpenApiOrg](ctx, &vcdClient.Client, outerType, c)
 }

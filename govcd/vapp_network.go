@@ -306,7 +306,7 @@ func (vapp *VApp) RemoveAllNetworkStaticRoutes(ctx context.Context, networkId st
 }
 
 // queryVappNetworks returns a list of vApp networks with an optional filter
-func queryVappNetworks(client *Client, values map[string]string) ([]*types.QueryResultVappNetworkRecordType, error) {
+func queryVappNetworks(ctx context.Context, client *Client, values map[string]string) ([]*types.QueryResultVappNetworkRecordType, error) {
 
 	vAppNetworkType := types.QtVappNetwork
 	if client.IsSysAdmin {
@@ -328,7 +328,7 @@ func queryVappNetworks(client *Client, values map[string]string) ([]*types.Query
 	if filterValue != "" {
 		params["filter"] = filterValue
 	}
-	results, err := client.cumulativeQuery(vAppNetworkType, nil, params)
+	results, err := client.cumulativeQuery(ctx, vAppNetworkType, nil, params)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving vApp networks %s", err)
 	}
@@ -340,22 +340,22 @@ func queryVappNetworks(client *Client, values map[string]string) ([]*types.Query
 }
 
 // QueryVappNetworks returns all vApp networks visible to the client
-func (client *Client) QueryVappNetworks(values map[string]string) ([]*types.QueryResultVappNetworkRecordType, error) {
-	return queryVappNetworks(client, values)
+func (client *Client) QueryVappNetworks(ctx context.Context, values map[string]string) ([]*types.QueryResultVappNetworkRecordType, error) {
+	return queryVappNetworks(ctx, client, values)
 }
 
 // QueryAllVappNetworks returns all vApp networks and vApp Org Networks belonging to the current vApp
-func (vapp *VApp) QueryAllVappNetworks(values map[string]string) ([]*types.QueryResultVappNetworkRecordType, error) {
+func (vapp *VApp) QueryAllVappNetworks(ctx context.Context, values map[string]string) ([]*types.QueryResultVappNetworkRecordType, error) {
 	// Note: when querying a field that contains a UUID, the system compares only the UUIDs, even if the full field contains more than that.
 	allValues := map[string]string{"vApp": extractUuid(vapp.VApp.ID)}
 	for k, v := range values {
 		allValues[k] = v
 	}
-	return queryVappNetworks(vapp.client, allValues)
+	return queryVappNetworks(ctx, vapp.client, allValues)
 }
 
 // QueryVappNetworks returns all vApp networks belonging to the current vApp
-func (vapp *VApp) QueryVappNetworks(values map[string]string) ([]*types.QueryResultVappNetworkRecordType, error) {
+func (vapp *VApp) QueryVappNetworks(ctx context.Context, values map[string]string) ([]*types.QueryResultVappNetworkRecordType, error) {
 	// Note: when querying a field that contains a UUID, the system compares only the UUIDs, even if the full field contains more than that.
 	allValues := map[string]string{
 		"vApp":     extractUuid(vapp.VApp.ID),
@@ -364,11 +364,11 @@ func (vapp *VApp) QueryVappNetworks(values map[string]string) ([]*types.QueryRes
 	for k, v := range values {
 		allValues[k] = v
 	}
-	return queryVappNetworks(vapp.client, allValues)
+	return queryVappNetworks(ctx, vapp.client, allValues)
 }
 
 // QueryVappOrgNetworks returns all vApp networks belonging to the current vApp
-func (vapp *VApp) QueryVappOrgNetworks(values map[string]string) ([]*types.QueryResultVappNetworkRecordType, error) {
+func (vapp *VApp) QueryVappOrgNetworks(ctx context.Context, values map[string]string) ([]*types.QueryResultVappNetworkRecordType, error) {
 	// Note: when querying a field that contains a UUID, the system compares only the UUIDs, even if the full field contains more than that.
 	allValues := map[string]string{
 		"vApp":     extractUuid(vapp.VApp.ID),
@@ -377,5 +377,5 @@ func (vapp *VApp) QueryVappOrgNetworks(values map[string]string) ([]*types.Query
 	for k, v := range values {
 		allValues[k] = v
 	}
-	return queryVappNetworks(vapp.client, allValues)
+	return queryVappNetworks(ctx, vapp.client, allValues)
 }

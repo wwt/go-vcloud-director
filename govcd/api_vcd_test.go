@@ -1017,7 +1017,7 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
 			return
 		}
-		err = task.WaitTaskCompletion()
+		err = task.WaitTaskCompletion(context.Background())
 		if err != nil {
 			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
 			return

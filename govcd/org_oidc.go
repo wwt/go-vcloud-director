@@ -7,6 +7,7 @@ package govcd
 import (
 	"bytes"
 	"cmp"
+	"context"
 	"encoding/xml"
 	"fmt"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
@@ -18,8 +19,8 @@ import (
 )
 
 // GetOpenIdConnectSettings retrieves the current OpenID Connect settings for a given Organization
-func (adminOrg *AdminOrg) GetOpenIdConnectSettings() (*types.OrgOAuthSettings, error) {
-	return oidcExecuteRequest(adminOrg, http.MethodGet, nil)
+func (adminOrg *AdminOrg) GetOpenIdConnectSettings(ctx context.Context) (*types.OrgOAuthSettings, error) {
+	return oidcExecuteRequest(ctx, adminOrg, http.MethodGet, nil)
 }
 
 // SetOpenIdConnectSettings sets the OpenID Connect configuration for a given Organization. If the well-known configuration
@@ -28,7 +29,7 @@ func (adminOrg *AdminOrg) GetOpenIdConnectSettings() (*types.OrgOAuthSettings, e
 // If there are no fields set, the configuration retrieved from the well-known configuration endpoint is applied as-is.
 // ClientId and ClientSecret properties are always mandatory, with and without well-known endpoint.
 // This method returns an error if the settings can't be saved in VCD for any reason or if the provided settings are wrong.
-func (adminOrg *AdminOrg) SetOpenIdConnectSettings(settings types.OrgOAuthSettings) (*types.OrgOAuthSettings, error) {
+func (adminOrg *AdminOrg) SetOpenIdConnectSettings(ctx context.Context, settings types.OrgOAuthSettings) (*types.OrgOAuthSettings, error) {
 	if settings.ClientId == "" {
 		return nil, fmt.Errorf("the Client ID is mandatory to configure OpenID Connect")
 	}
@@ -36,11 +37,11 @@ func (adminOrg *AdminOrg) SetOpenIdConnectSettings(settings types.OrgOAuthSettin
 		return nil, fmt.Errorf("the Client Secret is mandatory to configure OpenID Connect")
 	}
 	if settings.WellKnownEndpoint != "" {
-		err := oidcValidateConnection(adminOrg.client, settings.WellKnownEndpoint)
+		err := oidcValidateConnection(ctx, adminOrg.client, settings.WellKnownEndpoint)
 		if err != nil {
 			return nil, err
 		}
-		wellKnownSettings, err := oidcConfigureWithEndpoint(adminOrg.client, adminOrg.AdminOrg.HREF, settings.WellKnownEndpoint)
+		wellKnownSettings, err := oidcConfigureWithEndpoint(ctx, adminOrg.client, adminOrg.AdminOrg.HREF, settings.WellKnownEndpoint)
 		if err != nil {
 			return nil, err
 		}
@@ -100,15 +101,15 @@ func (adminOrg *AdminOrg) SetOpenIdConnectSettings(settings types.OrgOAuthSettin
 	}
 
 	// Perform connectivity validations
-	err := oidcValidateConnection(adminOrg.client, settings.UserAuthorizationEndpoint)
+	err := oidcValidateConnection(ctx, adminOrg.client, settings.UserAuthorizationEndpoint)
 	if err != nil {
 		return nil, err
 	}
-	err = oidcValidateConnection(adminOrg.client, settings.AccessTokenEndpoint)
+	err = oidcValidateConnection(ctx, adminOrg.client, settings.AccessTokenEndpoint)
 	if err != nil {
 		return nil, err
 	}
-	err = oidcValidateConnection(adminOrg.client, settings.UserInfoEndpoint)
+	err = oidcValidateConnection(ctx, adminOrg.client, settings.UserInfoEndpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +122,7 @@ func (adminOrg *AdminOrg) SetOpenIdConnectSettings(settings types.OrgOAuthSettin
 	}
 	settings.OIDCAttributeMapping.Xmlns = types.XMLNamespaceVCloud
 
-	result, err := oidcExecuteRequest(adminOrg, http.MethodPut, &settings)
+	result, err := oidcExecuteRequest(ctx, adminOrg, http.MethodPut, &settings)
 	if err != nil {
 		return nil, err
 	}
@@ -130,8 +131,8 @@ func (adminOrg *AdminOrg) SetOpenIdConnectSettings(settings types.OrgOAuthSettin
 }
 
 // DeleteOpenIdConnectSettings deletes the current OpenID Connect settings from a given Organization
-func (adminOrg *AdminOrg) DeleteOpenIdConnectSettings() error {
-	_, err := oidcExecuteRequest(adminOrg, http.MethodDelete, nil)
+func (adminOrg *AdminOrg) DeleteOpenIdConnectSettings(ctx context.Context) error {
+	_, err := oidcExecuteRequest(ctx, adminOrg, http.MethodDelete, nil)
 	if err != nil {
 		return err
 	}
@@ -139,7 +140,7 @@ func (adminOrg *AdminOrg) DeleteOpenIdConnectSettings() error {
 }
 
 // oidcExecuteRequest executes a request to the OIDC endpoint with the given payload and HTTP method
-func oidcExecuteRequest(adminOrg *AdminOrg, method string, payload *types.OrgOAuthSettings) (*types.OrgOAuthSettings, error) {
+func oidcExecuteRequest(ctx context.Context, adminOrg *AdminOrg, method string, payload *types.OrgOAuthSettings) (*types.OrgOAuthSettings, error) {
 	if adminOrg.AdminOrg.HREF == "" {
 		return nil, fmt.Errorf("the HREF of the Organization is required to use OpenID Connect")
 	}
@@ -177,7 +178,7 @@ func oidcExecuteRequest(adminOrg *AdminOrg, method string, payload *types.OrgOAu
 	}
 
 	// Perform the HTTP call with the custom headers and obtained API version
-	req := adminOrg.client.newRequest(nil, nil, method, *endpoint, body, getHighestOidcApiVersion(adminOrg.client), headers)
+	req := adminOrg.client.newRequest(ctx, nil, nil, method, *endpoint, body, getHighestOidcApiVersion(ctx, adminOrg.client), headers)
 	resp, err := checkResp(adminOrg.client.Http.Do(req))
 
 	// Check the errors and get the response
@@ -210,7 +211,7 @@ func oidcExecuteRequest(adminOrg *AdminOrg, method string, payload *types.OrgOAu
 		if resp != nil && resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("error saving Organization OpenID Connect settings, expected status code %d - received %d", http.StatusOK, resp.StatusCode)
 		}
-		return adminOrg.GetOpenIdConnectSettings()
+		return adminOrg.GetOpenIdConnectSettings(ctx)
 	default:
 		return nil, fmt.Errorf("not supported HTTP method %s", method)
 	}
@@ -218,7 +219,7 @@ func oidcExecuteRequest(adminOrg *AdminOrg, method string, payload *types.OrgOAu
 
 // oidcValidateConnection executes a test probe against the given endpoint to validate that the client
 // can establish a connection.
-func oidcValidateConnection(client *Client, endpoint string) error {
+func oidcValidateConnection(ctx context.Context, client *Client, endpoint string) error {
 	uri, err := url.Parse(endpoint)
 	if err != nil {
 		return err
@@ -237,11 +238,12 @@ func oidcValidateConnection(client *Client, endpoint string) error {
 		return err
 	}
 
-	result, err := client.TestConnection(types.TestConnection{
-		Host:   uri.Hostname(),
-		Port:   port,
-		Secure: &isSecure,
-	})
+	result, err := client.TestConnection(ctx,
+		types.TestConnection{
+			Host:   uri.Hostname(),
+			Port:   port,
+			Secure: &isSecure,
+		})
 	if err != nil {
 		return err
 	}
@@ -253,16 +255,16 @@ func oidcValidateConnection(client *Client, endpoint string) error {
 }
 
 // oidcConfigureWithEndpoint uses the given endpoint to retrieve an OpenID Connect configuration
-func oidcConfigureWithEndpoint(client *Client, orgHref, endpoint string) (types.OrgOAuthSettings, error) {
+func oidcConfigureWithEndpoint(ctx context.Context, client *Client, orgHref, endpoint string) (types.OrgOAuthSettings, error) {
 	payload := types.OpenIdProviderInfo{
 		Xmlns:                               types.XMLNamespaceVCloud,
 		OpenIdProviderConfigurationEndpoint: endpoint,
 	}
 	var result types.OpenIdProviderConfiguration
 
-	_, err := client.ExecuteRequestWithApiVersion(orgHref+"/settings/oauth/openIdProviderConfig", http.MethodPost,
+	_, err := client.ExecuteRequestWithApiVersion(ctx, orgHref+"/settings/oauth/openIdProviderConfig", http.MethodPost,
 		types.MimeOpenIdProviderInfoXml, "error getting OpenID Connect settings from endpoint: %s", payload, &result,
-		getHighestOidcApiVersion(client))
+		getHighestOidcApiVersion(ctx, client))
 	if err != nil {
 		return types.OrgOAuthSettings{}, err
 	}
@@ -271,15 +273,15 @@ func oidcConfigureWithEndpoint(client *Client, orgHref, endpoint string) (types.
 }
 
 // getHighestOidcApiVersion tries to get the highest possible version for the OpenID Connect endpoint
-func getHighestOidcApiVersion(client *Client) string {
+func getHighestOidcApiVersion(ctx context.Context, client *Client) string {
 	// v38.1 adds CustomUiButtonLabel
-	targetVersion := client.GetSpecificApiVersionOnCondition(">= 38.1", "38.1")
+	targetVersion := client.GetSpecificApiVersionOnCondition(ctx, ">= 38.1", "38.1")
 	if targetVersion != "38.1" {
 		// v38.0 adds SendClientCredentialsAsAuthorizationHeader, UsePKCE,
-		targetVersion = client.GetSpecificApiVersionOnCondition(">= 38.0", "38.0")
+		targetVersion = client.GetSpecificApiVersionOnCondition(ctx, ">= 38.0", "38.0")
 		if targetVersion != "38.0" {
 			// v37.1 adds EnableIdTokenClaims
-			targetVersion = client.GetSpecificApiVersionOnCondition(">= 37.1", "37.1")
+			targetVersion = client.GetSpecificApiVersionOnCondition(ctx, ">= 37.1", "37.1")
 		}
 	} // Otherwise we get the default API version
 	return targetVersion

@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
@@ -20,10 +21,10 @@ type NsxtEdgeGatewayStaticRoute struct {
 }
 
 // CreateStaticRoute based on type definition
-func (egw *NsxtEdgeGateway) CreateStaticRoute(staticRouteConfig *types.NsxtEdgeGatewayStaticRoute) (*NsxtEdgeGatewayStaticRoute, error) {
+func (egw *NsxtEdgeGateway) CreateStaticRoute(ctx context.Context, staticRouteConfig *types.NsxtEdgeGatewayStaticRoute) (*NsxtEdgeGatewayStaticRoute, error) {
 	client := egw.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeGatewayStaticRoutes
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -41,12 +42,12 @@ func (egw *NsxtEdgeGateway) CreateStaticRoute(staticRouteConfig *types.NsxtEdgeG
 	}
 
 	// Non standard behavior of entity - `Details` field in task contains ID of newly created object while the Owner is Edge Gateway
-	task, err := client.OpenApiPostItemAsync(apiVersion, urlRef, nil, staticRouteConfig)
+	task, err := client.OpenApiPostItemAsync(ctx, apiVersion, urlRef, nil, staticRouteConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error creating NSX-T Edge Gateway Static Route: %s", err)
 	}
 
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error creating NSX-T Edge Gateway Static Route: %s", err)
 	}
@@ -60,7 +61,7 @@ func (egw *NsxtEdgeGateway) CreateStaticRoute(staticRouteConfig *types.NsxtEdgeG
 		if err != nil {
 			return nil, err
 		}
-		err = client.OpenApiGetItem(apiVersion, getUrlRef, nil, returnObject.NsxtEdgeGatewayStaticRoute, nil)
+		err = client.OpenApiGetItem(ctx, apiVersion, getUrlRef, nil, returnObject.NsxtEdgeGatewayStaticRoute, nil)
 		if err != nil {
 			return nil, fmt.Errorf("error retrieving NSX-T Edge Gateway Static Route after creation: %s", err)
 		}
@@ -68,7 +69,7 @@ func (egw *NsxtEdgeGateway) CreateStaticRoute(staticRouteConfig *types.NsxtEdgeG
 		// ID was not present in response, therefore Static Route needs to be found manually. Using
 		// 'Name', 'Description' and 'NetworkCidr' for finding the entity. Duplicate entries can
 		// exist, but but it should be a good enough combination for finding unique entry until VCD API is fixed
-		allStaticRoutes, err := egw.GetAllStaticRoutes(nil)
+		allStaticRoutes, err := egw.GetAllStaticRoutes(ctx, nil)
 		if err != nil {
 			return nil, fmt.Errorf("error retrieving NSX-T Edge Gateway Static Route after creation: %s", err)
 		}
@@ -95,10 +96,10 @@ func (egw *NsxtEdgeGateway) CreateStaticRoute(staticRouteConfig *types.NsxtEdgeG
 }
 
 // GetAllStaticRoutes retrieves all Static Routes for a particular NSX-T Edge Gateway
-func (egw *NsxtEdgeGateway) GetAllStaticRoutes(queryParameters url.Values) ([]*NsxtEdgeGatewayStaticRoute, error) {
+func (egw *NsxtEdgeGateway) GetAllStaticRoutes(ctx context.Context, queryParameters url.Values) ([]*NsxtEdgeGatewayStaticRoute, error) {
 	client := egw.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeGatewayStaticRoutes
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +111,7 @@ func (egw *NsxtEdgeGateway) GetAllStaticRoutes(queryParameters url.Values) ([]*N
 	}
 
 	typeResponses := []*types.NsxtEdgeGatewayStaticRoute{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParameters, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParameters, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -130,12 +131,12 @@ func (egw *NsxtEdgeGateway) GetAllStaticRoutes(queryParameters url.Values) ([]*N
 // GetStaticRouteByNetworkCidr retrieves Static Route by network CIDR
 //
 // Note. It will return an error if more than one items is found
-func (egw *NsxtEdgeGateway) GetStaticRouteByNetworkCidr(networkCidr string) (*NsxtEdgeGatewayStaticRoute, error) {
+func (egw *NsxtEdgeGateway) GetStaticRouteByNetworkCidr(ctx context.Context, networkCidr string) (*NsxtEdgeGatewayStaticRoute, error) {
 	if networkCidr == "" {
 		return nil, fmt.Errorf("cidr cannot be empty")
 	}
 
-	allStaticRoutes, err := egw.GetAllStaticRoutes(nil)
+	allStaticRoutes, err := egw.GetAllStaticRoutes(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving NSX-T Edge Gateway Static Route: %s", err)
 	}
@@ -158,12 +159,12 @@ func (egw *NsxtEdgeGateway) GetStaticRouteByNetworkCidr(networkCidr string) (*Ns
 // GetStaticRouteByName retrieves Static Route by name
 //
 // Note. It will return an error if more than one items is found
-func (egw *NsxtEdgeGateway) GetStaticRouteByName(name string) (*NsxtEdgeGatewayStaticRoute, error) {
+func (egw *NsxtEdgeGateway) GetStaticRouteByName(ctx context.Context, name string) (*NsxtEdgeGatewayStaticRoute, error) {
 	if name == "" {
 		return nil, fmt.Errorf("cidr cannot be empty")
 	}
 
-	allStaticRoutes, err := egw.GetAllStaticRoutes(nil)
+	allStaticRoutes, err := egw.GetAllStaticRoutes(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving NSX-T Edge Gateway Static Route: %s", err)
 	}
@@ -185,14 +186,14 @@ func (egw *NsxtEdgeGateway) GetStaticRouteByName(name string) (*NsxtEdgeGatewayS
 }
 
 // GetStaticRouteById retrieves Static Route by given ID
-func (egw *NsxtEdgeGateway) GetStaticRouteById(id string) (*NsxtEdgeGatewayStaticRoute, error) {
+func (egw *NsxtEdgeGateway) GetStaticRouteById(ctx context.Context, id string) (*NsxtEdgeGatewayStaticRoute, error) {
 	if id == "" {
 		return nil, fmt.Errorf("ID is required")
 	}
 
 	client := egw.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeGatewayStaticRoutes
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +210,7 @@ func (egw *NsxtEdgeGateway) GetStaticRouteById(id string) (*NsxtEdgeGatewayStati
 		NsxtEdgeGatewayStaticRoute: &types.NsxtEdgeGatewayStaticRoute{},
 	}
 
-	err = client.OpenApiGetItem(apiVersion, urlRef, nil, returnObject.NsxtEdgeGatewayStaticRoute, nil)
+	err = client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, returnObject.NsxtEdgeGatewayStaticRoute, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving NSX-T Edge Gateway Static Route: %s", err)
 	}
@@ -218,10 +219,10 @@ func (egw *NsxtEdgeGateway) GetStaticRouteById(id string) (*NsxtEdgeGatewayStati
 }
 
 // Update Static Route
-func (staticRoute *NsxtEdgeGatewayStaticRoute) Update(StaticRouteConfig *types.NsxtEdgeGatewayStaticRoute) (*NsxtEdgeGatewayStaticRoute, error) {
+func (staticRoute *NsxtEdgeGatewayStaticRoute) Update(ctx context.Context, StaticRouteConfig *types.NsxtEdgeGatewayStaticRoute) (*NsxtEdgeGatewayStaticRoute, error) {
 	client := staticRoute.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeGatewayStaticRoutes
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +239,7 @@ func (staticRoute *NsxtEdgeGatewayStaticRoute) Update(StaticRouteConfig *types.N
 		NsxtEdgeGatewayStaticRoute: &types.NsxtEdgeGatewayStaticRoute{},
 	}
 
-	err = client.OpenApiPutItem(apiVersion, urlRef, nil, StaticRouteConfig, returnObject.NsxtEdgeGatewayStaticRoute, nil)
+	err = client.OpenApiPutItem(ctx, apiVersion, urlRef, nil, StaticRouteConfig, returnObject.NsxtEdgeGatewayStaticRoute, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error setting NSX-T Edge Gateway Static Route: %s", err)
 	}
@@ -247,10 +248,10 @@ func (staticRoute *NsxtEdgeGatewayStaticRoute) Update(StaticRouteConfig *types.N
 }
 
 // Delete Static Route
-func (staticRoute *NsxtEdgeGatewayStaticRoute) Delete() error {
+func (staticRoute *NsxtEdgeGatewayStaticRoute) Delete(ctx context.Context) error {
 	client := staticRoute.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeGatewayStaticRoutes
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -261,7 +262,7 @@ func (staticRoute *NsxtEdgeGatewayStaticRoute) Delete() error {
 		return err
 	}
 
-	err = client.OpenApiDeleteItem(apiVersion, urlRef, nil, nil)
+	err = client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil, nil)
 	if err != nil {
 		return fmt.Errorf("error deleting NSX-T Edge Gateway Static Route: %s", err)
 	}

@@ -378,6 +378,6 @@ func (vcd *TestVCD) Test_UpdateNetworkStaticRoutes(check *C) {
 	check.Assert(err, IsNil)
 	task, err = network.Delete()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 }

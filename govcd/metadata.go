@@ -281,7 +281,7 @@ func (adminVdc *AdminVdc) DeleteMetadataEntry(ctx context.Context, key string) e
 // Note: Requires system administrator privileges.
 // Deprecated: Use AdminVdc.DeleteMetadataEntryWithDomainAsync
 func (vdc *Vdc) DeleteMetadataEntryAsync(ctx context.Context, key string) (Task, error) {
-	return deleteMetadata(vdc.client, getAdminURL(vdc.Vdc.HREF), vdc.Vdc.Name, key, false)
+	return deleteMetadata(ctx, vdc.client, getAdminURL(vdc.Vdc.HREF), vdc.Vdc.Name, key, false)
 }
 
 // DeleteMetadataEntryAsync deletes VDC metadata depending on key provided as input and returns the task.
@@ -367,8 +367,8 @@ func (providerVdc *ProviderVdc) DeleteMetadataEntry(ctx context.Context, key str
 // DeleteMetadataEntryAsync deletes Provider VDC metadata depending on key provided as input and returns the task.
 // Note: Requires system administrator privileges.
 // Deprecated: Use ProviderVdc.DeleteMetadataEntryWithDomainAsync
-func (providerVdc *ProviderVdc) DeleteMetadataEntryAsync(key string) (Task, error) {
-	return deleteMetadata(providerVdc.client, providerVdc.ProviderVdc.HREF, providerVdc.ProviderVdc.Name, key, false)
+func (providerVdc *ProviderVdc) DeleteMetadataEntryAsync(ctx context.Context, key string) (Task, error) {
+	return deleteMetadata(ctx, providerVdc.client, providerVdc.ProviderVdc.HREF, providerVdc.ProviderVdc.Name, key, false)
 }
 
 // AddMetadataEntry adds VApp metadata typedValue and key/value pair provided as input
@@ -855,7 +855,7 @@ func (disk *Disk) DeleteMetadataEntry(ctx context.Context, key string) error {
 // a task.
 // Deprecated: Use Disk.DeleteMetadataEntryWithDomainAsync instead
 func (disk *Disk) DeleteMetadataEntryAsync(ctx context.Context, key string) (Task, error) {
-	return deleteMetadata(disk.client, disk.Disk.HREF, disk.Disk.Name, key, false)
+	return deleteMetadata(ctx, disk.client, disk.Disk.HREF, disk.Disk.Name, key, false)
 }
 
 // AddMetadataEntry adds OrgVDCNetwork metadata typedValue and key/value pair provided as input
@@ -950,7 +950,7 @@ func (catalogItem *CatalogItem) DeleteMetadataEntry(ctx context.Context, key str
 // and returns a task.
 // Deprecated: Use CatalogItem.DeleteMetadataEntryWithDomainAsync instead
 func (catalogItem *CatalogItem) DeleteMetadataEntryAsync(ctx context.Context, key string) (Task, error) {
-	return deleteMetadata(catalogItem.client, catalogItem.CatalogItem.HREF, catalogItem.CatalogItem.Name, key, false)
+	return deleteMetadata(ctx, catalogItem.client, catalogItem.CatalogItem.HREF, catalogItem.CatalogItem.Name, key, false)
 }
 
 // DeleteMetadataEntry deletes OrgVDCNetwork metadata depending on key provided as input

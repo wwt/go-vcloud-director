@@ -5,12 +5,13 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 	"net/url"
 )
 
-func (vcdClient *VCDClient) GetAllNsxtTransportZones(nsxtManagerId string, queryParameters url.Values) ([]*types.TransportZone, error) {
+func (vcdClient *VCDClient) GetAllNsxtTransportZones(ctx context.Context, nsxtManagerId string, queryParameters url.Values) ([]*types.TransportZone, error) {
 	if nsxtManagerId == "" {
 		return nil, fmt.Errorf("empty NSX-T manager ID")
 	}
@@ -21,7 +22,7 @@ func (vcdClient *VCDClient) GetAllNsxtTransportZones(nsxtManagerId string, query
 
 	client := vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointImportableTransportZones
-	apiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	apiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +40,7 @@ func (vcdClient *VCDClient) GetAllNsxtTransportZones(nsxtManagerId string, query
 	}
 	queryParams = queryParameterFilterAnd(fmt.Sprintf("%s==%s", filterField, nsxtManagerId), queryParams)
 	var typeResponses []*types.TransportZone
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParams, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParams, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}

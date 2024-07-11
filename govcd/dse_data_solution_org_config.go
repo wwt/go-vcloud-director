@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
@@ -25,8 +26,8 @@ type DataSolutionOrgConfig struct {
 }
 
 // CreateDataSolutionOrgConfig creates Data Solution Org Configuration for a defined orgId
-func (vcdClient *VCDClient) CreateDataSolutionOrgConfig(orgId string, cfg *types.DataSolutionOrgConfig) (*DataSolutionOrgConfig, error) {
-	rdeType, err := vcdClient.GetRdeType(dataSolutionOrgConfig[0], dataSolutionOrgConfig[1], dataSolutionOrgConfig[2])
+func (vcdClient *VCDClient) CreateDataSolutionOrgConfig(ctx context.Context, orgId string, cfg *types.DataSolutionOrgConfig) (*DataSolutionOrgConfig, error) {
+	rdeType, err := vcdClient.GetRdeType(ctx, dataSolutionOrgConfig[0], dataSolutionOrgConfig[1], dataSolutionOrgConfig[2])
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving RDE Type for VCD Data Solution Org Configuration: %s", err)
 	}
@@ -46,19 +47,19 @@ func (vcdClient *VCDClient) CreateDataSolutionOrgConfig(orgId string, cfg *types
 	}
 
 	// 4. Create RDE
-	createdRdeEntity, err := rdeType.CreateRde(*entityCfg, nil)
+	createdRdeEntity, err := rdeType.CreateRde(ctx, *entityCfg, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating RDE entity: %s", err)
 	}
 
 	// 5. Resolve RDE
-	err = createdRdeEntity.Resolve()
+	err = createdRdeEntity.Resolve(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error resolving Solutions add-on after creating: %s", err)
 	}
 
 	// 6. Reload RDE
-	err = createdRdeEntity.Refresh()
+	err = createdRdeEntity.Refresh(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error refreshing RDE after resolving: %s", err)
 	}
@@ -78,8 +79,8 @@ func (vcdClient *VCDClient) CreateDataSolutionOrgConfig(orgId string, cfg *types
 }
 
 // GetAllDataSolutionOrgConfigs retrieves all available Data Solution Org Configs
-func (vcdClient *VCDClient) GetAllDataSolutionOrgConfigs(queryParameters url.Values) ([]*DataSolutionOrgConfig, error) {
-	allDseInstances, err := vcdClient.GetAllRdes(dataSolutionOrgConfig[0], dataSolutionOrgConfig[1], dataSolutionOrgConfig[2], queryParameters)
+func (vcdClient *VCDClient) GetAllDataSolutionOrgConfigs(ctx context.Context, queryParameters url.Values) ([]*DataSolutionOrgConfig, error) {
+	allDseInstances, err := vcdClient.GetAllRdes(ctx, dataSolutionOrgConfig[0], dataSolutionOrgConfig[1], dataSolutionOrgConfig[2], queryParameters)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving all Data Solution Org Configs: %s", err)
 	}
@@ -103,7 +104,7 @@ func (vcdClient *VCDClient) GetAllDataSolutionOrgConfigs(queryParameters url.Val
 
 // GetAllDataSolutionOrgConfigs retrieves all available Data Solution Org Configs for a given Data
 // Solution
-func (ds *DataSolution) GetAllDataSolutionOrgConfigs() ([]*DataSolutionOrgConfig, error) {
+func (ds *DataSolution) GetAllDataSolutionOrgConfigs(ctx context.Context) ([]*DataSolutionOrgConfig, error) {
 	if ds == nil || ds.DataSolution == nil {
 		return nil, fmt.Errorf("error - Data Solution structure is empty")
 	}
@@ -112,12 +113,12 @@ func (ds *DataSolution) GetAllDataSolutionOrgConfigs() ([]*DataSolutionOrgConfig
 	queryParams = queryParameterFilterAnd(fmt.Sprintf("entity.spec.solutionType==%s", ds.DataSolution.Spec.SolutionType), queryParams)
 	queryParams = queryParameterFilterAnd("state==RESOLVED", queryParams)
 
-	return ds.vcdClient.GetAllDataSolutionOrgConfigs(queryParams)
+	return ds.vcdClient.GetAllDataSolutionOrgConfigs(ctx, queryParams)
 }
 
 // GetDataSolutionOrgConfigForTenant retrieves all available Data Solution Org Configs for a given
 // Data Solution and then uses local filter to find the one for given tenantId
-func (ds *DataSolution) GetDataSolutionOrgConfigForTenant(tenantId string) (*DataSolutionOrgConfig, error) {
+func (ds *DataSolution) GetDataSolutionOrgConfigForTenant(ctx context.Context, tenantId string) (*DataSolutionOrgConfig, error) {
 	if ds == nil || ds.DataSolution == nil {
 		return nil, fmt.Errorf("error - Data Solution structure is empty")
 	}
@@ -126,7 +127,7 @@ func (ds *DataSolution) GetDataSolutionOrgConfigForTenant(tenantId string) (*Dat
 		return nil, fmt.Errorf("tenant ID is required")
 	}
 
-	allOrgConfigs, err := ds.GetAllDataSolutionOrgConfigs()
+	allOrgConfigs, err := ds.GetAllDataSolutionOrgConfigs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving all Data Solution Org Configs: %s", err)
 	}
@@ -150,11 +151,11 @@ func (ds *DataSolution) GetDataSolutionOrgConfigForTenant(tenantId string) (*Dat
 }
 
 // Delete Data Solution Org Config
-func (dsOrgCfg *DataSolutionOrgConfig) Delete() error {
+func (dsOrgCfg *DataSolutionOrgConfig) Delete(ctx context.Context) error {
 	if dsOrgCfg.DefinedEntity == nil {
 		return fmt.Errorf("error - parent Defined Entity is nil")
 	}
-	return dsOrgCfg.DefinedEntity.Delete()
+	return dsOrgCfg.DefinedEntity.Delete(ctx)
 }
 
 // RdeId is a shortcut of SolutionEntity.DefinedEntity.DefinedEntity.ID

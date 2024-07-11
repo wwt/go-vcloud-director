@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 	"net/url"
@@ -25,10 +26,10 @@ type StorageProfile struct {
 
 // GetAllStorageProfiles retrieves all storage profiles existing in a given storage profile context
 // Note: this function finds all *named* resource pools, but not the unnamed one [*(Any)]
-func (vcenter VCenter) GetAllStorageProfiles(resourcePoolId string, queryParams url.Values) ([]*StorageProfile, error) {
+func (vcenter VCenter) GetAllStorageProfiles(ctx context.Context, resourcePoolId string, queryParams url.Values) ([]*StorageProfile, error) {
 	client := vcenter.client.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointStorageProfiles
-	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +47,7 @@ func (vcenter VCenter) GetAllStorageProfiles(resourcePoolId string, queryParams 
 	if resourcePoolId != "" {
 		queryParams.Set("filter", fmt.Sprintf("_context==%s", resourcePoolId))
 	}
-	err = client.OpenApiGetAllItems(minimumApiVersion, urlRef, queryParams, &retrieved, nil)
+	err = client.OpenApiGetAllItems(ctx, minimumApiVersion, urlRef, queryParams, &retrieved, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error getting storage profile list: %s", err)
 	}
@@ -68,8 +69,8 @@ func (vcenter VCenter) GetAllStorageProfiles(resourcePoolId string, queryParams 
 }
 
 // GetStorageProfileById retrieves a storage profile in the context of a given resource pool
-func (vcenter VCenter) GetStorageProfileById(resourcePoolId, id string) (*StorageProfile, error) {
-	storageProfiles, err := vcenter.GetAllStorageProfiles(resourcePoolId, nil)
+func (vcenter VCenter) GetStorageProfileById(ctx context.Context, resourcePoolId, id string) (*StorageProfile, error) {
+	storageProfiles, err := vcenter.GetAllStorageProfiles(ctx, resourcePoolId, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -82,8 +83,8 @@ func (vcenter VCenter) GetStorageProfileById(resourcePoolId, id string) (*Storag
 }
 
 // GetStorageProfileByName retrieves a storage profile in the context of a given resource pool
-func (vcenter VCenter) GetStorageProfileByName(resourcePoolId, name string) (*StorageProfile, error) {
-	storageProfiles, err := vcenter.GetAllStorageProfiles(resourcePoolId, nil)
+func (vcenter VCenter) GetStorageProfileByName(ctx context.Context, resourcePoolId, name string) (*StorageProfile, error) {
+	storageProfiles, err := vcenter.GetAllStorageProfiles(ctx, resourcePoolId, nil)
 	if err != nil {
 		return nil, err
 	}

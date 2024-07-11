@@ -751,7 +751,7 @@ func (vdc *Vdc) QueryAllMedia(ctx context.Context, mediaName string) ([]*MediaRe
 
 // enableDownload prepares a media item for download and returns a download link
 // Note: depending on the size of the item, it may take a long time.
-func (media *Media) enableDownload() (string, error) {
+func (media *Media) enableDownload(ctx context.Context) (string, error) {
 	downloadUrl := getUrlFromLink(media.Media.Link, "enable", "")
 	if downloadUrl == "" {
 		return "", fmt.Errorf("no enable URL found")
@@ -765,6 +765,7 @@ func (media *Media) enableDownload() (string, error) {
 	//    </File>
 	//</Files>
 	task, err := media.client.executeTaskRequest(
+		ctx,
 		downloadUrl,
 		http.MethodPost,
 		types.MimeTask,
@@ -774,12 +775,12 @@ func (media *Media) enableDownload() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	err = media.Refresh()
+	err = media.Refresh(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -809,9 +810,9 @@ func (media *Media) enableDownload() (string, error) {
 
 // Download gets the contents of a media item as a byte stream
 // NOTE: the whole item will be saved in local memory. Do not attempt this operation for very large items
-func (media *Media) Download() ([]byte, error) {
+func (media *Media) Download(ctx context.Context) ([]byte, error) {
 
-	downloadHref, err := media.enableDownload()
+	downloadHref, err := media.enableDownload(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -821,7 +822,7 @@ func (media *Media) Download() ([]byte, error) {
 		return nil, fmt.Errorf("error getting download URL: %s", err)
 	}
 
-	request := media.client.NewRequest(map[string]string{}, http.MethodGet, *downloadUrl, nil)
+	request := media.client.NewRequest(ctx, map[string]string{}, http.MethodGet, *downloadUrl, nil)
 	resp, err := media.client.Http.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("error getting media download: %s", err)

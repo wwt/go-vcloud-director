@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 	"net/url"
@@ -26,30 +27,30 @@ type OpenApiMetadataEntry struct {
 
 // GetMetadata returns all the metadata from a DefinedEntity.
 // NOTE: The obtained metadata doesn't have ETags, use GetMetadataById or GetMetadataByKey to obtain a ETag for a specific entry.
-func (rde *DefinedEntity) GetMetadata() ([]*OpenApiMetadataEntry, error) {
+func (rde *DefinedEntity) GetMetadata(ctx context.Context) ([]*OpenApiMetadataEntry, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntities
-	return getAllOpenApiMetadata(rde.client, endpoint, rde.DefinedEntity.ID, rde.DefinedEntity.Name, "entity", nil)
+	return getAllOpenApiMetadata(ctx, rde.client, endpoint, rde.DefinedEntity.ID, rde.DefinedEntity.Name, "entity", nil)
 }
 
 // GetMetadataByKey returns a unique DefinedEntity metadata entry corresponding to the given domain, namespace and key.
 // The domain and namespace are only needed when there's more than one entry with the same key.
 // This is a more costly operation than GetMetadataById due to ETags, so use that preferred option whenever possible.
-func (rde *DefinedEntity) GetMetadataByKey(domain, namespace, key string) (*OpenApiMetadataEntry, error) {
+func (rde *DefinedEntity) GetMetadataByKey(ctx context.Context, domain, namespace, key string) (*OpenApiMetadataEntry, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntities
-	return getOpenApiMetadataByKey(rde.client, endpoint, rde.DefinedEntity.ID, rde.DefinedEntity.Name, "entity", domain, namespace, key)
+	return getOpenApiMetadataByKey(ctx, rde.client, endpoint, rde.DefinedEntity.ID, rde.DefinedEntity.Name, "entity", domain, namespace, key)
 }
 
 // GetMetadataById returns a unique DefinedEntity metadata entry corresponding to the given domain, namespace and key.
 // The domain and namespace are only needed when there's more than one entry with the same key.
-func (rde *DefinedEntity) GetMetadataById(id string) (*OpenApiMetadataEntry, error) {
+func (rde *DefinedEntity) GetMetadataById(ctx context.Context, id string) (*OpenApiMetadataEntry, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntities
-	return getOpenApiMetadataById(rde.client, endpoint, rde.DefinedEntity.ID, rde.DefinedEntity.Name, "entity", id)
+	return getOpenApiMetadataById(ctx, rde.client, endpoint, rde.DefinedEntity.ID, rde.DefinedEntity.Name, "entity", id)
 }
 
 // AddMetadata adds metadata to the receiver DefinedEntity.
-func (rde *DefinedEntity) AddMetadata(metadataEntry types.OpenApiMetadataEntry) (*OpenApiMetadataEntry, error) {
+func (rde *DefinedEntity) AddMetadata(ctx context.Context, metadataEntry types.OpenApiMetadataEntry) (*OpenApiMetadataEntry, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntities
-	return addOpenApiMetadata(rde.client, endpoint, rde.DefinedEntity.ID, metadataEntry)
+	return addOpenApiMetadata(ctx, rde.client, endpoint, rde.DefinedEntity.ID, metadataEntry)
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -58,7 +59,7 @@ func (rde *DefinedEntity) AddMetadata(metadataEntry types.OpenApiMetadataEntry) 
 
 // Update updates the metadata value from the receiver entry.
 // Only the value and persistence of the entry can be updated. Re-create the entry in case you want to modify any of the other fields.
-func (entry *OpenApiMetadataEntry) Update(value interface{}, persistent bool) error {
+func (entry *OpenApiMetadataEntry) Update(ctx context.Context, value interface{}, persistent bool) error {
 	if entry.MetadataEntry.ID == "" {
 		return fmt.Errorf("ID of the receiver metadata entry is empty")
 	}
@@ -78,7 +79,7 @@ func (entry *OpenApiMetadataEntry) Update(value interface{}, persistent bool) er
 		},
 	}
 
-	apiVersion, err := entry.client.getOpenApiHighestElevatedVersion(entry.parentEndpoint)
+	apiVersion, err := entry.client.getOpenApiHighestElevatedVersion(ctx, entry.parentEndpoint)
 	if err != nil {
 		return err
 	}
@@ -88,7 +89,7 @@ func (entry *OpenApiMetadataEntry) Update(value interface{}, persistent bool) er
 		return err
 	}
 
-	headers, err := entry.client.OpenApiPutItemAndGetHeaders(apiVersion, urlRef, nil, payload, entry.MetadataEntry, map[string]string{"If-Match": entry.Etag})
+	headers, err := entry.client.OpenApiPutItemAndGetHeaders(ctx, apiVersion, urlRef, nil, payload, entry.MetadataEntry, map[string]string{"If-Match": entry.Etag})
 	if err != nil {
 		return err
 	}
@@ -97,12 +98,12 @@ func (entry *OpenApiMetadataEntry) Update(value interface{}, persistent bool) er
 }
 
 // Delete deletes the receiver metadata entry.
-func (entry *OpenApiMetadataEntry) Delete() error {
+func (entry *OpenApiMetadataEntry) Delete(ctx context.Context) error {
 	if entry.MetadataEntry.ID == "" {
 		return fmt.Errorf("ID of the receiver metadata entry is empty")
 	}
 
-	apiVersion, err := entry.client.getOpenApiHighestElevatedVersion(entry.parentEndpoint)
+	apiVersion, err := entry.client.getOpenApiHighestElevatedVersion(ctx, entry.parentEndpoint)
 	if err != nil {
 		return err
 	}
@@ -112,7 +113,7 @@ func (entry *OpenApiMetadataEntry) Delete() error {
 		return err
 	}
 
-	err = entry.client.OpenApiDeleteItem(apiVersion, urlRef, nil, nil)
+	err = entry.client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -130,8 +131,8 @@ func (entry *OpenApiMetadataEntry) Delete() error {
 
 // getAllOpenApiMetadata is a generic function to retrieve all metadata from any VCD object using its ID and the given OpenAPI endpoint.
 // It supports query parameters to input, for example, filtering options.
-func getAllOpenApiMetadata(client *Client, endpoint, objectId, objectName, objectType string, queryParameters url.Values) ([]*OpenApiMetadataEntry, error) {
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+func getAllOpenApiMetadata(ctx context.Context, client *Client, endpoint, objectId, objectName, objectType string, queryParameters url.Values) ([]*OpenApiMetadataEntry, error) {
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +143,7 @@ func getAllOpenApiMetadata(client *Client, endpoint, objectId, objectName, objec
 	}
 
 	allMetadata := []*types.OpenApiMetadataEntry{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParameters, &allMetadata, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParameters, &allMetadata, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -175,11 +176,11 @@ func getAllOpenApiMetadata(client *Client, endpoint, objectId, objectName, objec
 
 // getOpenApiMetadataByKey is a generic function to retrieve a unique metadata entry from any VCD object using its domain, namespace and key.
 // The domain and namespace are only needed when there's more than one entry with the same key.
-func getOpenApiMetadataByKey(client *Client, endpoint, objectId, objectName, objectType string, domain, namespace, key string) (*OpenApiMetadataEntry, error) {
+func getOpenApiMetadataByKey(ctx context.Context, client *Client, endpoint, objectId, objectName, objectType string, domain, namespace, key string) (*OpenApiMetadataEntry, error) {
 	queryParameters := url.Values{}
 	// As for now, the filter only supports filtering by key
 	queryParameters.Add("filter", fmt.Sprintf("keyValue.key==%s", key))
-	metadata, err := getAllOpenApiMetadata(client, endpoint, objectId, objectName, objectType, queryParameters)
+	metadata, err := getAllOpenApiMetadata(ctx, client, endpoint, objectId, objectName, objectType, queryParameters)
 	if err != nil {
 		return nil, err
 	}
@@ -200,20 +201,20 @@ func getOpenApiMetadataByKey(client *Client, endpoint, objectId, objectName, obj
 			return nil, fmt.Errorf("found %d metadata entries associated to object %s", len(filteredMetadata), objectId)
 		}
 		// Required to retrieve an ETag
-		return getOpenApiMetadataById(client, endpoint, objectId, objectName, objectType, filteredMetadata[0].MetadataEntry.ID)
+		return getOpenApiMetadataById(ctx, client, endpoint, objectId, objectName, objectType, filteredMetadata[0].MetadataEntry.ID)
 	}
 
 	// Required to retrieve an ETag
-	return getOpenApiMetadataById(client, endpoint, objectId, objectName, objectType, metadata[0].MetadataEntry.ID)
+	return getOpenApiMetadataById(ctx, client, endpoint, objectId, objectName, objectType, metadata[0].MetadataEntry.ID)
 }
 
 // getOpenApiMetadataById is a generic function to retrieve a unique metadata entry from any VCD object using its unique ID.
-func getOpenApiMetadataById(client *Client, endpoint, objectId, objectName, objectType, metadataId string) (*OpenApiMetadataEntry, error) {
+func getOpenApiMetadataById(ctx context.Context, client *Client, endpoint, objectId, objectName, objectType, metadataId string) (*OpenApiMetadataEntry, error) {
 	if metadataId == "" {
 		return nil, fmt.Errorf("input metadata entry ID is empty")
 	}
 
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +231,7 @@ func getOpenApiMetadataById(client *Client, endpoint, objectId, objectName, obje
 		parentEndpoint: endpoint,
 	}
 
-	headers, err := client.OpenApiGetItemAndHeaders(apiVersion, urlRef, nil, response.MetadataEntry, nil)
+	headers, err := client.OpenApiGetItemAndHeaders(ctx, apiVersion, urlRef, nil, response.MetadataEntry, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -245,8 +246,8 @@ func getOpenApiMetadataById(client *Client, endpoint, objectId, objectName, obje
 }
 
 // addOpenApiMetadata adds one metadata entry to the VCD object with given ID
-func addOpenApiMetadata(client *Client, endpoint, objectId string, metadataEntry types.OpenApiMetadataEntry) (*OpenApiMetadataEntry, error) {
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+func addOpenApiMetadata(ctx context.Context, client *Client, endpoint, objectId string, metadataEntry types.OpenApiMetadataEntry) (*OpenApiMetadataEntry, error) {
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +262,7 @@ func addOpenApiMetadata(client *Client, endpoint, objectId string, metadataEntry
 		MetadataEntry:  &types.OpenApiMetadataEntry{},
 		parentEndpoint: endpoint,
 	}
-	headers, err := client.OpenApiPostItemAndGetHeaders(apiVersion, urlRef, nil, metadataEntry, response.MetadataEntry, nil)
+	headers, err := client.OpenApiPostItemAndGetHeaders(ctx, apiVersion, urlRef, nil, metadataEntry, response.MetadataEntry, nil)
 	if err != nil {
 		return nil, err
 	}

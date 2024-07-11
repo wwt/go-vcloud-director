@@ -7,6 +7,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -58,7 +59,7 @@ func (vcd *TestVCD) Test_AddAndDeleteMetadataOnVapp(check *C) {
 	// Add metadata
 	task, err := vcd.vapp.AddMetadata("key", "value")
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
@@ -72,7 +73,7 @@ func (vcd *TestVCD) Test_AddAndDeleteMetadataOnVapp(check *C) {
 	// Remove metadata
 	task, err = vcd.vapp.DeleteMetadata("key")
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
@@ -108,7 +109,7 @@ func (vcd *TestVCD) Test_AddAndDeleteMetadataOnVm(check *C) {
 	// Add metadata
 	task, err := vm.AddMetadata("key", "value")
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
@@ -127,7 +128,7 @@ func (vcd *TestVCD) Test_AddAndDeleteMetadataOnVm(check *C) {
 	// Remove metadata
 	task, err = vm.DeleteMetadata("key")
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 	metadata, err = vm.GetMetadata()
@@ -209,7 +210,7 @@ func (vcd *TestVCD) Test_AddAndDeleteMetadataOnMediaRecord(check *C) {
 	uploadTask, err := catalog.UploadMediaImage(itemName, "upload from test", vcd.config.Media.MediaPath, 1024)
 	check.Assert(err, IsNil)
 	check.Assert(uploadTask, NotNil)
-	err = uploadTask.WaitTaskCompletion()
+	err = uploadTask.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	AddToCleanupList(itemName, "mediaCatalogImage", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.Name, check.TestName())
@@ -244,7 +245,7 @@ func (vcd *TestVCD) Test_AddAndDeleteMetadataOnMediaRecord(check *C) {
 	// Remove catalog item so far other tests don't fail
 	task, err := mediaRecord.Delete()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 }
 
@@ -373,7 +374,7 @@ func (vcd *TestVCD) Test_MetadataEntryOnMediaRecordCRUD(check *C) {
 	uploadTask, err := catalog.UploadMediaImage(itemName, "upload from test", vcd.config.Media.MediaPath, 1024)
 	check.Assert(err, IsNil)
 	check.Assert(uploadTask, NotNil)
-	err = uploadTask.WaitTaskCompletion()
+	err = uploadTask.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	AddToCleanupList(itemName, "mediaCatalogImage", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.Name, check.TestName())
@@ -389,7 +390,7 @@ func (vcd *TestVCD) Test_MetadataEntryOnMediaRecordCRUD(check *C) {
 	testMetadataCRUDActionsDeprecated(mediaRecord, check, nil)
 	task, err := mediaRecord.Delete()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 }
 
@@ -443,7 +444,7 @@ func (vcd *TestVCD) Test_MetadataOnIndependentDiskCRUD(check *C) {
 	diskHREF := task.Task.Owner.HREF
 	PrependToCleanupList(diskHREF, "disk", "", check.TestName())
 
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	disk, err := vcd.vdc.GetDiskByHref(diskHREF)
@@ -453,7 +454,7 @@ func (vcd *TestVCD) Test_MetadataOnIndependentDiskCRUD(check *C) {
 
 	task, err = disk.Delete()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 }
 

@@ -1,6 +1,7 @@
 package govcd
 
 import (
+	"context"
 	_ "embed"
 	"encoding/base64"
 	"encoding/json"
@@ -56,7 +57,7 @@ func getCseComponentsVersions(cseVersion semver.Version) (*cseComponentsVersions
 //
 // WARNING: Don't use this method inside loops or avoid calling it multiple times in a row, as it performs many queries
 // to VCD.
-func cseConvertToCseKubernetesClusterType(rde *DefinedEntity) (*CseKubernetesCluster, error) {
+func cseConvertToCseKubernetesClusterType(ctx context.Context, rde *DefinedEntity) (*CseKubernetesCluster, error) {
 	requiredType := fmt.Sprintf("%s:%s", cseKubernetesClusterVendor, cseKubernetesClusterNamespace)
 
 	if !strings.Contains(rde.DefinedEntity.ID, requiredType) || !strings.Contains(rde.DefinedEntity.EntityType, requiredType) {
@@ -266,7 +267,7 @@ func cseConvertToCseKubernetesClusterType(rde *DefinedEntity) (*CseKubernetesClu
 	// FIXME: This is a workaround, because for some reason the OrgVdcs[*].Id property contains the VDC name instead of the VDC ID.
 	//        Once this is fixed, this conditional should not be needed anymore.
 	if result.VdcId == result.capvcdType.Status.Capvcd.VcdProperties.OrgVdcs[0].Name {
-		vdcs, err := queryOrgVdcList(rde.client, map[string]string{})
+		vdcs, err := queryOrgVdcList(ctx, rde.client, map[string]string{})
 		if err != nil {
 			return nil, fmt.Errorf("could not get VDC IDs as no VDC was found: %s", err)
 		}
@@ -288,7 +289,7 @@ func cseConvertToCseKubernetesClusterType(rde *DefinedEntity) (*CseKubernetesClu
 	params.Add("filter", fmt.Sprintf("name==%s", result.capvcdType.Status.Capvcd.VcdProperties.OrgVdcs[0].OvdcNetworkName))
 	params = queryParameterFilterAnd("orgVdc.id=="+result.VdcId, params)
 	params = queryParameterFilterAnd("_context==includeAccessible", params)
-	networks, err := getAllOpenApiOrgVdcNetworks(rde.client, params, nil)
+	networks, err := getAllOpenApiOrgVdcNetworks(ctx, rde.client, params, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not read Org VDC Network from Capvcd type: %s", err)
 	}
@@ -300,7 +301,7 @@ func cseConvertToCseKubernetesClusterType(rde *DefinedEntity) (*CseKubernetesClu
 	// Here we retrieve several items that we need from now onwards, like Storage Profiles and Compute Policies
 	storageProfiles := map[string]string{}
 	if rde.client.IsSysAdmin {
-		allSp, err := queryAdminOrgVdcStorageProfilesByVdcId(rde.client, result.VdcId)
+		allSp, err := queryAdminOrgVdcStorageProfilesByVdcId(ctx, rde.client, result.VdcId)
 		if err != nil {
 			return nil, fmt.Errorf("could not get all the Storage Profiles: %s", err)
 		}
@@ -308,7 +309,7 @@ func cseConvertToCseKubernetesClusterType(rde *DefinedEntity) (*CseKubernetesClu
 			storageProfiles[recordType.Name] = fmt.Sprintf("urn:vcloud:vdcstorageProfile:%s", extractUuid(recordType.HREF))
 		}
 	} else {
-		allSp, err := queryOrgVdcStorageProfilesByVdcId(rde.client, result.VdcId)
+		allSp, err := queryOrgVdcStorageProfilesByVdcId(ctx, rde.client, result.VdcId)
 		if err != nil {
 			return nil, fmt.Errorf("could not get all the Storage Profiles: %s", err)
 		}
@@ -317,7 +318,7 @@ func cseConvertToCseKubernetesClusterType(rde *DefinedEntity) (*CseKubernetesClu
 		}
 	}
 
-	computePolicies, err := getAllVdcComputePoliciesV2(rde.client, nil)
+	computePolicies, err := getAllVdcComputePoliciesV2(ctx, rde.client, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not get all the Compute Policies: %s", err)
 	}
@@ -399,7 +400,7 @@ func cseConvertToCseKubernetesClusterType(rde *DefinedEntity) (*CseKubernetesClu
 				// We retrieve the Kubernetes Template OVA just once for the Control Plane because all YAML blocks share the same
 				vAppTemplateName := traverseMapAndGet[string](yamlDocument, "spec.template.spec.template", ".")
 				catalogName := traverseMapAndGet[string](yamlDocument, "spec.template.spec.catalog", ".")
-				vAppTemplates, err := queryVappTemplateListWithFilter(rde.client, map[string]string{
+				vAppTemplates, err := queryVappTemplateListWithFilter(ctx, rde.client, map[string]string{
 					"catalogName": catalogName,
 					"name":        vAppTemplateName,
 				})
@@ -506,14 +507,14 @@ func cseConvertToCseKubernetesClusterType(rde *DefinedEntity) (*CseKubernetesClu
 // If one of the states of the cluster at a given point is "error", this function also checks whether the cluster has the "AutoRepairOnErrors" flag enabled,
 // so it keeps waiting if it's true.
 // If timeout is reached before the cluster is in "provisioned" state, it returns an error.
-func waitUntilClusterIsProvisioned(client *Client, clusterId string, timeout time.Duration) error {
+func waitUntilClusterIsProvisioned(ctx context.Context, client *Client, clusterId string, timeout time.Duration) error {
 	var elapsed time.Duration
 	sleepTime := 10
 
 	start := time.Now()
 	capvcd := &types.Capvcd{}
 	for elapsed <= timeout || timeout == 0 { // If the user specifies timeout=0, we wait forever
-		rde, err := getRdeById(client, clusterId)
+		rde, err := getRdeById(ctx, client, clusterId)
 		if err != nil {
 			return err
 		}
@@ -669,7 +670,7 @@ func (input *CseClusterSettings) validate() error {
 // For example, the most relevant transformation is the change of the item IDs that are present in CseClusterSettings
 // (such as CseClusterSettings.KubernetesTemplateOvaId) to their corresponding Names (e.g. cseClusterSettingsInternal.KubernetesTemplateOvaName),
 // which are the identifiers that Container Service Extension uses internally.
-func (input *CseClusterSettings) toCseClusterSettingsInternal(org Org) (*cseClusterSettingsInternal, error) {
+func (input *CseClusterSettings) toCseClusterSettingsInternal(ctx context.Context, org Org) (*cseClusterSettingsInternal, error) {
 	err := input.validate()
 	if err != nil {
 		return nil, err
@@ -681,13 +682,13 @@ func (input *CseClusterSettings) toCseClusterSettingsInternal(org Org) (*cseClus
 	}
 	output.OrganizationName = org.Org.Name
 
-	vdc, err := org.GetVDCById(input.VdcId, true)
+	vdc, err := org.GetVDCById(ctx, input.VdcId, true)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve the VDC with ID '%s': %s", input.VdcId, err)
 	}
 	output.VdcName = vdc.Vdc.Name
 
-	vAppTemplate, err := getVAppTemplateById(org.client, input.KubernetesTemplateOvaId)
+	vAppTemplate, err := getVAppTemplateById(ctx, org.client, input.KubernetesTemplateOvaId)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve the Kubernetes Template OVA with ID '%s': %s", input.KubernetesTemplateOvaId, err)
 	}
@@ -699,13 +700,13 @@ func (input *CseClusterSettings) toCseClusterSettingsInternal(org Org) (*cseClus
 	}
 	output.TkgVersionBundle = tkgVersions
 
-	catalogName, err := vAppTemplate.GetCatalogName()
+	catalogName, err := vAppTemplate.GetCatalogName(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve the Catalog name where the the Kubernetes Template OVA '%s' (%s) is hosted: %s", input.KubernetesTemplateOvaId, vAppTemplate.VAppTemplate.Name, err)
 	}
 	output.CatalogName = catalogName
 
-	network, err := vdc.GetOrgVdcNetworkById(input.NetworkId, true)
+	network, err := vdc.GetOrgVdcNetworkById(ctx, input.NetworkId, true)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve the Org VDC Network with ID '%s': %s", input.NetworkId, err)
 	}
@@ -715,7 +716,7 @@ func (input *CseClusterSettings) toCseClusterSettingsInternal(org Org) (*cseClus
 	if err != nil {
 		return nil, err
 	}
-	rdeType, err := getRdeType(org.client, cseKubernetesClusterVendor, cseKubernetesClusterNamespace, cseComponentsVersions.CapvcdRdeTypeVersion)
+	rdeType, err := getRdeType(ctx, org.client, cseKubernetesClusterVendor, cseKubernetesClusterNamespace, cseComponentsVersions.CapvcdRdeTypeVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -734,7 +735,7 @@ func (input *CseClusterSettings) toCseClusterSettingsInternal(org Org) (*cseClus
 		storageProfileIds = append(storageProfileIds, input.DefaultStorageClass.StorageProfileId)
 	}
 
-	idToNameCache, err := idToNames(org.client, computePolicyIds, storageProfileIds)
+	idToNameCache, err := idToNames(ctx, org.client, computePolicyIds, storageProfileIds)
 	if err != nil {
 		return nil, err
 	}
@@ -780,7 +781,7 @@ func (input *CseClusterSettings) toCseClusterSettingsInternal(org Org) (*cseClus
 		}
 	}
 
-	vcdKeConfig, err := getVcdKeConfig(org.client, cseComponentsVersions.VcdKeConfigRdeTypeVersion, input.NodeHealthCheck)
+	vcdKeConfig, err := getVcdKeConfig(ctx, org.client, cseComponentsVersions.VcdKeConfigRdeTypeVersion, input.NodeHealthCheck)
 	if err != nil {
 		return nil, err
 	}
@@ -788,7 +789,7 @@ func (input *CseClusterSettings) toCseClusterSettingsInternal(org Org) (*cseClus
 
 	output.Owner = input.Owner
 	if input.Owner == "" {
-		sessionInfo, err := org.client.GetSessionInfo()
+		sessionInfo, err := org.client.GetSessionInfo(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("error getting the Owner: %s", err)
 		}
@@ -919,9 +920,9 @@ func (tkgVersions tkgVersionBundle) kubernetesVersionIsUpgradeableFrom(kubernete
 
 // getVcdKeConfig gets the required information from the CSE Server configuration RDE (VCDKEConfig), such as the
 // Machine Health Check settings and the Container Registry URL.
-func getVcdKeConfig(client *Client, vcdKeConfigVersion string, retrieveMachineHealtchCheckInfo bool) (vcdKeConfig, error) {
+func getVcdKeConfig(ctx context.Context, client *Client, vcdKeConfigVersion string, retrieveMachineHealtchCheckInfo bool) (vcdKeConfig, error) {
 	result := vcdKeConfig{}
-	rdes, err := getRdesByName(client, "vmware", "VCDKEConfig", vcdKeConfigVersion, "vcdKeConfig")
+	rdes, err := getRdesByName(ctx, client, "vmware", "VCDKEConfig", vcdKeConfigVersion, "vcdKeConfig")
 	if err != nil {
 		return result, err
 	}
@@ -971,7 +972,7 @@ func getVcdKeConfig(client *Client, vcdKeConfigVersion string, retrieveMachineHe
 // idToNames returns a map that associates Compute Policies/Storage Profiles IDs with their respective names.
 // This is useful as the input to create/update a cluster uses different entities IDs, but CSE cluster creation/update process uses Names.
 // For that reason, we need to transform IDs to Names by querying VCD
-func idToNames(client *Client, computePolicyIds, storageProfileIds []string) (map[string]string, error) {
+func idToNames(ctx context.Context, client *Client, computePolicyIds, storageProfileIds []string) (map[string]string, error) {
 	result := map[string]string{
 		"": "", // Default empty value to map optional values that were not set, to avoid extra checks. For example, an empty vGPU Policy.
 	}
@@ -979,7 +980,7 @@ func idToNames(client *Client, computePolicyIds, storageProfileIds []string) (ma
 	// be used to reduce the calls to VCD. The URN format used by VCD guarantees that IDs are unique, so there is no possibility of clashes here.
 	for _, id := range storageProfileIds {
 		if _, alreadyPresent := result[id]; !alreadyPresent {
-			storageProfile, err := getStorageProfileById(client, id)
+			storageProfile, err := getStorageProfileById(ctx, client, id)
 			if err != nil {
 				return nil, fmt.Errorf("could not retrieve Storage Profile with ID '%s': %s", id, err)
 			}
@@ -988,7 +989,7 @@ func idToNames(client *Client, computePolicyIds, storageProfileIds []string) (ma
 	}
 	for _, id := range computePolicyIds {
 		if _, alreadyPresent := result[id]; !alreadyPresent {
-			computePolicy, err := getVdcComputePolicyV2ById(client, id)
+			computePolicy, err := getVdcComputePolicyV2ById(ctx, client, id)
 			if err != nil {
 				return nil, fmt.Errorf("could not retrieve Compute Policy with ID '%s': %s", id, err)
 			}

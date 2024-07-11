@@ -90,7 +90,7 @@ func (vcd *TestVCD) Test_VMAttachOrDetachDisk(check *C) {
 	PrependToCleanupList(diskHREF, "disk", "", check.TestName())
 
 	// Wait for disk creation complete
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	// Verify created disk
@@ -109,7 +109,7 @@ func (vcd *TestVCD) Test_VMAttachOrDetachDisk(check *C) {
 	}, types.RelDiskAttach)
 	check.Assert(err, IsNil)
 
-	err = attachDiskTask.WaitTaskCompletion()
+	err = attachDiskTask.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	// Get attached VM
@@ -126,7 +126,7 @@ func (vcd *TestVCD) Test_VMAttachOrDetachDisk(check *C) {
 	}, types.RelDiskDetach)
 	check.Assert(err, IsNil)
 
-	err = detachDiskTask.WaitTaskCompletion()
+	err = detachDiskTask.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 }
@@ -177,7 +177,7 @@ func (vcd *TestVCD) Test_VMAttachAndDetachDisk(check *C) {
 	PrependToCleanupList(diskHREF, "disk", "", check.TestName())
 
 	// Wait for disk creation complete
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	// Verify created disk
@@ -196,7 +196,7 @@ func (vcd *TestVCD) Test_VMAttachAndDetachDisk(check *C) {
 	})
 	check.Assert(err, IsNil)
 
-	err = attachDiskTask.WaitTaskCompletion()
+	err = attachDiskTask.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	// Get attached VM
@@ -213,7 +213,7 @@ func (vcd *TestVCD) Test_VMAttachAndDetachDisk(check *C) {
 	})
 	check.Assert(err, IsNil)
 
-	err = detachDiskTask.WaitTaskCompletion()
+	err = detachDiskTask.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 }
@@ -248,7 +248,7 @@ func (vcd *TestVCD) Test_HandleInsertOrEjectMedia(check *C) {
 
 	uploadTask, err := catalog.UploadMediaImage(itemName, "upload from test", vcd.config.Media.MediaPath, 1024)
 	check.Assert(err, IsNil)
-	err = uploadTask.WaitTaskCompletion()
+	err = uploadTask.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	AddToCleanupList(itemName, "mediaCatalogImage", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.Name, "Test_HandleInsertOrEjectMedia")
@@ -264,7 +264,7 @@ func (vcd *TestVCD) Test_HandleInsertOrEjectMedia(check *C) {
 	insertMediaTask, err := vm.HandleInsertMedia(vcd.org, vcd.config.VCD.Catalog.Name, itemName)
 	check.Assert(err, IsNil)
 
-	err = insertMediaTask.WaitTaskCompletion()
+	err = insertMediaTask.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	//verify
@@ -281,7 +281,7 @@ func (vcd *TestVCD) Test_HandleInsertOrEjectMedia(check *C) {
 	insertMediaTask, err = vm.HandleInsertMedia(vcd.org, vcd.config.VCD.Catalog.Name, itemName)
 	check.Assert(err, IsNil)
 
-	err = insertMediaTask.WaitTaskCompletion()
+	err = insertMediaTask.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	//verify
@@ -303,7 +303,7 @@ func (vcd *TestVCD) Test_HandleInsertOrEjectMedia(check *C) {
 		time.Sleep(time.Second * 3)
 	}
 
-	err = ejectMediaTask.Task.WaitTaskCompletion()
+	err = ejectMediaTask.Task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	//verify
@@ -314,7 +314,7 @@ func (vcd *TestVCD) Test_HandleInsertOrEjectMedia(check *C) {
 	// Remove catalog item so far other tests don't fail
 	task, err := media.Delete()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 }
 
@@ -354,7 +354,7 @@ func (vcd *TestVCD) Test_VMChangeCPUCountWithCore(check *C) {
 
 	task, err := vm.ChangeCPUCountWithCore(int(cpuCount), &cores)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
@@ -376,7 +376,7 @@ func (vcd *TestVCD) Test_VMChangeCPUCountWithCore(check *C) {
 	// return to previous value
 	task, err = vm.ChangeCPUCountWithCore(int(currentCpus), &currentCores)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 }
@@ -394,7 +394,7 @@ func (vcd *TestVCD) Test_VMToggleHardwareVirtualization(check *C) {
 	// PowerOn
 	task, err := vm.PowerOn()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
@@ -405,14 +405,14 @@ func (vcd *TestVCD) Test_VMToggleHardwareVirtualization(check *C) {
 	// Undeploy, so the VM goes to POWERED_OFF state instead of PARTIALLY_POWERED_OFF
 	task, err = vm.Undeploy()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
 	// Perform steps on powered off VM
 	task, err = vm.ToggleHardwareVirtualization(true)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
@@ -422,7 +422,7 @@ func (vcd *TestVCD) Test_VMToggleHardwareVirtualization(check *C) {
 
 	task, err = vm.ToggleHardwareVirtualization(false)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
@@ -444,14 +444,14 @@ func (vcd *TestVCD) Test_VMPowerOnPowerOff(check *C) {
 		fmt.Printf("VM status: %s, powering off", vmStatus)
 		task, err := vm.PowerOff()
 		check.Assert(err, IsNil)
-		err = task.WaitTaskCompletion()
+		err = task.WaitTaskCompletion(context.Background())
 		check.Assert(err, IsNil)
 		check.Assert(task.Task.Status, Equals, "success")
 	}
 
 	task, err := vm.PowerOn()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 	err = vm.Refresh()
@@ -462,7 +462,7 @@ func (vcd *TestVCD) Test_VMPowerOnPowerOff(check *C) {
 
 	task, err = vm.PowerOff()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 	vmStatus, err = vm.GetStatus()
@@ -487,7 +487,7 @@ func (vcd *TestVCD) Test_VmShutdown(check *C) {
 	if vmStatus != "POWERED_ON" {
 		task, err := vm.PowerOn()
 		check.Assert(err, IsNil)
-		err = task.WaitTaskCompletion()
+		err = task.WaitTaskCompletion(context.Background())
 		check.Assert(err, IsNil)
 		check.Assert(task.Task.Status, Equals, "success")
 		err = vm.Refresh()

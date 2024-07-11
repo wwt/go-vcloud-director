@@ -6,6 +6,7 @@ package govcd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -32,7 +33,7 @@ type SolutionAddOnInstance struct {
 // CreateSolutionAddOnInstance instantiates a new Solution Add-On. Some inputs may be mandatory for
 // creation depending on the Solution Add-On itself. Methods 'ValidateInputs' can help to
 // dynamically validate inputs based on the requirements in Solution Add-On.
-func (addon *SolutionAddOn) CreateSolutionAddOnInstance(inputs map[string]interface{}) (*SolutionAddOnInstance, string, error) {
+func (addon *SolutionAddOn) CreateSolutionAddOnInstance(ctx context.Context, inputs map[string]interface{}) (*SolutionAddOnInstance, string, error) {
 	// copy inputs to prevent mutation of function argument
 	inputsCopy := make(map[string]interface{})
 	maps.Copy(inputsCopy, inputs)
@@ -50,13 +51,13 @@ func (addon *SolutionAddOn) CreateSolutionAddOnInstance(inputs map[string]interf
 	}
 
 	parentRde := addon.DefinedEntity
-	result, err := parentRde.InvokeBehavior(addOnCreateInstanceBehaviorId, behaviorInvocation)
+	result, err := parentRde.InvokeBehavior(ctx, addOnCreateInstanceBehaviorId, behaviorInvocation)
 	if err != nil {
 		return nil, "", fmt.Errorf("error invoking RDE behavior: %s", err)
 	}
 
 	// Once the task is done and no error are here, one must find that instance from scratch
-	createdAddOnInstance, err := addon.GetInstanceByName(name)
+	createdAddOnInstance, err := addon.GetInstanceByName(ctx, name)
 	if err != nil {
 		return nil, "", fmt.Errorf("error retrieving Solution Add-On instance '%s' after creation: %s", name, err)
 	}
@@ -65,7 +66,7 @@ func (addon *SolutionAddOn) CreateSolutionAddOnInstance(inputs map[string]interf
 }
 
 // GetAllInstances retrieves all Solution Add-On Instances
-func (addon *SolutionAddOn) GetAllInstances() ([]*SolutionAddOnInstance, error) {
+func (addon *SolutionAddOn) GetAllInstances(ctx context.Context) ([]*SolutionAddOnInstance, error) {
 	vcdClient := addon.vcdClient
 
 	// This filter ensures that only Add-On instances, that are based of this particular Add-On are
@@ -73,18 +74,18 @@ func (addon *SolutionAddOn) GetAllInstances() ([]*SolutionAddOnInstance, error) 
 	queryParams := copyOrNewUrlValues(nil)
 	queryParams = queryParameterFilterAnd(fmt.Sprintf("entity.prototype==%s", addon.RdeId()), queryParams)
 
-	return vcdClient.GetAllSolutionAddonInstances(queryParams)
+	return vcdClient.GetAllSolutionAddonInstances(ctx, queryParams)
 }
 
 // GetInstanceByName retrieves Solution Add-On Instance by name for a particular Solution Add-On.
 // It will return an error if there is more than one Solution Add-On Instance with such name.
-func (addon *SolutionAddOn) GetInstanceByName(name string) (*SolutionAddOnInstance, error) {
+func (addon *SolutionAddOn) GetInstanceByName(ctx context.Context, name string) (*SolutionAddOnInstance, error) {
 	vcdClient := addon.vcdClient
 
 	queryParams := copyOrNewUrlValues(nil)
 	queryParams = queryParameterFilterAnd(fmt.Sprintf("entity.prototype==%s;entity.name==%s", addon.RdeId(), name), queryParams)
 
-	addOnInstances, err := vcdClient.GetAllSolutionAddonInstances(queryParams)
+	addOnInstances, err := vcdClient.GetAllSolutionAddonInstances(ctx, queryParams)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving Solution Add-On Instance with name '%s': %s", name, err)
 	}
@@ -93,19 +94,19 @@ func (addon *SolutionAddOn) GetInstanceByName(name string) (*SolutionAddOnInstan
 }
 
 // GetAllSolutionAddonInstancesByName will retrieve all Solution Add-On Instances available
-func (vcdClient *VCDClient) GetAllSolutionAddonInstancesByName(name string) ([]*SolutionAddOnInstance, error) {
+func (vcdClient *VCDClient) GetAllSolutionAddonInstancesByName(ctx context.Context, name string) ([]*SolutionAddOnInstance, error) {
 	queryParams := copyOrNewUrlValues(nil)
 	queryParams = queryParameterFilterAnd(fmt.Sprintf("entity.name==%s", name), queryParams)
 
-	return vcdClient.GetAllSolutionAddonInstances(queryParams)
+	return vcdClient.GetAllSolutionAddonInstances(ctx, queryParams)
 }
 
 // GetSolutionAddonInstanceByName will retrieve a single Solution Add-On Instance by name or fail
-func (vcdClient *VCDClient) GetSolutionAddonInstanceByName(name string) (*SolutionAddOnInstance, error) {
+func (vcdClient *VCDClient) GetSolutionAddonInstanceByName(ctx context.Context, name string) (*SolutionAddOnInstance, error) {
 	queryParams := copyOrNewUrlValues(nil)
 	queryParams = queryParameterFilterAnd(fmt.Sprintf("entity.name==%s", name), queryParams)
 
-	addOnInstances, err := vcdClient.GetAllSolutionAddonInstances(queryParams)
+	addOnInstances, err := vcdClient.GetAllSolutionAddonInstances(ctx, queryParams)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving Solution Add-On Instance with name '%s': %s", name, err)
 	}
@@ -114,8 +115,8 @@ func (vcdClient *VCDClient) GetSolutionAddonInstanceByName(name string) (*Soluti
 }
 
 // GetAllSolutionAddonInstances will retrieve Solution Add-On Instances based on given query parameters
-func (vcdClient *VCDClient) GetAllSolutionAddonInstances(queryParameters url.Values) ([]*SolutionAddOnInstance, error) {
-	allAddonInstances, err := vcdClient.GetAllRdes(slzAddOnInstanceRdeType[0], slzAddOnInstanceRdeType[1], slzAddOnInstanceRdeType[2], queryParameters)
+func (vcdClient *VCDClient) GetAllSolutionAddonInstances(ctx context.Context, queryParameters url.Values) ([]*SolutionAddOnInstance, error) {
+	allAddonInstances, err := vcdClient.GetAllRdes(ctx, slzAddOnInstanceRdeType[0], slzAddOnInstanceRdeType[1], slzAddOnInstanceRdeType[2], queryParameters)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving all Solution Add-on Instances: %s", err)
 	}
@@ -138,8 +139,8 @@ func (vcdClient *VCDClient) GetAllSolutionAddonInstances(queryParameters url.Val
 }
 
 // GetSolutionAddOnInstanceById retrieves a Solution Add-On Instance with a given ID
-func (vcdClient *VCDClient) GetSolutionAddOnInstanceById(id string) (*SolutionAddOnInstance, error) {
-	addOnInstanceRde, err := getRdeById(&vcdClient.Client, id)
+func (vcdClient *VCDClient) GetSolutionAddOnInstanceById(ctx context.Context, id string) (*SolutionAddOnInstance, error) {
+	addOnInstanceRde, err := getRdeById(ctx, &vcdClient.Client, id)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving Solution Add-On Instance RDE: %s", err)
 	}
@@ -160,7 +161,7 @@ func (vcdClient *VCDClient) GetSolutionAddOnInstanceById(id string) (*SolutionAd
 // Delete will delete a Solution Add-On instance with given 'deleteInputs'. Some fields in
 // 'deleteInputs' might be mandatory for deletion of an instance. One can use 'ValidateInputs'
 // method to check what inputs are defined for a particular Solution Add-On
-func (addonInstance *SolutionAddOnInstance) Delete(deleteInputs map[string]interface{}) (string, error) {
+func (addonInstance *SolutionAddOnInstance) Delete(ctx context.Context, deleteInputs map[string]interface{}) (string, error) {
 	// copy deleteInputs to prevent mutation of function argument
 	deleteInputsCopy := make(map[string]interface{})
 	maps.Copy(deleteInputsCopy, deleteInputs)
@@ -172,7 +173,7 @@ func (addonInstance *SolutionAddOnInstance) Delete(deleteInputs map[string]inter
 	}
 
 	parentRde := addonInstance.DefinedEntity
-	result, err := parentRde.InvokeBehavior(addOnInstanceRemovalBehaviorId, behaviorInvocation)
+	result, err := parentRde.InvokeBehavior(ctx, addOnInstanceRemovalBehaviorId, behaviorInvocation)
 	if err != nil {
 		return "", fmt.Errorf("error invoking removal of Solution Add-On instance '%s': %s", addonInstance.SolutionAddOnInstance.Name, err)
 	}
@@ -181,12 +182,12 @@ func (addonInstance *SolutionAddOnInstance) Delete(deleteInputs map[string]inter
 }
 
 // GetParentSolutionAddOn retrieves parent Solution Add-On that is specified in the Prototype field
-func (addOnInstance *SolutionAddOnInstance) GetParentSolutionAddOn() (*SolutionAddOn, error) {
+func (addOnInstance *SolutionAddOnInstance) GetParentSolutionAddOn(ctx context.Context) (*SolutionAddOn, error) {
 	if addOnInstance == nil || addOnInstance.DefinedEntity == nil || addOnInstance.DefinedEntity.DefinedEntity == nil {
 		return nil, fmt.Errorf("cannot retrieve parent Solution Add-On from empty instance")
 	}
 
-	return addOnInstance.vcdClient.GetSolutionAddonById(addOnInstance.SolutionAddOnInstance.Prototype)
+	return addOnInstance.vcdClient.GetSolutionAddonById(ctx, addOnInstance.SolutionAddOnInstance.Prototype)
 }
 
 // RdeId is a shortcut to retrieve parent RDE ID
@@ -200,12 +201,12 @@ func (addOnInstance *SolutionAddOnInstance) RdeId() string {
 
 // ReadCreationInputValues will read all input values that were specified upon instance creation and return them
 // either in their natural types, or all values converted to strings
-func (addOnInstance *SolutionAddOnInstance) ReadCreationInputValues(convertAllValuesToStrings bool) (map[string]interface{}, error) {
+func (addOnInstance *SolutionAddOnInstance) ReadCreationInputValues(ctx context.Context, convertAllValuesToStrings bool) (map[string]interface{}, error) {
 	if addOnInstance == nil || addOnInstance.SolutionAddOnInstance == nil || addOnInstance.SolutionAddOnInstance.Properties == nil {
 		return nil, fmt.Errorf("cannot extract properties - they are nil")
 	}
 
-	parentAddOn, err := addOnInstance.GetParentSolutionAddOn()
+	parentAddOn, err := addOnInstance.GetParentSolutionAddOn(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving parent Solution Add-On: %s", err)
 	}

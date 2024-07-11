@@ -55,22 +55,22 @@ func (d DefinedEntity) wrap(inner *types.DefinedEntity) *DefinedEntity {
 
 // CreateRdeType creates a Runtime Defined Entity Type.
 // Only a System administrator can create RDE Types.
-func (vcdClient *VCDClient) CreateRdeType(rde *types.DefinedEntityType) (*DefinedEntityType, error) {
+func (vcdClient *VCDClient) CreateRdeType(ctx context.Context, rde *types.DefinedEntityType) (*DefinedEntityType, error) {
 	c := crudConfig{
 		endpoint:    types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntityTypes,
 		entityLabel: labelDefinedEntityType,
 	}
 	outerType := DefinedEntityType{client: &vcdClient.Client}
-	return createOuterEntity(&vcdClient.Client, outerType, c, rde)
+	return createOuterEntity(ctx, &vcdClient.Client, outerType, c, rde)
 }
 
 // GetAllRdeTypes retrieves all Runtime Defined Entity Types. Query parameters can be supplied to perform additional filtering.
-func (vcdClient *VCDClient) GetAllRdeTypes(queryParameters url.Values) ([]*DefinedEntityType, error) {
-	return getAllRdeTypes(&vcdClient.Client, queryParameters)
+func (vcdClient *VCDClient) GetAllRdeTypes(ctx context.Context, queryParameters url.Values) ([]*DefinedEntityType, error) {
+	return getAllRdeTypes(ctx, &vcdClient.Client, queryParameters)
 }
 
 // getAllRdeTypes retrieves all Runtime Defined Entity Types. Query parameters can be supplied to perform additional filtering.
-func getAllRdeTypes(client *Client, queryParameters url.Values) ([]*DefinedEntityType, error) {
+func getAllRdeTypes(ctx context.Context, client *Client, queryParameters url.Values) ([]*DefinedEntityType, error) {
 	c := crudConfig{
 		endpoint:        types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntityTypes,
 		entityLabel:     labelDefinedEntityType,
@@ -78,19 +78,19 @@ func getAllRdeTypes(client *Client, queryParameters url.Values) ([]*DefinedEntit
 	}
 
 	outerType := DefinedEntityType{client: client}
-	return getAllOuterEntities[DefinedEntityType, types.DefinedEntityType](client, outerType, c)
+	return getAllOuterEntities[DefinedEntityType, types.DefinedEntityType](ctx, client, outerType, c)
 }
 
 // GetRdeType gets a Runtime Defined Entity Type by its unique combination of vendor, nss and version.
-func (vcdClient *VCDClient) GetRdeType(vendor, nss, version string) (*DefinedEntityType, error) {
-	return getRdeType(&vcdClient.Client, vendor, nss, version)
+func (vcdClient *VCDClient) GetRdeType(ctx context.Context, vendor, nss, version string) (*DefinedEntityType, error) {
+	return getRdeType(ctx, &vcdClient.Client, vendor, nss, version)
 }
 
 // getRdeType gets a Runtime Defined Entity Type by its unique combination of vendor, nss and version.
-func getRdeType(client *Client, vendor, nss, version string) (*DefinedEntityType, error) {
+func getRdeType(ctx context.Context, client *Client, vendor, nss, version string) (*DefinedEntityType, error) {
 	queryParameters := url.Values{}
 	queryParameters.Add("filter", fmt.Sprintf("vendor==%s;nss==%s;version==%s", vendor, nss, version))
-	rdeTypes, err := getAllRdeTypes(client, queryParameters)
+	rdeTypes, err := getAllRdeTypes(ctx, client, queryParameters)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func getRdeType(client *Client, vendor, nss, version string) (*DefinedEntityType
 }
 
 // GetRdeTypeById gets a Runtime Defined Entity Type by its ID.
-func (vcdClient *VCDClient) GetRdeTypeById(id string) (*DefinedEntityType, error) {
+func (vcdClient *VCDClient) GetRdeTypeById(ctx context.Context, id string) (*DefinedEntityType, error) {
 	c := crudConfig{
 		entityLabel:    labelDefinedEntityType,
 		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntityTypes,
@@ -115,12 +115,12 @@ func (vcdClient *VCDClient) GetRdeTypeById(id string) (*DefinedEntityType, error
 	}
 
 	outerType := DefinedEntityType{client: &vcdClient.Client}
-	return getOuterEntity[DefinedEntityType, types.DefinedEntityType](&vcdClient.Client, outerType, c)
+	return getOuterEntity[DefinedEntityType, types.DefinedEntityType](ctx, &vcdClient.Client, outerType, c)
 }
 
 // Update updates the receiver Runtime Defined Entity Type with the values given by the input.
 // Only a System administrator can create RDE Types.
-func (rdeType *DefinedEntityType) Update(rdeTypeToUpdate types.DefinedEntityType) error {
+func (rdeType *DefinedEntityType) Update(ctx context.Context, rdeTypeToUpdate types.DefinedEntityType) error {
 	if rdeType.DefinedEntityType.ID == "" {
 		return fmt.Errorf("ID of the receiver Runtime Defined Entity Type is empty")
 	}
@@ -147,7 +147,7 @@ func (rdeType *DefinedEntityType) Update(rdeTypeToUpdate types.DefinedEntityType
 		entityLabel:    labelDefinedEntityType,
 	}
 
-	resultDefinedEntityType, err := updateInnerEntity(rdeType.client, c, &rdeTypeToUpdate)
+	resultDefinedEntityType, err := updateInnerEntity(ctx, rdeType.client, c, &rdeTypeToUpdate)
 	if err != nil {
 		return err
 	}
@@ -160,14 +160,14 @@ func (rdeType *DefinedEntityType) Update(rdeTypeToUpdate types.DefinedEntityType
 
 // Delete deletes the receiver Runtime Defined Entity Type.
 // Only a System administrator can delete RDE Types.
-func (rdeType *DefinedEntityType) Delete() error {
+func (rdeType *DefinedEntityType) Delete(ctx context.Context) error {
 	c := crudConfig{
 		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntityTypes,
 		endpointParams: []string{rdeType.DefinedEntityType.ID},
 		entityLabel:    labelDefinedEntityType,
 	}
 
-	if err := deleteEntityById(rdeType.client, c); err != nil {
+	if err := deleteEntityById(ctx, rdeType.client, c); err != nil {
 		return err
 	}
 
@@ -176,29 +176,28 @@ func (rdeType *DefinedEntityType) Delete() error {
 }
 
 // GetAllBehaviors retrieves all the Behaviors of the receiver RDE Type.
-func (rdeType *DefinedEntityType) GetAllBehaviors(queryParameters url.Values) ([]*types.Behavior, error) {
+func (rdeType *DefinedEntityType) GetAllBehaviors(ctx context.Context, queryParameters url.Values) ([]*types.Behavior, error) {
 	if rdeType.DefinedEntityType.ID == "" {
 		return nil, fmt.Errorf("ID of the receiver Defined Entity Type is empty")
 	}
-	return getAllBehaviors(rdeType.client, rdeType.DefinedEntityType.ID, types.OpenApiEndpointRdeTypeBehaviors, queryParameters)
+	return getAllBehaviors(ctx, rdeType.client, rdeType.DefinedEntityType.ID, types.OpenApiEndpointRdeTypeBehaviors, queryParameters)
 }
-
 
 // GetBehaviorById retrieves a unique Behavior that belongs to the receiver RDE Type and is determined by the
 // input ID. The ID can be a RDE Interface Behavior ID or a RDE Type overridden Behavior ID.
-func (rdeType *DefinedEntityType) GetBehaviorById(id string) (*types.Behavior, error) {
+func (rdeType *DefinedEntityType) GetBehaviorById(ctx context.Context, id string) (*types.Behavior, error) {
 	c := crudConfig{
 		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeTypeBehaviors,
 		endpointParams: []string{rdeType.DefinedEntityType.ID, id},
 		entityLabel:    labelRdeBehavior,
 	}
-	return getInnerEntity[types.Behavior](rdeType.client, c)
+	return getInnerEntity[types.Behavior](ctx, rdeType.client, c)
 }
 
 // GetBehaviorByName retrieves a unique Behavior that belongs to the receiver RDE Type and is named after
 // the input.
-func (rdeType *DefinedEntityType) GetBehaviorByName(name string) (*types.Behavior, error) {
-	behaviors, err := rdeType.GetAllBehaviors(nil)
+func (rdeType *DefinedEntityType) GetBehaviorByName(ctx context.Context, name string) (*types.Behavior, error) {
+	behaviors, err := rdeType.GetAllBehaviors(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not get the Behaviors of the Defined Entity Type with ID '%s': %s", rdeType.DefinedEntityType.ID, err)
 	}
@@ -208,7 +207,7 @@ func (rdeType *DefinedEntityType) GetBehaviorByName(name string) (*types.Behavio
 
 // UpdateBehaviorOverride overrides an Interface Behavior. Only Behavior description and execution can be overridden.
 // It returns the new Behavior, result of the override (with a new ID).
-func (rdeType *DefinedEntityType) UpdateBehaviorOverride(behavior types.Behavior) (*types.Behavior, error) {
+func (rdeType *DefinedEntityType) UpdateBehaviorOverride(ctx context.Context, behavior types.Behavior) (*types.Behavior, error) {
 	if rdeType.DefinedEntityType.ID == "" {
 		return nil, fmt.Errorf("ID of the receiver Defined Entity Type is empty")
 	}
@@ -221,12 +220,12 @@ func (rdeType *DefinedEntityType) UpdateBehaviorOverride(behavior types.Behavior
 		endpointParams: []string{rdeType.DefinedEntityType.ID, behavior.ID},
 		entityLabel:    labelRdeBehaviorOverride,
 	}
-	return updateInnerEntity(rdeType.client, c, &behavior)
+	return updateInnerEntity(ctx, rdeType.client, c, &behavior)
 }
 
 // DeleteBehaviorOverride removes a Behavior specified by its ID from the receiver Defined Entity Type.
 // The ID can be the Interface Behavior ID or the Type Behavior ID (the overridden one).
-func (rdeType *DefinedEntityType) DeleteBehaviorOverride(behaviorId string) error {
+func (rdeType *DefinedEntityType) DeleteBehaviorOverride(ctx context.Context, behaviorId string) error {
 	if rdeType.DefinedEntityType.ID == "" {
 		return fmt.Errorf("ID of the receiver Defined Entity Type is empty")
 	}
@@ -236,12 +235,12 @@ func (rdeType *DefinedEntityType) DeleteBehaviorOverride(behaviorId string) erro
 		endpointParams: []string{rdeType.DefinedEntityType.ID, behaviorId},
 		entityLabel:    labelRdeBehaviorOverride,
 	}
-	return deleteEntityById(rdeType.client, c)
+	return deleteEntityById(ctx, rdeType.client, c)
 }
 
 // SetBehaviorAccessControls sets the given slice of BehaviorAccess to the receiver Defined Entity Type.
 // If the input is nil, it removes all access controls from the receiver Defined Entity Type.
-func (det *DefinedEntityType) SetBehaviorAccessControls(acls []*types.BehaviorAccess) error {
+func (det *DefinedEntityType) SetBehaviorAccessControls(ctx context.Context, acls []*types.BehaviorAccess) error {
 	if det.DefinedEntityType.ID == "" {
 		return fmt.Errorf("ID of the receiver Defined Entity Type is empty")
 	}
@@ -265,7 +264,7 @@ func (det *DefinedEntityType) SetBehaviorAccessControls(acls []*types.BehaviorAc
 		endpointParams: []string{det.DefinedEntityType.ID},
 		entityLabel:    labelRdeBehaviorAccessControl,
 	}
-	_, err = updateInnerEntity(det.client, c, &payload)
+	_, err = updateInnerEntity(ctx, det.client, c, &payload)
 	if err != nil {
 		return err
 	}
@@ -275,29 +274,29 @@ func (det *DefinedEntityType) SetBehaviorAccessControls(acls []*types.BehaviorAc
 
 // GetAllBehaviorsAccessControls gets all the Behaviors Access Controls from the receiver DefinedEntityType.
 // Query parameters can be supplied to modify pagination.
-func (det *DefinedEntityType) GetAllBehaviorsAccessControls(queryParameters url.Values) ([]*types.BehaviorAccess, error) {
+func (det *DefinedEntityType) GetAllBehaviorsAccessControls(ctx context.Context, queryParameters url.Values) ([]*types.BehaviorAccess, error) {
 	c := crudConfig{
 		endpoint:        types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeTypeBehaviorAccessControls,
 		queryParameters: queryParameters,
 		endpointParams:  []string{det.DefinedEntityType.ID},
 		entityLabel:     labelRdeBehaviorAccessControl,
 	}
-	return getAllInnerEntities[types.BehaviorAccess](det.client, c)
+	return getAllInnerEntities[types.BehaviorAccess](ctx, det.client, c)
 }
 
 // GetAllRdes gets all the RDE instances of the given vendor, nss and version.
-func (vcdClient *VCDClient) GetAllRdes(vendor, nss, version string, queryParameters url.Values) ([]*DefinedEntity, error) {
-	return getAllRdes(&vcdClient.Client, vendor, nss, version, queryParameters)
+func (vcdClient *VCDClient) GetAllRdes(ctx context.Context, vendor, nss, version string, queryParameters url.Values) ([]*DefinedEntity, error) {
+	return getAllRdes(ctx, &vcdClient.Client, vendor, nss, version, queryParameters)
 }
 
 // GetAllRdes gets all the RDE instances of the receiver type.
-func (rdeType *DefinedEntityType) GetAllRdes(queryParameters url.Values) ([]*DefinedEntity, error) {
-	return getAllRdes(rdeType.client, rdeType.DefinedEntityType.Vendor, rdeType.DefinedEntityType.Nss, rdeType.DefinedEntityType.Version, queryParameters)
+func (rdeType *DefinedEntityType) GetAllRdes(ctx context.Context, queryParameters url.Values) ([]*DefinedEntity, error) {
+	return getAllRdes(ctx, rdeType.client, rdeType.DefinedEntityType.Vendor, rdeType.DefinedEntityType.Nss, rdeType.DefinedEntityType.Version, queryParameters)
 }
 
 // getAllRdes gets all the RDE instances of the given vendor, nss and version.
 // Supports filtering with the given queryParameters.
-func getAllRdes(client *Client, vendor, nss, version string, queryParameters url.Values) ([]*DefinedEntity, error) {
+func getAllRdes(ctx context.Context, client *Client, vendor, nss, version string, queryParameters url.Values) ([]*DefinedEntity, error) {
 	c := crudConfig{
 		endpoint:        types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntitiesTypes,
 		entityLabel:     labelDefinedEntityType,
@@ -306,7 +305,7 @@ func getAllRdes(client *Client, vendor, nss, version string, queryParameters url
 	}
 
 	outerType := DefinedEntity{client: client}
-	return getAllOuterEntities[DefinedEntity, types.DefinedEntity](client, outerType, c)
+	return getAllOuterEntities[DefinedEntity, types.DefinedEntity](ctx, client, outerType, c)
 }
 
 // GetRdesByName gets RDE instances with the given name that belongs to the receiver type.
@@ -326,7 +325,7 @@ func (vcdClient *VCDClient) GetRdesByName(ctx context.Context, vendor, nss, vers
 func getRdesByName(ctx context.Context, client *Client, vendor, nss, version, name string) ([]*DefinedEntity, error) {
 	queryParameters := url.Values{}
 	queryParameters.Add("filter", fmt.Sprintf("name==%s", name))
-	rdeTypes, err := getAllRdes(client, vendor, nss, version, queryParameters)
+	rdeTypes, err := getAllRdes(ctx, client, vendor, nss, version, queryParameters)
 	if err != nil {
 		return nil, err
 	}
@@ -341,18 +340,18 @@ func getRdesByName(ctx context.Context, client *Client, vendor, nss, version, na
 // GetRdeById gets a Runtime Defined Entity by its ID.
 // Getting a RDE by ID populates the ETag field in the returned object.
 func (rdeType *DefinedEntityType) GetRdeById(ctx context.Context, id string) (*DefinedEntity, error) {
-	return getRdeById(rdeType.client, id)
+	return getRdeById(ctx, rdeType.client, id)
 }
 
 // GetRdeById gets a Runtime Defined Entity by its ID.
 // Getting a RDE by ID populates the ETag field in the returned object.
 func (vcdClient *VCDClient) GetRdeById(ctx context.Context, id string) (*DefinedEntity, error) {
-	return getRdeById(&vcdClient.Client, id)
+	return getRdeById(ctx, &vcdClient.Client, id)
 }
 
 // getRdeById gets a Runtime Defined Entity by its ID.
 // Getting a RDE by ID populates the ETag field in the returned object.
-func getRdeById(client *Client, id string) (*DefinedEntity, error) {
+func getRdeById(ctx context.Context, client *Client, id string) (*DefinedEntity, error) {
 	c := crudConfig{
 		entityLabel:    labelDefinedEntityType,
 		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntities,
@@ -360,7 +359,7 @@ func getRdeById(client *Client, id string) (*DefinedEntity, error) {
 	}
 
 	outerType := DefinedEntity{client: client}
-	result, headers, err := getOuterEntityWithHeaders(client, outerType, c)
+	result, headers, err := getOuterEntityWithHeaders(ctx, client, outerType, c)
 	if err != nil {
 		return nil, err
 	}
@@ -379,7 +378,7 @@ func (rdeType *DefinedEntityType) CreateRde(ctx context.Context, entity types.De
 	if err != nil {
 		return nil, err
 	}
-	return getRdeFromTask(rdeType.client, task)
+	return getRdeFromTask(ctx, rdeType.client, task)
 }
 
 // CreateRde creates an entity of the type of the given vendor, nss and version.
@@ -398,7 +397,7 @@ func createRdeAndGetFromTask(ctx context.Context, client *Client, vendor, nss, v
 	if err != nil {
 		return nil, err
 	}
-	return getRdeFromTask(client, task)
+	return getRdeFromTask(ctx, client, task)
 }
 
 // CreateRde creates an entity of the type of the receiver Runtime Defined Entity (RDE) type.
@@ -440,7 +439,7 @@ func createRde(ctx context.Context, client *Client, entity types.DefinedEntity, 
 
 // getRdeFromTask gets the Runtime Defined Entity from a given Task. This method is useful after RDE creation, as
 // the API just returns a Task with the RDE details inside.
-func getRdeFromTask(client *Client, task *Task) (*DefinedEntity, error) {
+func getRdeFromTask(ctx context.Context, client *Client, task *Task) (*DefinedEntity, error) {
 	if task.Task == nil {
 		return nil, fmt.Errorf("could not retrieve the RDE from task, as it is nil")
 	}
@@ -457,7 +456,7 @@ func getRdeFromTask(client *Client, task *Task) (*DefinedEntity, error) {
 		rdeId = task.Task.Owner.ID
 	}
 
-	return getRdeById(client, rdeId)
+	return getRdeById(ctx, client, rdeId)
 }
 
 // State is a function to check if any of the elements in the path to 'rde.DefinedEntity.State' are
@@ -497,10 +496,10 @@ func (rde *DefinedEntity) Resolve(ctx context.Context) error {
 }
 
 // Refresh reloads RDE
-func (rde *DefinedEntity) Refresh() error {
+func (rde *DefinedEntity) Refresh(ctx context.Context) error {
 	client := rde.client
 
-	refreshedRde, err := getRdeById(client, rde.DefinedEntity.ID)
+	refreshedRde, err := getRdeById(ctx, client, rde.DefinedEntity.ID)
 	if err != nil {
 		return fmt.Errorf("error refreshing RDE: %s", err)
 	}
@@ -512,7 +511,7 @@ func (rde *DefinedEntity) Refresh() error {
 // Update updates the receiver Runtime Defined Entity with the values given by the input. This method is useful
 // if rde.Resolve() failed and a JSON entity change is needed.
 // Updating a RDE populates the ETag field in the receiver object.
-func (rde *DefinedEntity) Update(rdeToUpdate types.DefinedEntity) error {
+func (rde *DefinedEntity) Update(ctx context.Context, rdeToUpdate types.DefinedEntity) error {
 	if rde.DefinedEntity.ID == "" {
 		return fmt.Errorf("ID of the receiver Runtime Defined Entity is empty")
 	}
@@ -525,7 +524,7 @@ func (rde *DefinedEntity) Update(rdeToUpdate types.DefinedEntity) error {
 
 	if rde.Etag == "" {
 		// We need to get an Etag to perform the update
-		retrievedRde, err := getRdeById(rde.client, rde.DefinedEntity.ID)
+		retrievedRde, err := getRdeById(ctx, rde.client, rde.DefinedEntity.ID)
 		if err != nil {
 			return err
 		}
@@ -542,7 +541,7 @@ func (rde *DefinedEntity) Update(rdeToUpdate types.DefinedEntity) error {
 		additionalHeader: map[string]string{"If-Match": rde.Etag},
 	}
 
-	resultDefinedEntity, headers, err := updateInnerEntityWithHeaders(rde.client, c, &rdeToUpdate)
+	resultDefinedEntity, headers, err := updateInnerEntityWithHeaders(ctx, rde.client, c, &rdeToUpdate)
 	if err != nil {
 		return err
 	}
@@ -555,21 +554,20 @@ func (rde *DefinedEntity) Update(rdeToUpdate types.DefinedEntity) error {
 }
 
 // Delete deletes the receiver Runtime Defined Entity.
-func (rde *DefinedEntity) Delete() error {
+func (rde *DefinedEntity) Delete(ctx context.Context) error {
 	c := crudConfig{
 		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntities,
 		endpointParams: []string{rde.DefinedEntity.ID},
 		entityLabel:    labelDefinedEntity,
 	}
 
-	if err := deleteEntityById(rde.client, c); err != nil {
+	if err := deleteEntityById(ctx, rde.client, c); err != nil {
 		return amendRdeApiError(rde.client, err)
 	}
 
 	rde.DefinedEntity = &types.DefinedEntity{}
 	rde.Etag = ""
 	return nil
-}
 }
 
 // InvokeBehavior calls a Behavior identified by the given ID with the given execution parameters.
@@ -606,8 +604,8 @@ func (rde *DefinedEntity) InvokeBehavior(ctx context.Context, behaviorId string,
 
 // InvokeBehaviorAndMarshal calls a Behavior identified by the given ID with the given execution parameters.
 // Returns the invocation result marshaled with the input object.
-func (rde *DefinedEntity) InvokeBehaviorAndMarshal(behaviorId string, invocation types.BehaviorInvocation, output interface{}) error {
-	result, err := rde.InvokeBehavior(behaviorId, invocation)
+func (rde *DefinedEntity) InvokeBehaviorAndMarshal(ctx context.Context, behaviorId string, invocation types.BehaviorInvocation, output interface{}) error {
+	result, err := rde.InvokeBehavior(ctx, behaviorId, invocation)
 	if err != nil {
 		return err
 	}
@@ -621,43 +619,43 @@ func (rde *DefinedEntity) InvokeBehaviorAndMarshal(behaviorId string, invocation
 }
 
 // SetAccessControl sets Defined Entity Access Control
-func (de *DefinedEntity) SetAccessControl(acl *types.DefinedEntityAccess) (*types.DefinedEntityAccess, error) {
+func (de *DefinedEntity) SetAccessControl(ctx context.Context, acl *types.DefinedEntityAccess) (*types.DefinedEntityAccess, error) {
 	c := crudConfig{
 		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntityAccessControls,
 		endpointParams: []string{de.DefinedEntity.ID},
 		entityLabel:    labelDefinedEntityAccessControl,
 	}
-	return createInnerEntity(de.client, c, acl)
+	return createInnerEntity(ctx, de.client, c, acl)
 }
 
 // GetAllAccessControls gets all Defined Entity Access Controls from the receiver DefinedEntity.
 // Query parameters can be supplied to modify search criteria.
-func (de *DefinedEntity) GetAllAccessControls(queryParameters url.Values) ([]*types.DefinedEntityAccess, error) {
+func (de *DefinedEntity) GetAllAccessControls(ctx context.Context, queryParameters url.Values) ([]*types.DefinedEntityAccess, error) {
 	c := crudConfig{
 		endpoint:        types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntityAccessControls,
 		queryParameters: queryParameters,
 		endpointParams:  []string{de.DefinedEntity.ID},
 		entityLabel:     labelDefinedEntityAccessControl,
 	}
-	return getAllInnerEntities[types.DefinedEntityAccess](de.client, c)
+	return getAllInnerEntities[types.DefinedEntityAccess](ctx, de.client, c)
 }
 
 // GetAccessControlById gets all Defined Entity Access Controls from the receiver DefinedEntity.
-func (de *DefinedEntity) GetAccessControlById(id string) (*types.DefinedEntityAccess, error) {
+func (de *DefinedEntity) GetAccessControlById(ctx context.Context, id string) (*types.DefinedEntityAccess, error) {
 	c := crudConfig{
 		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntityAccessControls,
 		endpointParams: []string{de.DefinedEntity.ID, id},
 		entityLabel:    labelDefinedEntityAccessControl,
 	}
-	return getInnerEntity[types.DefinedEntityAccess](de.client, c)
+	return getInnerEntity[types.DefinedEntityAccess](ctx, de.client, c)
 }
 
 // DeleteAccessControl removes a given Access Control
-func (de *DefinedEntity) DeleteAccessControl(acl *types.DefinedEntityAccess) error {
+func (de *DefinedEntity) DeleteAccessControl(ctx context.Context, acl *types.DefinedEntityAccess) error {
 	c := crudConfig{
 		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRdeEntityAccessControls,
 		endpointParams: []string{de.DefinedEntity.ID, acl.Id},
 		entityLabel:    labelDefinedEntityAccessControl,
 	}
-	return deleteEntityById(de.client, c)
+	return deleteEntityById(ctx, de.client, c)
 }

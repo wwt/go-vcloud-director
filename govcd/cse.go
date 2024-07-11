@@ -1,6 +1,7 @@
 package govcd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	semver "github.com/hashicorp/go-version"
@@ -19,13 +20,13 @@ import (
 //
 // If the cluster is created correctly, returns all the available data in CseKubernetesCluster or an error if some of the fields
 // of the created cluster cannot be calculated or retrieved.
-func (org *Org) CseCreateKubernetesCluster(clusterData CseClusterSettings, timeout time.Duration) (*CseKubernetesCluster, error) {
-	clusterId, err := org.CseCreateKubernetesClusterAsync(clusterData)
+func (org *Org) CseCreateKubernetesCluster(ctx context.Context, clusterData CseClusterSettings, timeout time.Duration) (*CseKubernetesCluster, error) {
+	clusterId, err := org.CseCreateKubernetesClusterAsync(ctx, clusterData)
 	if err != nil {
 		return nil, err
 	}
 
-	err = waitUntilClusterIsProvisioned(org.client, clusterId, timeout)
+	err = waitUntilClusterIsProvisioned(ctx, org.client, clusterId, timeout)
 	if err != nil {
 		return &CseKubernetesCluster{
 			client: org.client,
@@ -33,13 +34,13 @@ func (org *Org) CseCreateKubernetesCluster(clusterData CseClusterSettings, timeo
 		}, err
 	}
 
-	return getCseKubernetesClusterById(org.client, clusterId)
+	return getCseKubernetesClusterById(ctx, org.client, clusterId)
 }
 
 // CseCreateKubernetesClusterAsync creates a Kubernetes cluster with the data given as input (CseClusterSettings), but does not
 // wait for the creation process to finish, so it doesn't monitor for any errors during the process. It returns just the ID of
 // the created cluster. One can manually check the status of the cluster with VCDClient.CseGetKubernetesClusterById and the result of this method.
-func (org *Org) CseCreateKubernetesClusterAsync(clusterSettings CseClusterSettings) (string, error) {
+func (org *Org) CseCreateKubernetesClusterAsync(ctx context.Context, clusterSettings CseClusterSettings) (string, error) {
 	if org == nil {
 		return "", fmt.Errorf("CseCreateKubernetesClusterAsync cannot be called on a nil Organization receiver")
 	}
@@ -54,7 +55,7 @@ func (org *Org) CseCreateKubernetesClusterAsync(clusterSettings CseClusterSettin
 		return "", err
 	}
 
-	internalSettings, err := clusterSettings.toCseClusterSettingsInternal(*org)
+	internalSettings, err := clusterSettings.toCseClusterSettingsInternal(ctx, *org)
 	if err != nil {
 		return "", fmt.Errorf("error creating the CSE Kubernetes cluster: %s", err)
 	}
@@ -64,7 +65,7 @@ func (org *Org) CseCreateKubernetesClusterAsync(clusterSettings CseClusterSettin
 		return "", err
 	}
 
-	rde, err := createRdeAndGetFromTask(org.client, cseKubernetesClusterVendor, cseKubernetesClusterNamespace, cseSubcomponents.CapvcdRdeTypeVersion,
+	rde, err := createRdeAndGetFromTask(ctx, org.client, cseKubernetesClusterVendor, cseKubernetesClusterNamespace, cseSubcomponents.CapvcdRdeTypeVersion,
 		types.DefinedEntity{
 			EntityType: internalSettings.RdeType.ID,
 			Name:       internalSettings.Name,
@@ -78,26 +79,26 @@ func (org *Org) CseCreateKubernetesClusterAsync(clusterSettings CseClusterSettin
 }
 
 // CseGetKubernetesClusterById retrieves a CSE Kubernetes cluster from VCD by its unique ID
-func (vcdClient *VCDClient) CseGetKubernetesClusterById(id string) (*CseKubernetesCluster, error) {
-	return getCseKubernetesClusterById(&vcdClient.Client, id)
+func (vcdClient *VCDClient) CseGetKubernetesClusterById(ctx context.Context, id string) (*CseKubernetesCluster, error) {
+	return getCseKubernetesClusterById(ctx, &vcdClient.Client, id)
 }
 
 // CseGetKubernetesClustersByName retrieves all the CSE Kubernetes clusters from VCD with the given name that belong to the receiver Organization.
 // Note: The clusters retrieved won't have a valid ETag to perform operations on them. Use VCDClient.CseGetKubernetesClusterById for that instead.
-func (org *Org) CseGetKubernetesClustersByName(cseVersion semver.Version, name string) ([]*CseKubernetesCluster, error) {
+func (org *Org) CseGetKubernetesClustersByName(ctx context.Context, cseVersion semver.Version, name string) ([]*CseKubernetesCluster, error) {
 	cseSubcomponents, err := getCseComponentsVersions(cseVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	rdes, err := getRdesByName(org.client, cseKubernetesClusterVendor, cseKubernetesClusterNamespace, cseSubcomponents.CapvcdRdeTypeVersion, name)
+	rdes, err := getRdesByName(ctx, org.client, cseKubernetesClusterVendor, cseKubernetesClusterNamespace, cseSubcomponents.CapvcdRdeTypeVersion, name)
 	if err != nil {
 		return nil, err
 	}
 	var clusters []*CseKubernetesCluster
 	for _, rde := range rdes {
 		if rde.DefinedEntity.Org != nil && rde.DefinedEntity.Org.ID == org.Org.ID {
-			cluster, err := cseConvertToCseKubernetesClusterType(rde)
+			cluster, err := cseConvertToCseKubernetesClusterType(ctx, rde)
 			if err != nil {
 				return nil, err
 			}
@@ -108,18 +109,18 @@ func (org *Org) CseGetKubernetesClustersByName(cseVersion semver.Version, name s
 }
 
 // getCseKubernetesClusterById retrieves a CSE Kubernetes cluster from VCD by its unique ID
-func getCseKubernetesClusterById(client *Client, clusterId string) (*CseKubernetesCluster, error) {
-	rde, err := getRdeById(client, clusterId)
+func getCseKubernetesClusterById(ctx context.Context, client *Client, clusterId string) (*CseKubernetesCluster, error) {
+	rde, err := getRdeById(ctx, client, clusterId)
 	if err != nil {
 		return nil, err
 	}
-	return cseConvertToCseKubernetesClusterType(rde)
+	return cseConvertToCseKubernetesClusterType(ctx, rde)
 }
 
 // Refresh gets the latest information about the receiver CSE Kubernetes cluster and updates its properties.
 // All cached fields such as the supported OVAs list (from CseKubernetesCluster.GetSupportedUpgrades) are also cleared.
-func (cluster *CseKubernetesCluster) Refresh() error {
-	refreshed, err := getCseKubernetesClusterById(cluster.client, cluster.ID)
+func (cluster *CseKubernetesCluster) Refresh(ctx context.Context) error {
+	refreshed, err := getCseKubernetesClusterById(ctx, cluster.client, cluster.ID)
 	if err != nil {
 		return fmt.Errorf("failed refreshing the CSE Kubernetes Cluster: %s", err)
 	}
@@ -129,9 +130,9 @@ func (cluster *CseKubernetesCluster) Refresh() error {
 
 // GetKubeconfig retrieves the Kubeconfig from an existing CSE Kubernetes cluster that is in provisioned state.
 // If refresh=true, it retrieves the latest state of the cluster from VCD before requesting the Kubeconfig.
-func (cluster *CseKubernetesCluster) GetKubeconfig(refresh bool) (string, error) {
+func (cluster *CseKubernetesCluster) GetKubeconfig(ctx context.Context, refresh bool) (string, error) {
 	if refresh {
-		err := cluster.Refresh()
+		err := cluster.Refresh(ctx)
 		if err != nil {
 			return "", err
 		}
@@ -145,7 +146,7 @@ func (cluster *CseKubernetesCluster) GetKubeconfig(refresh bool) (string, error)
 		return "", fmt.Errorf("cannot get a Kubeconfig of a Kubernetes cluster that is not in 'provisioned' state. It is '%s'", cluster.State)
 	}
 
-	rde, err := getRdeById(cluster.client, cluster.ID)
+	rde, err := getRdeById(ctx, cluster.client, cluster.ID)
 	if err != nil {
 		return "", err
 	}
@@ -161,7 +162,7 @@ func (cluster *CseKubernetesCluster) GetKubeconfig(refresh bool) (string, error)
 	}
 	result := invocationResult{}
 
-	err = rde.InvokeBehaviorAndMarshal(fmt.Sprintf("urn:vcloud:behavior-interface:getFullEntity:cse:capvcd:%s", versions.CseInterfaceVersion), types.BehaviorInvocation{}, &result)
+	err = rde.InvokeBehaviorAndMarshal(ctx, fmt.Sprintf("urn:vcloud:behavior-interface:getFullEntity:cse:capvcd:%s", versions.CseInterfaceVersion), types.BehaviorInvocation{}, &result)
 	if err != nil {
 		return "", fmt.Errorf("could not retrieve the Kubeconfig, the Behavior invocation failed: %s", err)
 	}
@@ -178,24 +179,24 @@ func (cluster *CseKubernetesCluster) GetKubeconfig(refresh bool) (string, error)
 // The input is a map where the key is the Worker pool unique name, and the value is the update payload for that Worker Pool.
 // If refresh=true, it retrieves the latest state of the cluster from VCD before updating.
 // WARNING: At least one worker pool must have one or more nodes running, otherwise the cluster will be left in an unusable state.
-func (cluster *CseKubernetesCluster) UpdateWorkerPools(input map[string]CseWorkerPoolUpdateInput, refresh bool) error {
-	return cluster.Update(CseClusterUpdateInput{
+func (cluster *CseKubernetesCluster) UpdateWorkerPools(ctx context.Context, input map[string]CseWorkerPoolUpdateInput, refresh bool) error {
+	return cluster.Update(ctx, CseClusterUpdateInput{
 		WorkerPools: &input,
 	}, refresh)
 }
 
 // AddWorkerPools executes an update on the receiver cluster to add new Worker Pools.
 // If refresh=true, it retrieves the latest state of the cluster from VCD before updating.
-func (cluster *CseKubernetesCluster) AddWorkerPools(input []CseWorkerPoolSettings, refresh bool) error {
-	return cluster.Update(CseClusterUpdateInput{
+func (cluster *CseKubernetesCluster) AddWorkerPools(ctx context.Context, input []CseWorkerPoolSettings, refresh bool) error {
+	return cluster.Update(ctx, CseClusterUpdateInput{
 		NewWorkerPools: &input,
 	}, refresh)
 }
 
 // UpdateControlPlane executes an update on the receiver cluster to change the existing control plane.
 // If refresh=true, it retrieves the latest state of the cluster from VCD before updating.
-func (cluster *CseKubernetesCluster) UpdateControlPlane(input CseControlPlaneUpdateInput, refresh bool) error {
-	return cluster.Update(CseClusterUpdateInput{
+func (cluster *CseKubernetesCluster) UpdateControlPlane(ctx context.Context, input CseControlPlaneUpdateInput, refresh bool) error {
+	return cluster.Update(ctx, CseClusterUpdateInput{
 		ControlPlane: &input,
 	}, refresh)
 }
@@ -206,7 +207,7 @@ func (cluster *CseKubernetesCluster) UpdateControlPlane(input CseControlPlaneUpd
 // If refreshOvas=true, this cache is cleared out and this method will query VCD for every vApp Template again.
 // Therefore, the refreshOvas flag should be set to true only when VCD has new OVAs that need to be considered or after a cluster upgrade.
 // NOTE: Any refresh operation from other methods will cause the cache to be cleared.
-func (cluster *CseKubernetesCluster) GetSupportedUpgrades(refreshOvas bool) ([]*types.VAppTemplate, error) {
+func (cluster *CseKubernetesCluster) GetSupportedUpgrades(ctx context.Context, refreshOvas bool) ([]*types.VAppTemplate, error) {
 	if refreshOvas {
 		cluster.supportedUpgrades = make([]*types.VAppTemplate, 0)
 	}
@@ -218,14 +219,14 @@ func (cluster *CseKubernetesCluster) GetSupportedUpgrades(refreshOvas bool) ([]*
 		return cluster.supportedUpgrades, nil
 	}
 
-	vAppTemplates, err := queryVappTemplateListWithFilter(cluster.client, nil)
+	vAppTemplates, err := queryVappTemplateListWithFilter(ctx, cluster.client, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not get vApp Templates: %s", err)
 	}
 	for _, template := range vAppTemplates {
 		// We can only know if the vApp Template is a TKGm OVA by inspecting its internals, hence we need to retrieve every one
 		// of them one by one. This is an expensive operation, hence the cache.
-		vAppTemplate, err := getVAppTemplateById(cluster.client, fmt.Sprintf("urn:vcloud:vapptemplate:%s", extractUuid(template.HREF)))
+		vAppTemplate, err := getVAppTemplateById(ctx, cluster.client, fmt.Sprintf("urn:vcloud:vapptemplate:%s", extractUuid(template.HREF)))
 		if err != nil {
 			continue // This means we cannot retrieve it (maybe due to some rights missing), so we cannot use it. We skip it
 		}
@@ -244,16 +245,16 @@ func (cluster *CseKubernetesCluster) GetSupportedUpgrades(refreshOvas bool) ([]*
 // UpgradeCluster executes an update on the receiver cluster to upgrade the Kubernetes template of the cluster.
 // If the cluster is not upgradeable or the OVA is incorrect, this method will return an error.
 // If refresh=true, it retrieves the latest state of the cluster from VCD before updating.
-func (cluster *CseKubernetesCluster) UpgradeCluster(kubernetesTemplateOvaId string, refresh bool) error {
-	return cluster.Update(CseClusterUpdateInput{
+func (cluster *CseKubernetesCluster) UpgradeCluster(ctx context.Context, kubernetesTemplateOvaId string, refresh bool) error {
+	return cluster.Update(ctx, CseClusterUpdateInput{
 		KubernetesTemplateOvaId: &kubernetesTemplateOvaId,
 	}, refresh)
 }
 
 // SetNodeHealthCheck executes an update on the receiver cluster to enable or disable the machine health check capabilities.
 // If refresh=true, it retrieves the latest state of the cluster from VCD before updating.
-func (cluster *CseKubernetesCluster) SetNodeHealthCheck(healthCheckEnabled bool, refresh bool) error {
-	return cluster.Update(CseClusterUpdateInput{
+func (cluster *CseKubernetesCluster) SetNodeHealthCheck(ctx context.Context, healthCheckEnabled bool, refresh bool) error {
+	return cluster.Update(ctx, CseClusterUpdateInput{
 		NodeHealthCheck: &healthCheckEnabled,
 	}, refresh)
 }
@@ -261,17 +262,17 @@ func (cluster *CseKubernetesCluster) SetNodeHealthCheck(healthCheckEnabled bool,
 // SetAutoRepairOnErrors executes an update on the receiver cluster to change the flag that controls the auto-repair
 // capabilities of CSE. If refresh=true, it retrieves the latest state of the cluster from VCD before updating.
 // NOTE: This method can only be used in CSE versions < 4.1.1
-func (cluster *CseKubernetesCluster) SetAutoRepairOnErrors(autoRepairOnErrors bool, refresh bool) error {
-	return cluster.Update(CseClusterUpdateInput{
+func (cluster *CseKubernetesCluster) SetAutoRepairOnErrors(ctx context.Context, autoRepairOnErrors bool, refresh bool) error {
+	return cluster.Update(ctx, CseClusterUpdateInput{
 		AutoRepairOnErrors: &autoRepairOnErrors,
 	}, refresh)
 }
 
 // Update executes an update on the receiver CSE Kubernetes Cluster on any of the allowed parameters defined in the input type.
 // If refresh=true, it retrieves the latest state of the cluster from VCD before updating.
-func (cluster *CseKubernetesCluster) Update(input CseClusterUpdateInput, refresh bool) error {
+func (cluster *CseKubernetesCluster) Update(ctx context.Context, input CseClusterUpdateInput, refresh bool) error {
 	if refresh {
-		err := cluster.Refresh()
+		err := cluster.Refresh(ctx)
 		if err != nil {
 			return err
 		}
@@ -298,7 +299,7 @@ func (cluster *CseKubernetesCluster) Update(input CseClusterUpdateInput, refresh
 		cluster.capvcdType.Spec.VcdKe.AutoRepairOnErrors = *input.AutoRepairOnErrors
 	}
 
-	updatedCapiYaml, err := cluster.updateCapiYaml(input)
+	updatedCapiYaml, err := cluster.updateCapiYaml(ctx, input)
 	if err != nil {
 		return err
 	}
@@ -321,13 +322,13 @@ func (cluster *CseKubernetesCluster) Update(input CseClusterUpdateInput, refresh
 	maxRetries := 5
 	updated := false
 	for retries <= maxRetries {
-		rde, err := getRdeById(cluster.client, cluster.ID)
+		rde, err := getRdeById(ctx, cluster.client, cluster.ID)
 		if err != nil {
 			return err
 		}
 
 		rde.DefinedEntity.Entity = entityContent
-		err = rde.Update(*rde.DefinedEntity)
+		err = rde.Update(ctx, *rde.DefinedEntity)
 		if err == nil {
 			updated = true
 			break
@@ -346,18 +347,18 @@ func (cluster *CseKubernetesCluster) Update(input CseClusterUpdateInput, refresh
 		return fmt.Errorf("could not update the Kubernetes cluster '%s' after %d retries, due to an ETag lock blocking the operations", cluster.ID, maxRetries)
 	}
 
-	return cluster.Refresh()
+	return cluster.Refresh(ctx)
 }
 
 // Delete deletes a CSE Kubernetes cluster, waiting the specified amount of time. If the timeout is reached, this method
 // returns an error, even if the cluster is already marked for deletion.
-func (cluster *CseKubernetesCluster) Delete(timeout time.Duration) error {
+func (cluster *CseKubernetesCluster) Delete(ctx context.Context, timeout time.Duration) error {
 	var elapsed time.Duration
 	start := time.Now()
 	markForDelete := false
 	forceDelete := false
 	for elapsed <= timeout || timeout == 0 { // If the user specifies timeout=0, we wait forever
-		rde, err := getRdeById(cluster.client, cluster.ID)
+		rde, err := getRdeById(ctx, cluster.client, cluster.ID)
 		if err != nil {
 			if ContainsNotFound(err) {
 				return nil // The RDE is gone, so the process is completed and there's nothing more to do
@@ -372,7 +373,7 @@ func (cluster *CseKubernetesCluster) Delete(timeout time.Duration) error {
 			// Mark the cluster for deletion
 			rde.DefinedEntity.Entity["spec"].(map[string]interface{})["vcdKe"].(map[string]interface{})["markForDelete"] = true
 			rde.DefinedEntity.Entity["spec"].(map[string]interface{})["vcdKe"].(map[string]interface{})["forceDelete"] = true
-			err = rde.Update(*rde.DefinedEntity)
+			err = rde.Update(ctx, *rde.DefinedEntity)
 			if err != nil {
 				// We ignore any ETag error. This just means a clash with the CSE Server, we just try again
 				if !strings.Contains(strings.ToLower(err.Error()), "etag") {

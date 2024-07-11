@@ -4,6 +4,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
@@ -18,11 +19,11 @@ type ServiceAccount struct {
 }
 
 // GetServiceAccountById gets a Service Account by its ID
-func (org *Org) GetServiceAccountById(serviceAccountId string) (*ServiceAccount, error) {
+func (org *Org) GetServiceAccountById(ctx context.Context, serviceAccountId string) (*ServiceAccount, error) {
 	client := org.client
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointServiceAccounts
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +38,7 @@ func (org *Org) GetServiceAccountById(serviceAccountId string) (*ServiceAccount,
 		org:            org,
 	}
 
-	err = client.OpenApiGetItem(apiVersion, urlRef, nil, newServiceAccount.ServiceAccount, nil)
+	err = client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, newServiceAccount.ServiceAccount, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -46,11 +47,11 @@ func (org *Org) GetServiceAccountById(serviceAccountId string) (*ServiceAccount,
 }
 
 // GetAllServiceAccounts gets all service accounts with the specified query parameters
-func (org *Org) GetAllServiceAccounts(queryParams url.Values) ([]*ServiceAccount, error) {
+func (org *Org) GetAllServiceAccounts(ctx context.Context, queryParams url.Values) ([]*ServiceAccount, error) {
 	client := org.client
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointServiceAccounts
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +69,7 @@ func (org *Org) GetAllServiceAccounts(queryParams url.Values) ([]*ServiceAccount
 	// VCD has a pageSize limit on this specific endpoint
 	queryParams.Add("pageSize", "32")
 	typeResponses := []*types.ServiceAccount{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParams, &typeResponses, getTenantContextHeader(tenantContext))
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParams, &typeResponses, getTenantContextHeader(tenantContext))
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get service accounts: %s", err)
@@ -86,11 +87,11 @@ func (org *Org) GetAllServiceAccounts(queryParams url.Values) ([]*ServiceAccount
 }
 
 // GetServiceAccountByName gets a service account by its name
-func (org *Org) GetServiceAccountByName(name string) (*ServiceAccount, error) {
+func (org *Org) GetServiceAccountByName(ctx context.Context, name string) (*ServiceAccount, error) {
 	queryParams := url.Values{}
 	queryParams.Add("filter", fmt.Sprintf("name==%s", name))
 
-	serviceAccounts, err := org.GetAllServiceAccounts(queryParams)
+	serviceAccounts, err := org.GetAllServiceAccounts(ctx, queryParams)
 	if err != nil {
 		return nil, fmt.Errorf("error getting service account by name: %s", err)
 	}
@@ -104,7 +105,7 @@ func (org *Org) GetServiceAccountByName(name string) (*ServiceAccount, error) {
 }
 
 // CreateServiceAccount creates a Service Account and sets it in `Created` status
-func (vcdClient *VCDClient) CreateServiceAccount(orgName, name, scope, softwareId, softwareVersion, clientUri string) (*ServiceAccount, error) {
+func (vcdClient *VCDClient) CreateServiceAccount(ctx context.Context, orgName, name, scope, softwareId, softwareVersion, clientUri string) (*ServiceAccount, error) {
 	saParams := &types.ApiTokenParams{
 		ClientName:      name,
 		Scope:           scope,
@@ -113,18 +114,18 @@ func (vcdClient *VCDClient) CreateServiceAccount(orgName, name, scope, softwareI
 		ClientURI:       clientUri,
 	}
 
-	newSaParams, err := vcdClient.RegisterToken(orgName, saParams)
+	newSaParams, err := vcdClient.RegisterToken(ctx, orgName, saParams)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register Service account: %s", err)
 	}
 
-	org, err := vcdClient.GetOrgByName(orgName)
+	org, err := vcdClient.GetOrgByName(ctx, orgName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Org by name: %s", err)
 	}
 
 	serviceAccountID := "urn:vcloud:serviceAccount:" + newSaParams.ClientID
-	serviceAccount, err := org.GetServiceAccountById(serviceAccountID)
+	serviceAccount, err := org.GetServiceAccountById(ctx, serviceAccountID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Service account by ID: %s", err)
 	}
@@ -133,10 +134,10 @@ func (vcdClient *VCDClient) CreateServiceAccount(orgName, name, scope, softwareI
 }
 
 // Update updates the modifiable fields of a Service Account
-func (sa *ServiceAccount) Update(saConfig *types.ServiceAccount) (*ServiceAccount, error) {
+func (sa *ServiceAccount) Update(ctx context.Context, saConfig *types.ServiceAccount) (*ServiceAccount, error) {
 	client := sa.org.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointServiceAccounts
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +155,7 @@ func (sa *ServiceAccount) Update(saConfig *types.ServiceAccount) (*ServiceAccoun
 		org:            sa.org,
 	}
 
-	err = client.OpenApiPutItem(apiVersion, urlRef, nil, saConfig, returnServiceAccount.ServiceAccount, nil)
+	err = client.OpenApiPutItem(ctx, apiVersion, urlRef, nil, saConfig, returnServiceAccount.ServiceAccount, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error updating Service Account: %s", err)
 	}
@@ -164,7 +165,7 @@ func (sa *ServiceAccount) Update(saConfig *types.ServiceAccount) (*ServiceAccoun
 
 // Authorize authorizes a service account and returns a DeviceID and UserCode which will be used while granting
 // the request, and sets the Service Account in `Requested` status
-func (sa *ServiceAccount) Authorize() error {
+func (sa *ServiceAccount) Authorize(ctx context.Context) error {
 	client := sa.org.client
 
 	uuid := extractUuid(sa.ServiceAccount.ID)
@@ -184,7 +185,7 @@ func (sa *ServiceAccount) Authorize() error {
 	}
 
 	// Not an OpenAPI endpoint so hardcoding the Service Account minimal version
-	err = client.OpenApiPostUrlEncoded("37.0", urlRef, nil, data, &sa.authParams, nil)
+	err = client.OpenApiPostUrlEncoded(ctx, "37.0", urlRef, nil, data, &sa.authParams, nil)
 	if err != nil {
 		return fmt.Errorf("error authorizing service account: %s", err)
 	}
@@ -193,7 +194,7 @@ func (sa *ServiceAccount) Authorize() error {
 }
 
 // Grant Grants access to the Service Account and sets it in `Granted` status
-func (sa *ServiceAccount) Grant() error {
+func (sa *ServiceAccount) Grant(ctx context.Context) error {
 	if sa.authParams == nil {
 		return fmt.Errorf("error: userCode is unset, service account needs to be authorized")
 	}
@@ -209,7 +210,7 @@ func (sa *ServiceAccount) Grant() error {
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointServiceAccountGrant
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -224,7 +225,7 @@ func (sa *ServiceAccount) Grant() error {
 		return fmt.Errorf("error granting service account: %s", err)
 	}
 
-	err = client.OpenApiPostItem(apiVersion, urlRef, nil, userCode, nil, getTenantContextHeader(tenantContext))
+	err = client.OpenApiPostItem(ctx, apiVersion, urlRef, nil, userCode, nil, getTenantContextHeader(tenantContext))
 	if err != nil {
 		return fmt.Errorf("error granting service account: %s", err)
 	}
@@ -233,7 +234,7 @@ func (sa *ServiceAccount) Grant() error {
 }
 
 // GetInitialApiToken gets the initial API token for the Service Account and sets it in `Active` status
-func (sa *ServiceAccount) GetInitialApiToken() (*types.ApiTokenRefresh, error) {
+func (sa *ServiceAccount) GetInitialApiToken(ctx context.Context) (*types.ApiTokenRefresh, error) {
 	if sa.authParams == nil {
 		return nil, fmt.Errorf("error: service account must be authorized and granted")
 	}
@@ -244,7 +245,7 @@ func (sa *ServiceAccount) GetInitialApiToken() (*types.ApiTokenRefresh, error) {
 		"client_id":   uuid,
 		"device_code": sa.authParams.DeviceCode,
 	}
-	token, err := client.getAccessToken(sa.ServiceAccount.Org.Name, "CreateServiceAccount", data)
+	token, err := client.getAccessToken(ctx, sa.ServiceAccount.Org.Name, "CreateServiceAccount", data)
 	if err != nil {
 		return nil, fmt.Errorf("error getting initial api token: %s", err)
 	}
@@ -252,12 +253,12 @@ func (sa *ServiceAccount) GetInitialApiToken() (*types.ApiTokenRefresh, error) {
 }
 
 // Refresh updates the Service Account object
-func (sa *ServiceAccount) Refresh() error {
+func (sa *ServiceAccount) Refresh(ctx context.Context) error {
 	if sa.ServiceAccount == nil || sa.org.client == nil || sa.ServiceAccount.ID == "" {
 		return fmt.Errorf("cannot refresh Service Account without ID")
 	}
 
-	updatedServiceAccount, err := sa.org.GetServiceAccountById(sa.ServiceAccount.ID)
+	updatedServiceAccount, err := sa.org.GetServiceAccountById(ctx, sa.ServiceAccount.ID)
 	if err != nil {
 		return err
 	}
@@ -267,11 +268,11 @@ func (sa *ServiceAccount) Refresh() error {
 }
 
 // Revoke revokes the service account and its' API token and puts it back in 'Created' stage
-func (sa *ServiceAccount) Revoke() error {
+func (sa *ServiceAccount) Revoke(ctx context.Context) error {
 	client := sa.org.client
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointServiceAccounts
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -281,7 +282,7 @@ func (sa *ServiceAccount) Revoke() error {
 		return err
 	}
 
-	err = client.OpenApiPostItem(apiVersion, urlRef, nil, nil, nil, nil)
+	err = client.OpenApiPostItem(ctx, apiVersion, urlRef, nil, nil, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -290,11 +291,11 @@ func (sa *ServiceAccount) Revoke() error {
 }
 
 // Delete deletes a Service Account
-func (sa *ServiceAccount) Delete() error {
+func (sa *ServiceAccount) Delete(ctx context.Context) error {
 	client := sa.org.client
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointServiceAccounts
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -304,7 +305,7 @@ func (sa *ServiceAccount) Delete() error {
 		return err
 	}
 
-	err = client.OpenApiDeleteItem(apiVersion, urlRef, nil, nil)
+	err = client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -315,9 +316,9 @@ func (sa *ServiceAccount) Delete() error {
 // SetServiceAccountApiToken gets the refresh token from a provided file, fetches
 // the bearer token and updates the provided file with the new refresh token for
 // next usage as service account API tokens are one-time use
-func (vcdClient *VCDClient) SetServiceAccountApiToken(org, apiTokenFile string) error {
-	if vcdClient.Client.APIVCDMaxVersionIs("< 37.0") {
-		version, err := vcdClient.Client.GetVcdFullVersion()
+func (vcdClient *VCDClient) SetServiceAccountApiToken(ctx context.Context, org, apiTokenFile string) error {
+	if vcdClient.Client.APIVCDMaxVersionIs(ctx, "< 37.0") {
+		version, err := vcdClient.Client.GetVcdFullVersion(ctx)
 		if err == nil {
 			return fmt.Errorf("minimum version for Service Account authentication is 10.4 - Version detected: %s", version.Version)
 		}
@@ -325,7 +326,7 @@ func (vcdClient *VCDClient) SetServiceAccountApiToken(org, apiTokenFile string) 
 		return fmt.Errorf("minimum API version for Service Account authentication is 37.0 - Version detected: %s", vcdClient.Client.APIVersion)
 	}
 
-	apiToken, err := vcdClient.SetApiTokenFromFile(org, apiTokenFile)
+	apiToken, err := vcdClient.SetApiTokenFromFile(ctx, org, apiTokenFile)
 	if err != nil {
 		return err
 	}

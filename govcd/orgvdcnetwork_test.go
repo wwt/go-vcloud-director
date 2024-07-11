@@ -396,7 +396,7 @@ func (vcd *TestVCD) Test_CreateUpdateOrgVdcNetworkIso(check *C) {
 	check.Assert(network.OrgVDCNetwork.Configuration.IPScopes.IPScope[0].IPRanges.IPRange[0].EndAddress, Equals, updatedEndAddress)
 	task, err := network.Delete()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 }

@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 
@@ -29,20 +30,20 @@ func (i IpSpaceUplink) wrap(inner *types.IpSpaceUplink) *IpSpaceUplink {
 }
 
 // CreateIpSpaceUplink creates an IP Space Uplink with a given configuration
-func (vcdClient *VCDClient) CreateIpSpaceUplink(ipSpaceUplinkConfig *types.IpSpaceUplink) (*IpSpaceUplink, error) {
+func (vcdClient *VCDClient) CreateIpSpaceUplink(ctx context.Context, ipSpaceUplinkConfig *types.IpSpaceUplink) (*IpSpaceUplink, error) {
 	c := crudConfig{
 		endpoint:    types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSpaceUplinks,
 		entityLabel: labelIpSpaceUplink,
 	}
 
 	outerType := IpSpaceUplink{vcdClient: vcdClient}
-	return createOuterEntity(&vcdClient.Client, outerType, c, ipSpaceUplinkConfig)
+	return createOuterEntity(ctx, &vcdClient.Client, outerType, c, ipSpaceUplinkConfig)
 }
 
 // GetAllIpSpaceUplinks retrieves all IP Space Uplinks for a given External Network ID
 //
 // externalNetworkId is mandatory
-func (vcdClient *VCDClient) GetAllIpSpaceUplinks(externalNetworkId string, queryParameters url.Values) ([]*IpSpaceUplink, error) {
+func (vcdClient *VCDClient) GetAllIpSpaceUplinks(ctx context.Context, externalNetworkId string, queryParameters url.Values) ([]*IpSpaceUplink, error) {
 	if externalNetworkId == "" {
 		return nil, fmt.Errorf("mandatory External Network ID is empty")
 	}
@@ -55,13 +56,13 @@ func (vcdClient *VCDClient) GetAllIpSpaceUplinks(externalNetworkId string, query
 	}
 
 	outerType := IpSpaceUplink{vcdClient: vcdClient}
-	return getAllOuterEntities[IpSpaceUplink, types.IpSpaceUplink](&vcdClient.Client, outerType, c)
+	return getAllOuterEntities[IpSpaceUplink, types.IpSpaceUplink](ctx, &vcdClient.Client, outerType, c)
 }
 
 // GetIpSpaceUplinkByName retrieves a single IP Space Uplink by Name in a given External Network
-func (vcdClient *VCDClient) GetIpSpaceUplinkByName(externalNetworkId, name string) (*IpSpaceUplink, error) {
+func (vcdClient *VCDClient) GetIpSpaceUplinkByName(ctx context.Context, externalNetworkId, name string) (*IpSpaceUplink, error) {
 	queryParams := queryParameterFilterAnd(fmt.Sprintf("name==%s", name), nil)
-	allIpSpaceUplinks, err := vcdClient.GetAllIpSpaceUplinks(externalNetworkId, queryParams)
+	allIpSpaceUplinks, err := vcdClient.GetAllIpSpaceUplinks(ctx, externalNetworkId, queryParams)
 	if err != nil {
 		return nil, fmt.Errorf("error getting IP Space Uplink by Name '%s':%s", name, err)
 	}
@@ -70,7 +71,7 @@ func (vcdClient *VCDClient) GetIpSpaceUplinkByName(externalNetworkId, name strin
 }
 
 // GetIpSpaceUplinkById retrieves IP Space Uplink with a given ID
-func (vcdClient *VCDClient) GetIpSpaceUplinkById(id string) (*IpSpaceUplink, error) {
+func (vcdClient *VCDClient) GetIpSpaceUplinkById(ctx context.Context, id string) (*IpSpaceUplink, error) {
 	c := crudConfig{
 		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSpaceUplinks,
 		endpointParams: []string{id},
@@ -78,11 +79,11 @@ func (vcdClient *VCDClient) GetIpSpaceUplinkById(id string) (*IpSpaceUplink, err
 	}
 
 	outerType := IpSpaceUplink{vcdClient: vcdClient}
-	return getOuterEntity[IpSpaceUplink, types.IpSpaceUplink](&vcdClient.Client, outerType, c)
+	return getOuterEntity[IpSpaceUplink, types.IpSpaceUplink](ctx, &vcdClient.Client, outerType, c)
 }
 
 // Update IP Space Uplink
-func (ipSpaceUplink *IpSpaceUplink) Update(ipSpaceUplinkConfig *types.IpSpaceUplink) (*IpSpaceUplink, error) {
+func (ipSpaceUplink *IpSpaceUplink) Update(ctx context.Context, ipSpaceUplinkConfig *types.IpSpaceUplink) (*IpSpaceUplink, error) {
 	c := crudConfig{
 		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSpaceUplinks,
 		endpointParams: []string{ipSpaceUplink.IpSpaceUplink.ID},
@@ -90,11 +91,11 @@ func (ipSpaceUplink *IpSpaceUplink) Update(ipSpaceUplinkConfig *types.IpSpaceUpl
 	}
 
 	outerType := IpSpaceUplink{vcdClient: ipSpaceUplink.vcdClient}
-	return updateOuterEntity(&ipSpaceUplink.vcdClient.Client, outerType, c, ipSpaceUplinkConfig)
+	return updateOuterEntity(ctx, &ipSpaceUplink.vcdClient.Client, outerType, c, ipSpaceUplinkConfig)
 }
 
 // Delete IP Space Uplink
-func (ipSpaceUplink *IpSpaceUplink) Delete() error {
+func (ipSpaceUplink *IpSpaceUplink) Delete(ctx context.Context) error {
 	if ipSpaceUplink == nil || ipSpaceUplink.IpSpaceUplink == nil || ipSpaceUplink.IpSpaceUplink.ID == "" {
 		return fmt.Errorf("IP Space Uplink must have ID")
 	}
@@ -105,5 +106,5 @@ func (ipSpaceUplink *IpSpaceUplink) Delete() error {
 		entityLabel:    labelIpSpaceUplink,
 	}
 
-	return deleteEntityById(&ipSpaceUplink.vcdClient.Client, c)
+	return deleteEntityById(ctx, &ipSpaceUplink.vcdClient.Client, c)
 }

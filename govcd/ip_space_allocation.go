@@ -5,6 +5,7 @@
 package govcd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -25,21 +26,21 @@ type IpSpaceIpAllocation struct {
 }
 
 // AllocateIp performs IP Allocation request for a specific Org and returns the result
-func (ipSpace *IpSpace) AllocateIp(orgId, orgName string, ipAllocationConfig *types.IpSpaceIpAllocationRequest) ([]types.IpSpaceIpAllocationRequestResult, error) {
-	return allocateIpSpaceIp(&ipSpace.vcdClient.Client, orgId, orgName, ipSpace.IpSpace.ID, ipAllocationConfig)
+func (ipSpace *IpSpace) AllocateIp(ctx context.Context, orgId, orgName string, ipAllocationConfig *types.IpSpaceIpAllocationRequest) ([]types.IpSpaceIpAllocationRequestResult, error) {
+	return allocateIpSpaceIp(ctx, &ipSpace.vcdClient.Client, orgId, orgName, ipSpace.IpSpace.ID, ipAllocationConfig)
 }
 
 // IpSpaceAllocateIp performs IP allocation request for a specific IP Space
-func (org *Org) IpSpaceAllocateIp(ipSpaceId string, ipAllocationConfig *types.IpSpaceIpAllocationRequest) ([]types.IpSpaceIpAllocationRequestResult, error) {
-	return allocateIpSpaceIp(org.client, org.Org.ID, org.Org.Name, ipSpaceId, ipAllocationConfig)
+func (org *Org) IpSpaceAllocateIp(ctx context.Context, ipSpaceId string, ipAllocationConfig *types.IpSpaceIpAllocationRequest) ([]types.IpSpaceIpAllocationRequestResult, error) {
+	return allocateIpSpaceIp(ctx, org.client, org.Org.ID, org.Org.Name, ipSpaceId, ipAllocationConfig)
 }
 
 // GetIpSpaceAllocationByTypeAndValue retrieves IP Space allocation by its type and value
 // allocationType can be 'FLOATING_IP' (types.IpSpaceIpAllocationTypeFloatingIp) or 'IP_PREFIX'
 // (types.IpSpaceIpAllocationTypeIpPrefix)
-func (org *Org) GetIpSpaceAllocationByTypeAndValue(ipSpaceId string, allocationType, value string, queryParameters url.Values) (*IpSpaceIpAllocation, error) {
+func (org *Org) GetIpSpaceAllocationByTypeAndValue(ctx context.Context, ipSpaceId string, allocationType, value string, queryParameters url.Values) (*IpSpaceIpAllocation, error) {
 	queryParams := queryParameterFilterAnd(fmt.Sprintf("value==%s;type==%s", value, allocationType), queryParameters)
-	results, err := getAllIpSpaceAllocations(org.client, ipSpaceId, org, queryParams)
+	results, err := getAllIpSpaceAllocations(ctx, org.client, ipSpaceId, org, queryParams)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving IP allocations: %s", err)
 	}
@@ -55,14 +56,14 @@ func (org *Org) GetIpSpaceAllocationByTypeAndValue(ipSpaceId string, allocationT
 // GetAllIpSpaceAllocations retrieves all IP Allocations for a particular IP Space
 // allocationType can be 'FLOATING_IP' (types.IpSpaceIpAllocationTypeFloatingIp) or 'IP_PREFIX'
 // (types.IpSpaceIpAllocationTypeIpPrefix)
-func (ipSpace *IpSpace) GetAllIpSpaceAllocations(allocationType string, queryParameters url.Values) ([]*IpSpaceIpAllocation, error) {
+func (ipSpace *IpSpace) GetAllIpSpaceAllocations(ctx context.Context, allocationType string, queryParameters url.Values) ([]*IpSpaceIpAllocation, error) {
 	if allocationType == "" {
 		return nil, fmt.Errorf("allocationType is mandatory and must be 'FLOATING_IP' or 'IP_PREFIX'")
 	}
 
 	client := ipSpace.vcdClient.Client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSpaceIpAllocations
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +75,7 @@ func (ipSpace *IpSpace) GetAllIpSpaceAllocations(allocationType string, queryPar
 
 	queryParams := queryParameterFilterAnd(fmt.Sprintf("type==%s", allocationType), queryParameters)
 	typeResponses := []*types.IpSpaceIpAllocation{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParams, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParams, &typeResponses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -98,13 +99,13 @@ func (ipSpace *IpSpace) GetAllIpSpaceAllocations(allocationType string, queryPar
 }
 
 // GetIpSpaceAllocationById retrieves IP Allocation in a given IP Space by IDs
-func (org *Org) GetIpSpaceAllocationById(ipSpaceId, allocationId string) (*IpSpaceIpAllocation, error) {
+func (org *Org) GetIpSpaceAllocationById(ctx context.Context, ipSpaceId, allocationId string) (*IpSpaceIpAllocation, error) {
 	if ipSpaceId == "" || allocationId == "" {
 		return nil, fmt.Errorf("ipSpaceId and allocationId cannot be empty")
 	}
 	client := org.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSpaceIpAllocations
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +122,7 @@ func (org *Org) GetIpSpaceAllocationById(ipSpaceId, allocationId string) (*IpSpa
 		client:              client,
 	}
 
-	err = client.OpenApiGetItem(apiVersion, urlRef, nil, response.IpSpaceIpAllocation, nil)
+	err = client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, response.IpSpaceIpAllocation, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -131,10 +132,10 @@ func (org *Org) GetIpSpaceAllocationById(ipSpaceId, allocationId string) (*IpSpa
 }
 
 // Update updates IP Allocation with a given configuration
-func (ipSpaceAllocation *IpSpaceIpAllocation) Update(ipSpaceAllocationConfig *types.IpSpaceIpAllocation) (*IpSpaceIpAllocation, error) {
+func (ipSpaceAllocation *IpSpaceIpAllocation) Update(ctx context.Context, ipSpaceAllocationConfig *types.IpSpaceIpAllocation) (*IpSpaceIpAllocation, error) {
 	client := ipSpaceAllocation.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSpaceIpAllocations
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +157,7 @@ func (ipSpaceAllocation *IpSpaceIpAllocation) Update(ipSpaceAllocationConfig *ty
 		return nil, err
 	}
 
-	err = client.OpenApiPutItem(apiVersion, urlRef, nil, ipSpaceAllocationConfig, returnIpSpaceAllocation.IpSpaceIpAllocation, getTenantContextHeader(tenantContext))
+	err = client.OpenApiPutItem(ctx, apiVersion, urlRef, nil, ipSpaceAllocationConfig, returnIpSpaceAllocation.IpSpaceIpAllocation, getTenantContextHeader(tenantContext))
 	if err != nil {
 		return nil, fmt.Errorf("error updating IP Space IP Allocation: %s", err)
 	}
@@ -165,7 +166,7 @@ func (ipSpaceAllocation *IpSpaceIpAllocation) Update(ipSpaceAllocationConfig *ty
 }
 
 // Delete removes IP Allocation
-func (ipSpaceAllocation *IpSpaceIpAllocation) Delete() error {
+func (ipSpaceAllocation *IpSpaceIpAllocation) Delete(ctx context.Context) error {
 	if ipSpaceAllocation == nil || ipSpaceAllocation.IpSpaceIpAllocation == nil || ipSpaceAllocation.IpSpaceIpAllocation.ID == "" {
 		return fmt.Errorf("IP Space IP Allocation must have ID")
 	}
@@ -176,7 +177,7 @@ func (ipSpaceAllocation *IpSpaceIpAllocation) Delete() error {
 
 	client := ipSpaceAllocation.client
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSpaceIpAllocations
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -191,7 +192,7 @@ func (ipSpaceAllocation *IpSpaceIpAllocation) Delete() error {
 		return err
 	}
 
-	err = client.OpenApiDeleteItem(apiVersion, urlRef, nil, getTenantContextHeader(tenantContext))
+	err = client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil, getTenantContextHeader(tenantContext))
 	if err != nil {
 		return fmt.Errorf("error deleting IP Space IP Allocation: %s", err)
 	}
@@ -199,13 +200,13 @@ func (ipSpaceAllocation *IpSpaceIpAllocation) Delete() error {
 	return nil
 }
 
-func allocateIpSpaceIp(client *Client, orgId, orgName, ipSpaceId string, ipAllocationConfig *types.IpSpaceIpAllocationRequest) ([]types.IpSpaceIpAllocationRequestResult, error) {
+func allocateIpSpaceIp(ctx context.Context, client *Client, orgId, orgName, ipSpaceId string, ipAllocationConfig *types.IpSpaceIpAllocationRequest) ([]types.IpSpaceIpAllocationRequestResult, error) {
 	if orgId == "" || orgName == "" || ipSpaceId == "" {
 		return nil, fmt.Errorf("IP Space must have all values Org ID, Org Name and IP Space ID populated")
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSpaceUplinksAllocate
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -220,12 +221,12 @@ func allocateIpSpaceIp(client *Client, orgId, orgName, ipSpaceId string, ipAlloc
 		OrgName: orgName,
 	}
 
-	task, err := client.OpenApiPostItemAsyncWithHeaders(apiVersion, urlRef, nil, ipAllocationConfig, getTenantContextHeader(tenantContext))
+	task, err := client.OpenApiPostItemAsyncWithHeaders(ctx, apiVersion, urlRef, nil, ipAllocationConfig, getTenantContextHeader(tenantContext))
 	if err != nil {
 		return nil, fmt.Errorf("error triggering IP Allocation task for IP Space '%s': %s", ipSpaceId, err)
 	}
 
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error waiting for task completion: %s", err)
 	}
@@ -245,9 +246,9 @@ func allocateIpSpaceIp(client *Client, orgId, orgName, ipSpaceId string, ipAlloc
 	return unmarshalStorage, nil
 }
 
-func getAllIpSpaceAllocations(client *Client, ipSpaceId string, org *Org, queryParameters url.Values) ([]*IpSpaceIpAllocation, error) {
+func getAllIpSpaceAllocations(ctx context.Context, client *Client, ipSpaceId string, org *Org, queryParameters url.Values) ([]*IpSpaceIpAllocation, error) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSpaceIpAllocations
-	apiVersion, err := client.getOpenApiHighestElevatedVersion(endpoint)
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +264,7 @@ func getAllIpSpaceAllocations(client *Client, ipSpaceId string, org *Org, queryP
 	}
 
 	typeResponses := []*types.IpSpaceIpAllocation{{}}
-	err = client.OpenApiGetAllItems(apiVersion, urlRef, queryParameters, &typeResponses, getTenantContextHeader(tenantContext))
+	err = client.OpenApiGetAllItems(ctx, apiVersion, urlRef, queryParameters, &typeResponses, getTenantContextHeader(tenantContext))
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +294,7 @@ func getAllIpSpaceAllocations(client *Client, ipSpaceId string, org *Org, queryP
 // Go code:
 // queryParams := url.Values{}
 // queryParams.Set("filter", "ipType==IPV4")
-func (vcdClient *VCDClient) GetAllIpSpaceFloatingIpSuggestions(gatewayId string, queryParameters url.Values) ([]*types.IpSpaceFloatingIpSuggestion, error) {
+func (vcdClient *VCDClient) GetAllIpSpaceFloatingIpSuggestions(ctx context.Context, gatewayId string, queryParameters url.Values) ([]*types.IpSpaceFloatingIpSuggestion, error) {
 	if gatewayId == "" {
 		return nil, fmt.Errorf("edge gateway ID is mandatory")
 	}
@@ -306,5 +307,5 @@ func (vcdClient *VCDClient) GetAllIpSpaceFloatingIpSuggestions(gatewayId string,
 		queryParameters: queryParams,
 	}
 
-	return getAllInnerEntities[types.IpSpaceFloatingIpSuggestion](&vcdClient.Client, c)
+	return getAllInnerEntities[types.IpSpaceFloatingIpSuggestion](ctx, &vcdClient.Client, c)
 }

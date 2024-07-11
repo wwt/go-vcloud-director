@@ -104,7 +104,7 @@ func (vcd *TestVCD) Test_LDAPSystem(check *C) {
 		task, err := adminOrg.Update()
 		check.Assert(err, IsNil)
 
-		err = task.WaitTaskCompletion()
+		err = task.WaitTaskCompletion(context.Background())
 		check.Assert(err, IsNil)
 	}()
 }

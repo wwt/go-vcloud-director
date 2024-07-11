@@ -349,6 +349,6 @@ func (vcd *TestVCD) Test_SearchOrgVdc(check *C) {
 	}
 	task, err := anotherVdc.Delete(true, true)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 }

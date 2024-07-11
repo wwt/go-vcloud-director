@@ -1,6 +1,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	semver "github.com/hashicorp/go-version"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
@@ -13,7 +14,7 @@ import (
 // and its Node Health Check capabilities, by using the new values provided as input.
 // If some of the values of the input is not provided, it doesn't change them.
 // If none of the values is provided, it just returns the same untouched YAML.
-func (cluster *CseKubernetesCluster) updateCapiYaml(input CseClusterUpdateInput) (string, error) {
+func (cluster *CseKubernetesCluster) updateCapiYaml(ctx context.Context, input CseClusterUpdateInput) (string, error) {
 	if cluster == nil || cluster.capvcdType == nil {
 		return "", fmt.Errorf("receiver cluster is nil")
 	}
@@ -60,7 +61,7 @@ func (cluster *CseKubernetesCluster) updateCapiYaml(input CseClusterUpdateInput)
 			}
 		}
 
-		yamlDocs, err = cseAddWorkerPoolsInYaml(yamlDocs, *cluster, *input.NewWorkerPools)
+		yamlDocs, err = cseAddWorkerPoolsInYaml(ctx, yamlDocs, *cluster, *input.NewWorkerPools)
 		if err != nil {
 			return cluster.capvcdType.Spec.CapiYaml, err
 		}
@@ -72,7 +73,7 @@ func (cluster *CseKubernetesCluster) updateCapiYaml(input CseClusterUpdateInput)
 	// as well.
 	// So in this special case this "optimization" would optimize nothing. The same happens with other YAML values.
 	if input.KubernetesTemplateOvaId != nil {
-		vAppTemplate, err := getVAppTemplateById(cluster.client, *input.KubernetesTemplateOvaId)
+		vAppTemplate, err := getVAppTemplateById(ctx, cluster.client, *input.KubernetesTemplateOvaId)
 		if err != nil {
 			return cluster.capvcdType.Spec.CapiYaml, fmt.Errorf("could not retrieve the Kubernetes Template OVA with ID '%s': %s", *input.KubernetesTemplateOvaId, err)
 		}
@@ -95,7 +96,7 @@ func (cluster *CseKubernetesCluster) updateCapiYaml(input CseClusterUpdateInput)
 		if err != nil {
 			return "", err
 		}
-		vcdKeConfig, err := getVcdKeConfig(cluster.client, cseComponentsVersions.VcdKeConfigRdeTypeVersion, *input.NodeHealthCheck)
+		vcdKeConfig, err := getVcdKeConfig(ctx, cluster.client, cseComponentsVersions.VcdKeConfigRdeTypeVersion, *input.NodeHealthCheck)
 		if err != nil {
 			return "", err
 		}
@@ -253,7 +254,7 @@ func cseUpdateWorkerPoolsInYaml(yamlDocuments []map[string]interface{}, workerPo
 // cseAddWorkerPoolsInYaml modifies the given Kubernetes cluster YAML contents by adding new Worker Pools
 // described by the input parameters.
 // NOTE: This function doesn't modify the input, but returns a copy of the YAML with the added unmarshalled documents.
-func cseAddWorkerPoolsInYaml(docs []map[string]interface{}, cluster CseKubernetesCluster, newWorkerPools []CseWorkerPoolSettings) ([]map[string]interface{}, error) {
+func cseAddWorkerPoolsInYaml(ctx context.Context, docs []map[string]interface{}, cluster CseKubernetesCluster, newWorkerPools []CseWorkerPoolSettings) ([]map[string]interface{}, error) {
 	if len(newWorkerPools) == 0 {
 		return docs, nil
 	}
@@ -265,7 +266,7 @@ func cseAddWorkerPoolsInYaml(docs []map[string]interface{}, cluster CseKubernete
 		storageProfileIds = append(storageProfileIds, w.StorageProfileId)
 	}
 
-	idToNameCache, err := idToNames(cluster.client, computePolicyIds, storageProfileIds)
+	idToNameCache, err := idToNames(ctx, cluster.client, computePolicyIds, storageProfileIds)
 	if err != nil {
 		return nil, err
 	}
