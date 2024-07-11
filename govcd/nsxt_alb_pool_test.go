@@ -65,16 +65,16 @@ func testAdvancedPoolConfig(check *C, edge *NsxtEdgeGateway, vcd *TestVCD, clien
 		Name:                     check.TestName() + "-Advanced",
 		GatewayRef:               types.OpenApiReference{ID: edge.EdgeGateway.ID},
 		Algorithm:                "FEWEST_SERVERS",
-		DefaultPort:              takeIntAddress(8443),
-		GracefulTimeoutPeriod:    takeIntAddress(1),
-		PassiveMonitoringEnabled: takeBoolPointer(true),
+		DefaultPort:              addrOf(8443),
+		GracefulTimeoutPeriod:    addrOf(1),
+		PassiveMonitoringEnabled: addrOf(true),
 		HealthMonitors:           nil,
 		Members: []types.NsxtAlbPoolMember{
 			{
 				Enabled:   true,
 				IpAddress: "1.1.1.1",
 				Port:      8400,
-				Ratio:     takeIntAddress(2),
+				Ratio:     addrOf(2),
 			},
 			{
 				Enabled:   false,
@@ -95,17 +95,17 @@ func testAdvancedPoolConfig(check *C, edge *NsxtEdgeGateway, vcd *TestVCD, clien
 	poolConfigAdvancedUpdated := &types.NsxtAlbPool{
 		Name:                     poolConfigAdvanced.Name + "-Updated",
 		GatewayRef:               types.OpenApiReference{ID: edge.EdgeGateway.ID},
-		Enabled:                  takeBoolPointer(false),
+		Enabled:                  addrOf(false),
 		Algorithm:                "LEAST_LOAD",
-		GracefulTimeoutPeriod:    takeIntAddress(0),
-		PassiveMonitoringEnabled: takeBoolPointer(false),
+		GracefulTimeoutPeriod:    addrOf(0),
+		PassiveMonitoringEnabled: addrOf(false),
 		HealthMonitors:           nil,
 		Members: []types.NsxtAlbPoolMember{
 			{
 				Enabled:   true,
 				IpAddress: "1.1.1.1",
 				Port:      8300,
-				Ratio:     takeIntAddress(3),
+				Ratio:     addrOf(3),
 			},
 			{
 				Enabled:   true,
@@ -138,9 +138,10 @@ func testPoolWithCertNoPrivateKey(check *C, vcd *TestVCD, edgeGatewayId string, 
 		GatewayRef:             types.OpenApiReference{ID: edgeGatewayId},
 		Algorithm:              "FASTEST_RESPONSE",
 		CaCertificateRefs:      []types.OpenApiReference{types.OpenApiReference{ID: createdCertificate.CertificateLibrary.Id}},
-		CommonNameCheckEnabled: takeBoolPointer(true),
+		CommonNameCheckEnabled: addrOf(true),
 		DomainNames:            []string{"one", "two", "three"},
-		DefaultPort:            takeIntAddress(1211),
+		DefaultPort:            addrOf(1211),
+		SslEnabled:             addrOf(true),
 	}
 
 	testAlbPoolConfig(check, vcd, "CertificateWithNoPrivateKey", poolConfigWithCert, nil, client)
@@ -173,7 +174,8 @@ func testPoolWithCertAndPrivateKey(check *C, vcd *TestVCD, edgeGatewayId string,
 
 		Algorithm:         "FASTEST_RESPONSE",
 		CaCertificateRefs: []types.OpenApiReference{types.OpenApiReference{ID: createdCertificate.CertificateLibrary.Id}},
-		DefaultPort:       takeIntAddress(1211),
+		DefaultPort:       addrOf(1211),
+		SslEnabled:        addrOf(true),
 	}
 
 	testAlbPoolConfig(check, vcd, "CertificateWithPrivateKey", poolConfigWithCertAndKey, nil, client)
@@ -259,6 +261,13 @@ func setupAlbPoolPrerequisites(check *C, vcd *TestVCD) (*NsxtAlbController, *Nsx
 		albSettingsConfig.SupportedFeatureSet = "PREMIUM"
 	}
 
+	// Enable IPv6 service network definition (VCD 10.4.0+)
+	if vcd.client.Client.APIVCDMaxVersionIs(">= 37.0") {
+		printVerbose("# Enabling IPv6 service network definition (VCD 10.4.0+)\n")
+		albSettingsConfig.ServiceNetworkDefinition = "192.168.255.125/25"
+		albSettingsConfig.Ipv6ServiceNetworkDefinition = "2001:0db8:85a3:0000:0000:8a2e:0370:7334/120"
+	}
+
 	// Enable Transparent mode on VCD >= 10.4.1
 	if vcd.client.Client.APIVCDMaxVersionIs(ctx, ">= 37.1") {
 		printVerbose("# Enabling Transparent mode on Edge Gateway (VCD 10.4.1+)\n")
@@ -288,8 +297,8 @@ func setupAlbPoolPrerequisites(check *C, vcd *TestVCD) (*NsxtAlbController, *Nsx
 	serviceEngineGroupAssignmentConfig := &types.NsxtAlbServiceEngineGroupAssignment{
 		GatewayRef:            &types.OpenApiReference{ID: edge.EdgeGateway.ID},
 		ServiceEngineGroupRef: &types.OpenApiReference{ID: seGroup.NsxtAlbServiceEngineGroup.ID},
-		MaxVirtualServices:    takeIntAddress(89),
-		MinVirtualServices:    takeIntAddress(20),
+		MaxVirtualServices:    addrOf(89),
+		MinVirtualServices:    addrOf(20),
 	}
 
 	assignment, err := vcd.client.CreateAlbServiceEngineGroupAssignment(ctx, serviceEngineGroupAssignmentConfig)

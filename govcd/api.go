@@ -54,6 +54,14 @@ type Client struct {
 	// "User-Agent: <product> / <product-version> <comment>"
 	UserAgent string
 
+	// RequestIdFunc is a function that would return an unique string to be used for
+	// 'X-Vmware-Vcloud-Client-Request-Id' which helps log tracing
+	// Function `WithVcloudRequestIdFunc` contains more details
+	RequestIdFunc func() string
+
+	// IgnoredMetadata allows to ignore metadata entries when using the methods defined in metadata_v2.go
+	IgnoredMetadata []IgnoredMetadata
+
 	supportedVersions SupportedVersions // Versions from /api/versions endpoint
 	customHeader      http.Header
 }
@@ -240,12 +248,12 @@ func (client *Client) newRequest(ctx context.Context, params map[string]string, 
 		req.Header.Add("Authorization", "bearer "+client.VCDToken)
 	}
 
-	// Merge in additional headers before logging if any where specified in additionalHeader
+	// Merge in additional headers before logging if anywhere specified in additionalHeader
 	// parameter
 	if len(additionalHeader) > 0 {
 		for headerName, headerValueSlice := range additionalHeader {
 			for _, singleHeaderValue := range headerValueSlice {
-				req.Header.Add(headerName, singleHeaderValue)
+				req.Header.Set(headerName, singleHeaderValue)
 			}
 		}
 	}
@@ -258,6 +266,7 @@ func (client *Client) newRequest(ctx context.Context, params map[string]string, 
 	}
 
 	setHttpUserAgent(client.UserAgent, req)
+	setVcloudClientRequestId(client.RequestIdFunc, req)
 
 	// Avoids passing data if the logging of requests is disabled
 	if util.LogHttpRequest {
@@ -654,8 +663,6 @@ func executeRequestCustomErr(ctx context.Context, pathURL string, params map[str
 		req.Header.Add("Content-Type", contentType)
 	}
 
-	setHttpUserAgent(client.UserAgent, req)
-
 	resp, err := client.Http.Do(req)
 	if err != nil {
 		return resp, err
@@ -668,6 +675,24 @@ func executeRequestCustomErr(ctx context.Context, pathURL string, params map[str
 func setHttpUserAgent(userAgent string, req *http.Request) {
 	if userAgent != "" {
 		req.Header.Set("User-Agent", userAgent)
+	}
+}
+
+// The X-VMWARE-VCLOUD-CLIENT-REQUEST-ID header must contain only alpha-numeric characters or
+// dashes. The header must contain at least one alpha-numeric character, and VMware Cloud Director
+// shortens it if it's longer than 128 characters long. The X-VMWARE-VCLOUD-REQUEST-ID response
+// header is formed from the first 128 characters of X-VMWARE-VCLOUD-CLIENT-REQUEST-ID, followed by
+// a dash and a random UUID that the server generates. If the X-VMWARE-VCLOUD-CLIENT-REQUEST-ID
+// header is invalid, null, or empty, the X-VMWARE-VCLOUD-REQUEST-ID is a random UUID. VMware Cloud
+// Director adds this value to every VMware Cloud Director, vCenter Server, and ESXi log message
+// related to processing the request, and provides a way to correlate the processing of a request
+// across all participating systems. If a request does not supply a
+// X-VMWARE-VCLOUD-CLIENT-REQUEST-ID header, the response contains an X-VMWARE-VCLOUD-REQUEST-ID
+// header with a generated value that cannot be used for log correlation.
+func setVcloudClientRequestId(requestBuilder func() string, req *http.Request) {
+	if requestBuilder != nil {
+		requestId := requestBuilder()
+		req.Header.Set("X-VMWARE-VCLOUD-CLIENT-REQUEST-ID", requestId)
 	}
 }
 
@@ -693,20 +718,6 @@ func combinedTaskErrorMessage(task *types.Task, err error) string {
 // and not getting the address of a variable (e.g. `addrOf(variable)`)
 func addrOf[T any](variable T) *T {
 	return &variable
-}
-
-func takeBoolPointer(value bool) *bool {
-	return &value
-}
-
-// takeIntAddress is a helper that returns the address of an `int`
-func takeIntAddress(x int) *int {
-	return &x
-}
-
-// takeStringPointer is a helper that returns the address of a `string`
-func takeStringPointer(x string) *string {
-	return &x
 }
 
 // IsUuid returns true if the identifier is a bare UUID
@@ -859,8 +870,8 @@ func (client *Client) TestConnectionWithDefaults(ctx context.Context, subscripti
 	testConnectionConfig := types.TestConnection{
 		Host:    url.Hostname(),
 		Port:    port,
-		Secure:  takeBoolPointer(true), // Default value used by VCD UI
-		Timeout: 30,                    // Default value used by VCD UI
+		Secure:  addrOf(true), // Default value used by VCD UI
+		Timeout: 30,           // Default value used by VCD UI
 	}
 
 	testConnectionResult, err := client.TestConnection(ctx, testConnectionConfig)
@@ -912,4 +923,24 @@ func safeClose(file *os.File) {
 	if err := file.Close(); err != nil {
 		util.Logger.Printf("Error closing file: %s\n", err)
 	}
+}
+
+// isSuccessStatus returns true if the given status code is between 200 and 300
+func isSuccessStatus(statusCode int) bool {
+	if statusCode >= http.StatusOK && // 200
+		statusCode < http.StatusMultipleChoices { // 300
+		return true
+	}
+	return false
+}
+
+// convertSliceOfStringsToOpenApiReferenceIds converts []string to []types.OpenApiReference by filling
+// types.OpenApiReference.ID fields
+func convertSliceOfStringsToOpenApiReferenceIds(ids []string) []types.OpenApiReference {
+	resultReferences := make([]types.OpenApiReference, len(ids))
+	for i, v := range ids {
+		resultReferences[i].ID = v
+	}
+
+	return resultReferences
 }

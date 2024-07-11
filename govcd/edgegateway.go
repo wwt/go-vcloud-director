@@ -485,7 +485,7 @@ func (egw *EdgeGateway) AddNATRuleAsync(ctx context.Context, ruleDetails NatRule
 	//construct new rule
 	natRule := &types.NatRule{
 		RuleType:    ruleDetails.NatType,
-		IsEnabled:   takeBoolPointer(true),
+		IsEnabled:   addrOf(true),
 		Description: ruleDetails.Description,
 		GatewayNatRule: &types.GatewayNatRule{
 			Interface: &types.Reference{
@@ -633,7 +633,7 @@ func (egw *EdgeGateway) AddNATPortMappingWithUplink(ctx context.Context, network
 	//add rule
 	natRule := &types.NatRule{
 		RuleType:  natType,
-		IsEnabled: takeBoolPointer(true),
+		IsEnabled: addrOf(true),
 		GatewayNatRule: &types.GatewayNatRule{
 			Interface: &types.Reference{
 				HREF: uplinkRef,
@@ -867,7 +867,7 @@ func (egw *EdgeGateway) Create1to1Mapping(ctx context.Context, internal, externa
 	snat := &types.NatRule{
 		Description: description,
 		RuleType:    "SNAT",
-		IsEnabled:   takeBoolPointer(true),
+		IsEnabled:   addrOf(true),
 		GatewayNatRule: &types.GatewayNatRule{
 			Interface: &types.Reference{
 				HREF: uplinkif,
@@ -886,7 +886,7 @@ func (egw *EdgeGateway) Create1to1Mapping(ctx context.Context, internal, externa
 	dnat := &types.NatRule{
 		Description: description,
 		RuleType:    "DNAT",
-		IsEnabled:   takeBoolPointer(true),
+		IsEnabled:   addrOf(true),
 		GatewayNatRule: &types.GatewayNatRule{
 			Interface: &types.Reference{
 				HREF: uplinkif,

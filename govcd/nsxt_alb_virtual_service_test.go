@@ -4,6 +4,7 @@ package govcd
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 
@@ -15,13 +16,13 @@ func (vcd *TestVCD) Test_AlbVirtualService(check *C) {
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
 	skipNoNsxtAlbConfiguration(vcd, check)
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointAlbEdgeGateway)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointAlbEdgeGateway)
 
 	// Setup prerequisite components
 	controller, cloud, seGroup, edge, seGroupAssignment, albPool := setupAlbVirtualServicePrerequisites(check, vcd)
 
 	// Setup Org user and connection
-	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	orgUserVcdClient, orgUser, err := newOrgUserConnection(adminOrg, "alb-virtual-service-testing", "CHANGE-ME", vcd.config.Provider.Url, true)
 	check.Assert(err, IsNil)
@@ -32,6 +33,10 @@ func (vcd *TestVCD) Test_AlbVirtualService(check *C) {
 	testVirtualServiceConfigWithCertHTTPS(check, edge, albPool, seGroup, vcd, vcd.client)
 	testMinimalVirtualServiceConfigL4(check, edge, albPool, seGroup, vcd, vcd.client)
 	testMinimalVirtualServiceConfigL4TLS(check, edge, albPool, seGroup, vcd, vcd.client)
+	if vcd.client.Client.APIVCDMaxVersionIs(">= 37.0") {
+		printVerbose("# Running 10.4.0+ IPv6 Virtual Service test as Sysadmin user\n")
+		testVirtualServiceConfigHTTPIPv6(check, edge, albPool, seGroup, vcd, vcd.client)
+	}
 
 	printVerbose("# Running tests as Org user\n")
 	// Run tests with Org admin user
@@ -39,9 +44,13 @@ func (vcd *TestVCD) Test_AlbVirtualService(check *C) {
 	testVirtualServiceConfigWithCertHTTPS(check, edge, albPool, seGroup, vcd, orgUserVcdClient)
 	testMinimalVirtualServiceConfigL4(check, edge, albPool, seGroup, vcd, orgUserVcdClient)
 	testMinimalVirtualServiceConfigL4TLS(check, edge, albPool, seGroup, vcd, orgUserVcdClient)
+	if vcd.client.Client.APIVCDMaxVersionIs(">= 37.0") {
+		printVerbose("# Running 10.4.0+ IPv6 Virtual Service test as Org user\n")
+		testVirtualServiceConfigHTTPIPv6(check, edge, albPool, seGroup, vcd, orgUserVcdClient)
+	}
 
 	// Test 10.4.1 Transparent mode on VCD >= 10.4.1
-	if vcd.client.Client.APIVCDMaxVersionIs(ctx, ">= 37.1") {
+	if vcd.client.Client.APIVCDMaxVersionIs(">= 37.1") {
 		printVerbose("# Running 10.4.1+ tests as Sysadmin user\n")
 
 		printVerbose("## Creating ALB Pool with Member Group (VCD 10.4.1+) as Sysadmin\n")
@@ -57,10 +66,10 @@ func (vcd *TestVCD) Test_AlbVirtualService(check *C) {
 		testMinimalVirtualServiceConfigHTTPTransparent(check, edge, poolWithMemberGroup, seGroup, vcd, orgUserVcdClient, false)
 
 		// cleanup ipset and pool membership
-		err = poolWithMemberGroup.Delete(ctx)
+		err = poolWithMemberGroup.Delete()
 		check.Assert(err, IsNil)
 
-		err = ipSet.Delete(ctx)
+		err = retryOnError(ipSet.Delete, 5, 1*time.Second)
 		check.Assert(err, IsNil)
 	}
 
@@ -68,14 +77,14 @@ func (vcd *TestVCD) Test_AlbVirtualService(check *C) {
 	tearDownAlbVirtualServicePrerequisites(check, albPool, seGroupAssignment, edge, seGroup, cloud, controller)
 
 	// cleanup Org user
-	err = orgUser.Delete(ctx, true)
+	err = orgUser.Delete(true)
 	check.Assert(err, IsNil)
 }
 
 func testMinimalVirtualServiceConfigHTTP(check *C, edge *NsxtEdgeGateway, pool *NsxtAlbPool, seGroup *NsxtAlbServiceEngineGroup, vcd *TestVCD, client *VCDClient) {
 	virtualServiceConfig := &types.NsxtAlbVirtualService{
 		Name:    check.TestName(),
-		Enabled: takeBoolPointer(true),
+		Enabled: addrOf(true),
 		ApplicationProfile: types.NsxtAlbVirtualServiceApplicationProfile{
 			SystemDefined: true,
 			Type:          "HTTP",
@@ -85,7 +94,7 @@ func testMinimalVirtualServiceConfigHTTP(check *C, edge *NsxtEdgeGateway, pool *
 		ServiceEngineGroupRef: types.OpenApiReference{ID: seGroup.NsxtAlbServiceEngineGroup.ID},
 		ServicePorts: []types.NsxtAlbVirtualServicePort{
 			{
-				PortStart: takeIntAddress(80),
+				PortStart: addrOf(80),
 			},
 		},
 		VirtualIpAddress: edge.EdgeGateway.EdgeGatewayUplinks[0].Subnets.Values[0].PrimaryIP,
@@ -94,7 +103,7 @@ func testMinimalVirtualServiceConfigHTTP(check *C, edge *NsxtEdgeGateway, pool *
 	virtualServiceConfigUpdated := &types.NsxtAlbVirtualService{
 		Name:        check.TestName(),
 		Description: "Updated",
-		Enabled:     takeBoolPointer(true),
+		Enabled:     addrOf(true),
 		ApplicationProfile: types.NsxtAlbVirtualServiceApplicationProfile{
 			SystemDefined: true,
 			Type:          "HTTP",
@@ -104,14 +113,14 @@ func testMinimalVirtualServiceConfigHTTP(check *C, edge *NsxtEdgeGateway, pool *
 		ServiceEngineGroupRef: types.OpenApiReference{ID: seGroup.NsxtAlbServiceEngineGroup.ID},
 		ServicePorts: []types.NsxtAlbVirtualServicePort{
 			{
-				PortStart:  takeIntAddress(443),
-				PortEnd:    takeIntAddress(449),
-				SslEnabled: takeBoolPointer(false),
+				PortStart:  addrOf(443),
+				PortEnd:    addrOf(449),
+				SslEnabled: addrOf(false),
 			},
 			{
-				PortStart:  takeIntAddress(2000),
-				PortEnd:    takeIntAddress(2010),
-				SslEnabled: takeBoolPointer(false),
+				PortStart:  addrOf(2000),
+				PortEnd:    addrOf(2010),
+				SslEnabled: addrOf(false),
 			},
 		},
 		// Use Primary IP of Edge Gateway as virtual service IP
@@ -122,6 +131,69 @@ func testMinimalVirtualServiceConfigHTTP(check *C, edge *NsxtEdgeGateway, pool *
 	}
 
 	testAlbVirtualServiceConfig(check, vcd, "MinimalHTTP", virtualServiceConfig, virtualServiceConfigUpdated, client)
+}
+
+func testVirtualServiceConfigHTTPIPv6(check *C, edge *NsxtEdgeGateway, pool *NsxtAlbPool, seGroup *NsxtAlbServiceEngineGroup, vcd *TestVCD, client *VCDClient) {
+	// Enable SLAAC Profile - this is a property of Edge Gateway - it will be removed with Edge
+	// Gateway itself upon cleanup
+	_, err := edge.UpdateSlaacProfile(&types.NsxtEdgeGatewaySlaacProfile{Enabled: true, Mode: "SLAAC"})
+	check.Assert(err, IsNil)
+	defer func() {
+		_, err := edge.UpdateSlaacProfile(&types.NsxtEdgeGatewaySlaacProfile{Enabled: false, Mode: "DISABLED"})
+		check.Assert(err, IsNil)
+	}()
+
+	virtualServiceConfig := &types.NsxtAlbVirtualService{
+		Name:    check.TestName(),
+		Enabled: addrOf(true),
+		ApplicationProfile: types.NsxtAlbVirtualServiceApplicationProfile{
+			SystemDefined: true,
+			Type:          "HTTP",
+		},
+		GatewayRef:            types.OpenApiReference{ID: edge.EdgeGateway.ID},
+		LoadBalancerPoolRef:   types.OpenApiReference{ID: pool.NsxtAlbPool.ID},
+		ServiceEngineGroupRef: types.OpenApiReference{ID: seGroup.NsxtAlbServiceEngineGroup.ID},
+		ServicePorts: []types.NsxtAlbVirtualServicePort{
+			{
+				PortStart: addrOf(80),
+			},
+		},
+		VirtualIpAddress:     edge.EdgeGateway.EdgeGatewayUplinks[0].Subnets.Values[0].PrimaryIP,
+		IPv6VirtualIpAddress: "2002:0:0:1234:abcd:ffff:c0a8:103",
+	}
+
+	virtualServiceConfigUpdated := &types.NsxtAlbVirtualService{
+		Name:        check.TestName(),
+		Description: "Updated",
+		Enabled:     addrOf(true),
+		ApplicationProfile: types.NsxtAlbVirtualServiceApplicationProfile{
+			SystemDefined: true,
+			Type:          "HTTP",
+		},
+		GatewayRef:            types.OpenApiReference{ID: edge.EdgeGateway.ID},
+		LoadBalancerPoolRef:   types.OpenApiReference{ID: pool.NsxtAlbPool.ID},
+		ServiceEngineGroupRef: types.OpenApiReference{ID: seGroup.NsxtAlbServiceEngineGroup.ID},
+		ServicePorts: []types.NsxtAlbVirtualServicePort{
+			{
+				PortStart:  addrOf(443),
+				PortEnd:    addrOf(449),
+				SslEnabled: addrOf(false),
+			},
+			{
+				PortStart:  addrOf(2000),
+				PortEnd:    addrOf(2010),
+				SslEnabled: addrOf(false),
+			},
+		},
+		// Use Primary IP of Edge Gateway as virtual service IP
+		VirtualIpAddress:     edge.EdgeGateway.EdgeGatewayUplinks[0].Subnets.Values[0].PrimaryIP,
+		IPv6VirtualIpAddress: "2002:0:0:1234:abcd:ffff:c0a8:103",
+		//HealthStatus:          "",
+		//HealthMessage:         "",
+		//DetailedHealthMessage: "",
+	}
+
+	testAlbVirtualServiceConfig(check, vcd, "IPv6", virtualServiceConfig, virtualServiceConfigUpdated, client)
 }
 
 func testMinimalVirtualServiceConfigHTTPTransparent(check *C, edge *NsxtEdgeGateway, poolWithMemberGroup *NsxtAlbPool, seGroup *NsxtAlbServiceEngineGroup, vcd *TestVCD, client *VCDClient, trueOnCreate bool) {
@@ -184,7 +256,7 @@ func testMinimalVirtualServiceConfigHTTPTransparent(check *C, edge *NsxtEdgeGate
 func testMinimalVirtualServiceConfigL4(check *C, edge *NsxtEdgeGateway, pool *NsxtAlbPool, seGroup *NsxtAlbServiceEngineGroup, vcd *TestVCD, client *VCDClient) {
 	virtualServiceConfig := &types.NsxtAlbVirtualService{
 		Name:    check.TestName(),
-		Enabled: takeBoolPointer(true),
+		Enabled: addrOf(true),
 		ApplicationProfile: types.NsxtAlbVirtualServiceApplicationProfile{
 			SystemDefined: true,
 			Type:          "L4",
@@ -194,7 +266,7 @@ func testMinimalVirtualServiceConfigL4(check *C, edge *NsxtEdgeGateway, pool *Ns
 		ServiceEngineGroupRef: types.OpenApiReference{ID: seGroup.NsxtAlbServiceEngineGroup.ID},
 		ServicePorts: []types.NsxtAlbVirtualServicePort{
 			{
-				PortStart: takeIntAddress(80),
+				PortStart: addrOf(80),
 			},
 		},
 		VirtualIpAddress: edge.EdgeGateway.EdgeGatewayUplinks[0].Subnets.Values[0].PrimaryIP,
@@ -203,7 +275,7 @@ func testMinimalVirtualServiceConfigL4(check *C, edge *NsxtEdgeGateway, pool *Ns
 	virtualServiceConfigUpdated := &types.NsxtAlbVirtualService{
 		Name:        check.TestName(),
 		Description: "Updated",
-		Enabled:     takeBoolPointer(true),
+		Enabled:     addrOf(true),
 		ApplicationProfile: types.NsxtAlbVirtualServiceApplicationProfile{
 			SystemDefined: true,
 			Type:          "L4",
@@ -213,29 +285,29 @@ func testMinimalVirtualServiceConfigL4(check *C, edge *NsxtEdgeGateway, pool *Ns
 		ServiceEngineGroupRef: types.OpenApiReference{ID: seGroup.NsxtAlbServiceEngineGroup.ID},
 		ServicePorts: []types.NsxtAlbVirtualServicePort{
 			{
-				PortStart: takeIntAddress(443),
+				PortStart: addrOf(443),
 				TcpUdpProfile: &types.NsxtAlbVirtualServicePortTcpUdpProfile{
 					SystemDefined: true,
 					Type:          "TCP_PROXY",
 				},
 			},
 			{
-				PortStart: takeIntAddress(8443),
-				PortEnd:   takeIntAddress(8445),
+				PortStart: addrOf(8443),
+				PortEnd:   addrOf(8445),
 				TcpUdpProfile: &types.NsxtAlbVirtualServicePortTcpUdpProfile{
 					SystemDefined: true,
 					Type:          "TCP_FAST_PATH",
 				},
 			},
 			{
-				PortStart: takeIntAddress(9000),
+				PortStart: addrOf(9000),
 				TcpUdpProfile: &types.NsxtAlbVirtualServicePortTcpUdpProfile{
 					SystemDefined: true,
 					Type:          "UDP_FAST_PATH",
 				},
 			},
 			{
-				PortStart: takeIntAddress(10000),
+				PortStart: addrOf(10000),
 			},
 		},
 		// Use Primary IP of Edge Gateway as virtual service IP
@@ -246,7 +318,7 @@ func testMinimalVirtualServiceConfigL4(check *C, edge *NsxtEdgeGateway, pool *Ns
 }
 
 func testMinimalVirtualServiceConfigL4TLS(check *C, edge *NsxtEdgeGateway, pool *NsxtAlbPool, seGroup *NsxtAlbServiceEngineGroup, vcd *TestVCD, client *VCDClient) {
-	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
+	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
@@ -256,15 +328,15 @@ func testMinimalVirtualServiceConfigL4TLS(check *C, edge *NsxtEdgeGateway, pool 
 		PrivateKey:           privateKey,
 		PrivateKeyPassphrase: "test",
 	}
-	openApiEndpoint, err := getEndpointByVersion(ctx, &vcd.client.Client)
+	openApiEndpoint, err := getEndpointByVersion(&vcd.client.Client)
 	check.Assert(err, IsNil)
-	createdCertificate, err := adminOrg.AddCertificateToLibrary(ctx, certificateConfigWithPrivateKey)
+	createdCertificate, err := adminOrg.AddCertificateToLibrary(certificateConfigWithPrivateKey)
 	check.Assert(err, IsNil)
 	PrependToCleanupListOpenApi(createdCertificate.CertificateLibrary.Alias, check.TestName(), openApiEndpoint+createdCertificate.CertificateLibrary.Id)
 
 	virtualServiceConfig := &types.NsxtAlbVirtualService{
 		Name:    check.TestName(),
-		Enabled: takeBoolPointer(true),
+		Enabled: addrOf(true),
 		ApplicationProfile: types.NsxtAlbVirtualServiceApplicationProfile{
 			SystemDefined: true,
 			Type:          "L4_TLS",
@@ -275,8 +347,8 @@ func testMinimalVirtualServiceConfigL4TLS(check *C, edge *NsxtEdgeGateway, pool 
 		CertificateRef:        &types.OpenApiReference{ID: createdCertificate.CertificateLibrary.Id},
 		ServicePorts: []types.NsxtAlbVirtualServicePort{
 			{
-				PortStart:  takeIntAddress(80),
-				SslEnabled: takeBoolPointer(true),
+				PortStart:  addrOf(80),
+				SslEnabled: addrOf(true),
 			},
 		},
 		VirtualIpAddress: edge.EdgeGateway.EdgeGatewayUplinks[0].Subnets.Values[0].PrimaryIP,
@@ -285,7 +357,7 @@ func testMinimalVirtualServiceConfigL4TLS(check *C, edge *NsxtEdgeGateway, pool 
 	virtualServiceConfigUpdated := &types.NsxtAlbVirtualService{
 		Name:        check.TestName(),
 		Description: "Updated",
-		Enabled:     takeBoolPointer(true),
+		Enabled:     addrOf(true),
 		ApplicationProfile: types.NsxtAlbVirtualServiceApplicationProfile{
 			SystemDefined: true,
 			Type:          "L4_TLS",
@@ -296,8 +368,8 @@ func testMinimalVirtualServiceConfigL4TLS(check *C, edge *NsxtEdgeGateway, pool 
 		CertificateRef:        &types.OpenApiReference{ID: createdCertificate.CertificateLibrary.Id},
 		ServicePorts: []types.NsxtAlbVirtualServicePort{
 			{
-				PortStart:  takeIntAddress(443),
-				SslEnabled: takeBoolPointer(true),
+				PortStart:  addrOf(443),
+				SslEnabled: addrOf(true),
 				TcpUdpProfile: &types.NsxtAlbVirtualServicePortTcpUdpProfile{
 					SystemDefined: true,
 					Type:          "TCP_PROXY", // The only possible type with L4_TLS
@@ -310,12 +382,12 @@ func testMinimalVirtualServiceConfigL4TLS(check *C, edge *NsxtEdgeGateway, pool 
 
 	testAlbVirtualServiceConfig(check, vcd, "L4-TLS", virtualServiceConfig, virtualServiceConfigUpdated, client)
 
-	err = createdCertificate.Delete(ctx)
+	err = createdCertificate.Delete()
 	check.Assert(err, IsNil)
 }
 
 func testVirtualServiceConfigWithCertHTTPS(check *C, edge *NsxtEdgeGateway, pool *NsxtAlbPool, seGroup *NsxtAlbServiceEngineGroup, vcd *TestVCD, client *VCDClient) {
-	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
+	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
@@ -326,15 +398,15 @@ func testVirtualServiceConfigWithCertHTTPS(check *C, edge *NsxtEdgeGateway, pool
 		PrivateKeyPassphrase: "test",
 	}
 
-	openApiEndpoint, err := getEndpointByVersion(ctx, &vcd.client.Client)
+	openApiEndpoint, err := getEndpointByVersion(&vcd.client.Client)
 	check.Assert(err, IsNil)
-	createdCertificate, err := adminOrg.AddCertificateToLibrary(ctx, certificateConfigWithPrivateKey)
+	createdCertificate, err := adminOrg.AddCertificateToLibrary(certificateConfigWithPrivateKey)
 	check.Assert(err, IsNil)
 	PrependToCleanupListOpenApi(createdCertificate.CertificateLibrary.Alias, check.TestName(), openApiEndpoint+createdCertificate.CertificateLibrary.Id)
 
 	virtualServiceConfig := &types.NsxtAlbVirtualService{
 		Name:    check.TestName(),
-		Enabled: takeBoolPointer(true),
+		Enabled: addrOf(true),
 		ApplicationProfile: types.NsxtAlbVirtualServiceApplicationProfile{
 			SystemDefined: true,
 			Type:          "HTTPS",
@@ -343,14 +415,14 @@ func testVirtualServiceConfigWithCertHTTPS(check *C, edge *NsxtEdgeGateway, pool
 		LoadBalancerPoolRef:   types.OpenApiReference{ID: pool.NsxtAlbPool.ID},
 		ServiceEngineGroupRef: types.OpenApiReference{ID: seGroup.NsxtAlbServiceEngineGroup.ID},
 		CertificateRef:        &types.OpenApiReference{ID: createdCertificate.CertificateLibrary.Id},
-		ServicePorts:          []types.NsxtAlbVirtualServicePort{{PortStart: takeIntAddress(80), SslEnabled: takeBoolPointer(true)}},
+		ServicePorts:          []types.NsxtAlbVirtualServicePort{{PortStart: addrOf(80), SslEnabled: addrOf(true)}},
 		VirtualIpAddress:      edge.EdgeGateway.EdgeGatewayUplinks[0].Subnets.Values[0].PrimaryIP,
 	}
 
 	virtualServiceConfigUpdated := &types.NsxtAlbVirtualService{
 		Name:        check.TestName(),
 		Description: "Updated",
-		Enabled:     takeBoolPointer(true),
+		Enabled:     addrOf(true),
 		ApplicationProfile: types.NsxtAlbVirtualServiceApplicationProfile{
 			SystemDefined: true,
 			Type:          "HTTPS",
@@ -361,11 +433,11 @@ func testVirtualServiceConfigWithCertHTTPS(check *C, edge *NsxtEdgeGateway, pool
 		CertificateRef:        &types.OpenApiReference{ID: createdCertificate.CertificateLibrary.Id},
 		ServicePorts: []types.NsxtAlbVirtualServicePort{
 			{
-				PortStart: takeIntAddress(80),
+				PortStart: addrOf(80),
 			},
 			{
-				PortStart:  takeIntAddress(443),
-				SslEnabled: takeBoolPointer(true),
+				PortStart:  addrOf(443),
+				SslEnabled: addrOf(true),
 			},
 		},
 		// Use Primary IP of Edge Gateway as virtual service IP
@@ -374,17 +446,17 @@ func testVirtualServiceConfigWithCertHTTPS(check *C, edge *NsxtEdgeGateway, pool
 
 	testAlbVirtualServiceConfig(check, vcd, "WithCertHTTPS", virtualServiceConfig, virtualServiceConfigUpdated, client)
 
-	err = createdCertificate.Delete(ctx)
+	err = createdCertificate.Delete()
 	check.Assert(err, IsNil)
 }
 
 func testAlbVirtualServiceConfig(check *C, vcd *TestVCD, name string, setupConfig *types.NsxtAlbVirtualService, updateConfig *types.NsxtAlbVirtualService, client *VCDClient) {
 	fmt.Printf("# Running ALB Virtual Service test with config %s ('System' user: %t) ", name, client.Client.IsSysAdmin)
 
-	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
-	createdVirtualService, err := client.CreateNsxtAlbVirtualService(ctx, setupConfig)
+	createdVirtualService, err := client.CreateNsxtAlbVirtualService(setupConfig)
 	check.Assert(err, IsNil)
 
 	// Verify mandatory fields
@@ -396,22 +468,22 @@ func testAlbVirtualServiceConfig(check *C, vcd *TestVCD, name string, setupConfi
 	PrependToCleanupListOpenApi(createdVirtualService.NsxtAlbVirtualService.Name, check.TestName(), openApiEndpoint)
 
 	// Get By ID
-	virtualServiceById, err := client.GetAlbVirtualServiceById(ctx, createdVirtualService.NsxtAlbVirtualService.ID)
+	virtualServiceById, err := client.GetAlbVirtualServiceById(createdVirtualService.NsxtAlbVirtualService.ID)
 	check.Assert(err, IsNil)
 	check.Assert(virtualServiceById.NsxtAlbVirtualService.ID, Equals, createdVirtualService.NsxtAlbVirtualService.ID)
 
 	// Get By Name
-	virtualServiceByName, err := client.GetAlbVirtualServiceByName(ctx, edge.EdgeGateway.ID, createdVirtualService.NsxtAlbVirtualService.Name)
+	virtualServiceByName, err := client.GetAlbVirtualServiceByName(edge.EdgeGateway.ID, createdVirtualService.NsxtAlbVirtualService.Name)
 	check.Assert(err, IsNil)
 	check.Assert(virtualServiceByName.NsxtAlbVirtualService.ID, Equals, createdVirtualService.NsxtAlbVirtualService.ID)
 
 	//Get All Virtual Service summaries
-	allVirtualServiceSummaries, err := client.GetAllAlbVirtualServiceSummaries(ctx, edge.EdgeGateway.ID, nil)
+	allVirtualServiceSummaries, err := client.GetAllAlbVirtualServiceSummaries(edge.EdgeGateway.ID, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(allVirtualServiceSummaries) > 0, Equals, true)
 
 	// Get All Pools
-	allVirtualServices, err := client.GetAllAlbVirtualServices(ctx, edge.EdgeGateway.ID, nil)
+	allVirtualServices, err := client.GetAllAlbVirtualServices(edge.EdgeGateway.ID, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(allVirtualServices) > 0, Equals, true)
 
@@ -420,14 +492,14 @@ func testAlbVirtualServiceConfig(check *C, vcd *TestVCD, name string, setupConfi
 	// Attempt an update if config is provided
 	if updateConfig != nil {
 		updateConfig.ID = createdVirtualService.NsxtAlbVirtualService.ID
-		updatedPool, err := createdVirtualService.Update(ctx, updateConfig)
+		updatedPool, err := createdVirtualService.Update(updateConfig)
 		check.Assert(err, IsNil)
 		check.Assert(createdVirtualService.NsxtAlbVirtualService.ID, Equals, updatedPool.NsxtAlbVirtualService.ID)
 		check.Assert(updatedPool.NsxtAlbVirtualService.Name, NotNil)
 		check.Assert(updatedPool.NsxtAlbVirtualService.GatewayRef.ID, NotNil)
 	}
 
-	err = createdVirtualService.Delete(ctx)
+	err = createdVirtualService.Delete()
 	check.Assert(err, IsNil)
 	fmt.Printf("Done.\n")
 }
@@ -437,11 +509,11 @@ func setupAlbVirtualServicePrerequisites(check *C, vcd *TestVCD) (*NsxtAlbContro
 
 	poolConfig := &types.NsxtAlbPool{
 		Name:       check.TestName(),
-		Enabled:    takeBoolPointer(true),
+		Enabled:    addrOf(true),
 		GatewayRef: types.OpenApiReference{ID: edge.EdgeGateway.ID},
 	}
 
-	albPool, err := vcd.client.CreateNsxtAlbPool(ctx, poolConfig)
+	albPool, err := vcd.client.CreateNsxtAlbPool(poolConfig)
 	check.Assert(err, IsNil)
 
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbPools + albPool.NsxtAlbPool.ID
@@ -460,7 +532,7 @@ func setupAlbPoolFirewallGroupMembers(check *C, vcd *TestVCD, edge *NsxtEdgeGate
 		IpAddresses: []string{"1.1.1.1"},
 	}
 
-	ipSet, err := vcd.nsxtVdc.CreateNsxtFirewallGroup(ctx, ipSetConfig)
+	ipSet, err := vcd.nsxtVdc.CreateNsxtFirewallGroup(ipSetConfig)
 	check.Assert(err, IsNil)
 
 	// add ip set to cleanup list
@@ -469,14 +541,14 @@ func setupAlbPoolFirewallGroupMembers(check *C, vcd *TestVCD, edge *NsxtEdgeGate
 
 	poolConfig := &types.NsxtAlbPool{
 		Name:       check.TestName() + "-member-group",
-		Enabled:    takeBoolPointer(true),
+		Enabled:    addrOf(true),
 		GatewayRef: types.OpenApiReference{ID: edge.EdgeGateway.ID},
 		MemberGroupRef: &types.OpenApiReference{
 			ID: ipSet.NsxtFirewallGroup.ID,
 		},
 	}
 
-	albPool, err := vcd.client.CreateNsxtAlbPool(ctx, poolConfig)
+	albPool, err := vcd.client.CreateNsxtAlbPool(poolConfig)
 	check.Assert(err, IsNil)
 
 	openApiEndpoint = types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAlbPools + albPool.NsxtAlbPool.ID
@@ -486,16 +558,16 @@ func setupAlbPoolFirewallGroupMembers(check *C, vcd *TestVCD, edge *NsxtEdgeGate
 }
 
 func tearDownAlbVirtualServicePrerequisites(check *C, albPool *NsxtAlbPool, assignment *NsxtAlbServiceEngineGroupAssignment, edge *NsxtEdgeGateway, seGroup *NsxtAlbServiceEngineGroup, cloud *NsxtAlbCloud, controller *NsxtAlbController) {
-	err := albPool.Delete(ctx)
+	err := albPool.Delete()
 	check.Assert(err, IsNil)
-	err = assignment.Delete(ctx)
+	err = assignment.Delete()
 	check.Assert(err, IsNil)
-	err = edge.DisableAlb(ctx)
+	err = edge.DisableAlb()
 	check.Assert(err, IsNil)
-	err = seGroup.Delete(ctx)
+	err = seGroup.Delete()
 	check.Assert(err, IsNil)
-	err = cloud.Delete(ctx)
+	err = cloud.Delete()
 	check.Assert(err, IsNil)
-	err = controller.Delete(ctx)
+	err = controller.Delete()
 	check.Assert(err, IsNil)
 }

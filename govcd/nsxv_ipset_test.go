@@ -29,11 +29,11 @@ func (vcd *TestVCD) Test_NsxvIpSet(check *C) {
 		check.Skip(check.TestName() + ": VDC name not given")
 		return
 	}
-	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	vdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Vdc, false)
+	vdc, err := org.GetVDCByName(vcd.config.VCD.Vdc, false)
 	check.Assert(err, IsNil)
 	check.Assert(vdc, NotNil)
 
@@ -46,10 +46,10 @@ func (vcd *TestVCD) Test_NsxvIpSet(check *C) {
 		// returned, next time it shuffles it again so one can not rely on order of list returned.
 		// IPAddresses: "192.168.200.1-192.168.200.24,192.168.200.1,192.168.200.1/24",
 		IPAddresses:        "192.168.200.1/24",
-		InheritanceAllowed: takeBoolPointer(false),
+		InheritanceAllowed: addrOf(false),
 	}
 
-	createdIpSet, err := vdc.CreateNsxvIpSet(ctx, ipSetConfig)
+	createdIpSet, err := vdc.CreateNsxvIpSet(ipSetConfig)
 	check.Assert(err, IsNil)
 	check.Assert(createdIpSet.ID, Not(Equals), "") // Validate that ID was set
 
@@ -64,30 +64,30 @@ func (vcd *TestVCD) Test_NsxvIpSet(check *C) {
 	check.Assert(createdIpSet, DeepEquals, ipSetConfig)
 
 	// 2. Try to create another IP set with the same name and expect error
-	_, err = vdc.CreateNsxvIpSet(ctx, ipSetConfig)
+	_, err = vdc.CreateNsxvIpSet(ipSetConfig)
 	check.Assert(err, ErrorMatches, ".*Another object with same name.* already exists in the current scope.*")
 
 	// 3. Get all IP sets
-	ipSets, err := vdc.GetAllNsxvIpSets(ctx)
+	ipSets, err := vdc.GetAllNsxvIpSets()
 	check.Assert(err, IsNil)
 	check.Assert(len(ipSets) > 0, Equals, true)
 
 	// 4. Get by Name, Id, NameOrId and check that all results are deeply equal
-	ipSetByName, err := vdc.GetNsxvIpSetByName(ctx, createdIpSet.Name)
+	ipSetByName, err := vdc.GetNsxvIpSetByName(createdIpSet.Name)
 	check.Assert(err, IsNil)
-	ipSetById, err := vdc.GetNsxvIpSetById(ctx, createdIpSet.ID)
+	ipSetById, err := vdc.GetNsxvIpSetById(createdIpSet.ID)
 	check.Assert(err, IsNil)
-	ipSetByName2, err := vdc.GetNsxvIpSetByNameOrId(ctx, createdIpSet.Name)
+	ipSetByName2, err := vdc.GetNsxvIpSetByNameOrId(createdIpSet.Name)
 	check.Assert(err, IsNil)
-	ipSetById2, err := vdc.GetNsxvIpSetByNameOrId(ctx, createdIpSet.ID)
+	ipSetById2, err := vdc.GetNsxvIpSetByNameOrId(createdIpSet.ID)
 	check.Assert(err, IsNil)
 	check.Assert(ipSetByName, DeepEquals, ipSetById)
 	check.Assert(ipSetByName, DeepEquals, ipSetByName2)
 	check.Assert(ipSetByName, DeepEquals, ipSetById2)
 
 	// 5. Update IP set field
-	createdIpSet.InheritanceAllowed = takeBoolPointer(true)
-	updatedIpSet, err := vcd.vdc.UpdateNsxvIpSet(ctx, createdIpSet)
+	createdIpSet.InheritanceAllowed = addrOf(true)
+	updatedIpSet, err := vcd.vdc.UpdateNsxvIpSet(createdIpSet)
 	check.Assert(err, IsNil)
 
 	// Check that only this field was changed
@@ -97,21 +97,21 @@ func (vcd *TestVCD) Test_NsxvIpSet(check *C) {
 	check.Assert(updatedIpSet, DeepEquals, createdIpSet)
 
 	// 6. Delete created IP set by Id
-	err = vdc.DeleteNsxvIpSetById(ctx, createdIpSet.ID)
+	err = vdc.DeleteNsxvIpSetById(createdIpSet.ID)
 	check.Assert(err, IsNil)
 
 	// Verify that the IP set cannot be found by ID and by Name
-	_, err = vdc.GetNsxvIpSetById(ctx, createdIpSet.ID)
+	_, err = vdc.GetNsxvIpSetById(createdIpSet.ID)
 	check.Assert(IsNotFound(err), Equals, true)
 
-	_, err = vdc.GetNsxvIpSetByName(ctx, createdIpSet.Name)
+	_, err = vdc.GetNsxvIpSetByName(createdIpSet.Name)
 	check.Assert(IsNotFound(err), Equals, true)
 
 	// 7. Create another IP set and try to delete by name
-	ipSet2, err := vdc.CreateNsxvIpSet(ctx, ipSetConfig)
+	ipSet2, err := vdc.CreateNsxvIpSet(ipSetConfig)
 	check.Assert(err, IsNil)
 
-	err = vdc.DeleteNsxvIpSetByName(ctx, ipSet2.Name)
+	err = vdc.DeleteNsxvIpSetByName(ipSet2.Name)
 	check.Assert(err, IsNil)
 }
 
@@ -122,8 +122,8 @@ func testCreateIpSet(name string, vdc *Vdc) (*types.EdgeIpSet, error) {
 		Name:               name,
 		Description:        "test-ipset-description",
 		IPAddresses:        "192.168.200.1/24",
-		InheritanceAllowed: takeBoolPointer(true),
+		InheritanceAllowed: addrOf(true),
 	}
 
-	return vdc.CreateNsxvIpSet(ctx, ipSetConfig)
+	return vdc.CreateNsxvIpSet(ipSetConfig)
 }

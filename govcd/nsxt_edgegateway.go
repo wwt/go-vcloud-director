@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/netip"
 	"net/url"
+	"time"
 
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 	"github.com/vmware/go-vcloud-director/v2/util"
@@ -184,6 +185,11 @@ func (adminOrg *AdminOrg) CreateNsxtEdgeGateway(ctx context.Context, edgeGateway
 		return nil, fmt.Errorf("error creating Edge Gateway: %s", err)
 	}
 
+	err = returnEgw.reorderUplinks()
+	if err != nil {
+		return nil, fmt.Errorf("error reordering Edge Gateway Uplinks after update operation: %s", err)
+	}
+
 	return returnEgw, nil
 }
 
@@ -198,6 +204,12 @@ func (egw *NsxtEdgeGateway) Refresh(ctx context.Context) error {
 		return fmt.Errorf("error refreshing NSX-T Edge Gateway: %s", err)
 	}
 	egw.EdgeGateway = refreshedEdge.EdgeGateway
+
+	err = egw.reorderUplinks()
+	if err != nil {
+		return fmt.Errorf("error reordering Edge Gateway Uplinks after refresh operation: %s", err)
+	}
+
 	return nil
 }
 
@@ -208,7 +220,7 @@ func (egw *NsxtEdgeGateway) Update(ctx context.Context, edgeGatewayConfig *types
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeGateways
-	minimumApiVersion, err := egw.client.getOpenApiHighestElevatedVersion(ctx, endpoint)
+	apiVersion, err := egw.client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -227,9 +239,14 @@ func (egw *NsxtEdgeGateway) Update(ctx context.Context, edgeGatewayConfig *types
 		client:      egw.client,
 	}
 
-	err = egw.client.OpenApiPutItem(ctx, minimumApiVersion, urlRef, nil, edgeGatewayConfig, returnEgw.EdgeGateway, nil)
+	err = egw.client.OpenApiPutItem(ctx, apiVersion, urlRef, nil, edgeGatewayConfig, returnEgw.EdgeGateway, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error updating Edge Gateway: %s", err)
+	}
+
+	err = egw.reorderUplinks()
+	if err != nil {
+		return nil, fmt.Errorf("error reordering Edge Gateway Uplinks after update operation: %s", err)
 	}
 
 	return returnEgw, nil
@@ -242,7 +259,7 @@ func (egw *NsxtEdgeGateway) Delete(ctx context.Context) error {
 	}
 
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeGateways
-	minimumApiVersion, err := egw.client.getOpenApiHighestElevatedVersion(ctx, endpoint)
+	apiVersion, err := egw.client.getOpenApiHighestElevatedVersion(ctx, endpoint)
 	if err != nil {
 		return err
 	}
@@ -256,8 +273,7 @@ func (egw *NsxtEdgeGateway) Delete(ctx context.Context) error {
 		return err
 	}
 
-	err = egw.client.OpenApiDeleteItem(ctx, minimumApiVersion, urlRef, nil, nil)
-
+	err = egw.client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil, nil)
 	if err != nil {
 		return fmt.Errorf("error deleting Edge Gateway: %s", err)
 	}
@@ -279,6 +295,30 @@ func (egw *NsxtEdgeGateway) MoveToVdcOrVdcGroup(ctx context.Context, vdcOrVdcGro
 	edgeGatewayConfig.OrgVdc = nil
 
 	return egw.Update(ctx, edgeGatewayConfig)
+}
+
+// reorderUplinks will ensure that uplink at slice index 0 is the one backed by NSX-T Tier0 External network.
+// NSX-T Edge Gateway can have many uplinks of different types (they are differentiated by 'backingType' field):
+// * MANDATORY - exactly 1 uplink to Tier0 Gateway (External network backed by NSX-T T0 Gateway or NSX-T T0 Gateway VRF) [backingType==NSXT_TIER0 or NSXT_VRF_TIER0]
+// * OPTIONAL - one or more External Network Uplinks (backed by NSX-T Segment backed External networks) [backingType==IMPORTED_T_LOGICAL_SWITCH]
+// It is expected that the Tier0 gateway uplink is always at index 0, but we have seen where VCD API
+// shuffles response values therefore it is important to ensure that uplink with
+// backingType==NSXT_TIER0 or backingType==NSXT_VRF_TIER0 the element 0 in types.EdgeGatewayUplinks to avoid breaking functionality
+// in upstream code.
+//
+// Note. This function wil be a noop in 10.4.0, because `backingType` was not present. However, this
+// poses no risks because the can be only 1 uplink up to 10.4.1, when `backingType` was introduced.
+func (egw *NsxtEdgeGateway) reorderUplinks() error {
+	if egw == nil || egw.EdgeGateway == nil {
+		return fmt.Errorf("edge gateway cannot be nil ")
+	}
+
+	if len(egw.EdgeGateway.EdgeGatewayUplinks) == 0 {
+		return fmt.Errorf("no uplinks present in Edge Gateway")
+	}
+
+	egw.EdgeGateway.EdgeGatewayUplinks = reorderEdgeGatewayUplinks(egw.EdgeGateway.EdgeGatewayUplinks)
+	return nil
 }
 
 // getNsxtEdgeGatewayById is a private parent for wrapped functions:
@@ -314,6 +354,11 @@ func getNsxtEdgeGatewayById(ctx context.Context, client *Client, id string, quer
 	if egw.EdgeGateway.GatewayBacking.GatewayType != "NSXT_BACKED" {
 		return nil, fmt.Errorf("%s: this is not NSX-T Edge Gateway (%s)",
 			ErrorEntityNotFound, egw.EdgeGateway.GatewayBacking.GatewayType)
+	}
+
+	err = egw.reorderUplinks()
+	if err != nil {
+		return nil, fmt.Errorf("error reordering Edge Gateway Uplink after API retrieval")
 	}
 
 	return egw, nil
@@ -365,6 +410,15 @@ func getAllNsxtEdgeGateways(ctx context.Context, client *Client, queryParameters
 	}
 
 	onlyNsxtEdges := filterOnlyNsxtEdges(wrappedResponses)
+
+	// Reorder uplink in all Edge Gateways
+	for edgeIndex := range onlyNsxtEdges {
+		err := onlyNsxtEdges[edgeIndex].reorderUplinks()
+		if err != nil {
+			return nil, fmt.Errorf("error reordering NSX-T Edge Gateway Uplinks for gateway '%s' ('%s'): %s",
+				onlyNsxtEdges[edgeIndex].EdgeGateway.Name, onlyNsxtEdges[edgeIndex].EdgeGateway.ID, err)
+		}
+	}
 
 	return onlyNsxtEdges, nil
 }
@@ -459,6 +513,9 @@ func (egw *NsxtEdgeGateway) GetUnusedExternalIPAddresses(ctx context.Context, re
 
 // GetAllUnusedExternalIPAddresses will retrieve all unassigned IP addresses for Edge Gateway It is
 // similar to GetUnusedExternalIPAddresses but returns all unused IPs instead of a specific amount
+//
+// Note. In case a very large subnet of IPv6 is present this function might exhaust memory. Please
+// use GetUnusedExternalIPAddressesWithCountLimit in such cases
 func (egw *NsxtEdgeGateway) GetAllUnusedExternalIPAddresses(ctx context.Context, refresh bool) ([]netip.Addr, error) {
 	if refresh {
 		err := egw.Refresh(ctx)
@@ -471,7 +528,35 @@ func (egw *NsxtEdgeGateway) GetAllUnusedExternalIPAddresses(ctx context.Context,
 		return nil, fmt.Errorf("error getting used IP addresses for Edge Gateway: %s", err)
 	}
 
-	return getAllUnusedExternalIPAddresses(egw.EdgeGateway.EdgeGatewayUplinks, usedIpAddresses, netip.Prefix{})
+	return getAllUnusedExternalIPAddresses(egw.EdgeGateway.EdgeGatewayUplinks, usedIpAddresses, netip.Prefix{}, 0)
+}
+
+// GetUsedAndUnusedExternalIPAddressCountWithLimit will count IPs and can limit their total count up
+// to 'limitTo' which can be used to count IPs with huge IPv6 subnets
+//
+// Return order - usedIpCount, unusedIpCount, error
+func (egw *NsxtEdgeGateway) GetUsedAndUnusedExternalIPAddressCountWithLimit(ctx context.Context, refresh bool, limitTo int64) (int64, int64, error) {
+	if refresh {
+		err := egw.Refresh(ctx)
+		if err != nil {
+			return 0, 0, fmt.Errorf("error refreshing Edge Gateway: %s", err)
+		}
+	}
+	usedIpAddresses, err := egw.GetUsedIpAddresses(ctx, nil)
+	if err != nil {
+		return 0, 0, fmt.Errorf("error getting used IP addresses for Edge Gateway: %s", err)
+	}
+
+	assignedIpAddresses, err := flattenEdgeGatewayUplinkToIpSlice(egw.EdgeGateway.EdgeGatewayUplinks, limitTo)
+	if err != nil {
+		return 0, 0, fmt.Errorf("error listing all IPs in Edge Gateway: %s", err)
+	}
+
+	usedIpCount := int64(len(usedIpAddresses))
+	assignedIpCount := int64(len(assignedIpAddresses))
+	unusedIpCount := assignedIpCount - usedIpCount
+
+	return usedIpCount, unusedIpCount, nil
 }
 
 // GetAllocatedIpCount traverses all subnets in Edge Gateway and returns a count of allocated IP
@@ -487,6 +572,66 @@ func (egw *NsxtEdgeGateway) GetAllocatedIpCount(ctx context.Context, refresh boo
 	allocatedIpCount := 0
 
 	for _, uplink := range egw.EdgeGateway.EdgeGatewayUplinks {
+		for _, subnet := range uplink.Subnets.Values {
+			if subnet.TotalIPCount != nil {
+				allocatedIpCount += *subnet.TotalIPCount
+			}
+		}
+	}
+
+	return allocatedIpCount, nil
+}
+
+// GetPrimaryNetworkAllocatedIpCount returns total count of allocated IPs for first NSX-T Edge
+// Gateway uplink
+func (egw *NsxtEdgeGateway) GetPrimaryNetworkAllocatedIpCount(ctx context.Context, refresh bool) (int, error) {
+	if refresh {
+		err := egw.Refresh(ctx)
+		if err != nil {
+			return 0, fmt.Errorf("error refreshing Edge Gateway: %s", err)
+		}
+	}
+
+	allocatedIpCount := 0
+
+	for _, subnet := range egw.EdgeGateway.EdgeGatewayUplinks[0].Subnets.Values {
+		if subnet.TotalIPCount != nil {
+			allocatedIpCount += *subnet.TotalIPCount
+		}
+	}
+
+	return allocatedIpCount, nil
+}
+
+// GetAllocatedIpCountByUplinkType will return a sum of allocated IPs for particular `uplinkType`
+// `uplinkType` can be one of 'NSXT_TIER0', 'NSXT_VRF_TIER0', 'IMPORTED_T_LOGICAL_SWITCH'
+//
+// Note. This function is based on BackingType field and requires at least VCD 10.4.1
+func (egw *NsxtEdgeGateway) GetAllocatedIpCountByUplinkType(ctx context.Context, refresh bool, uplinkType string) (int, error) {
+	if egw.client.APIVCDMaxVersionIs(ctx, "< 37.1") {
+		return 0, fmt.Errorf("this function requires at least VCD 10.4.1 to work")
+	}
+
+	if uplinkType != "NSXT_TIER0" &&
+		uplinkType != "IMPORTED_T_LOGICAL_SWITCH" &&
+		uplinkType != "NSXT_VRF_TIER0" {
+		return 0, fmt.Errorf("invalid 'uplinkType', expected 'NSXT_TIER0', 'IMPORTED_T_LOGICAL_SWITCH' or 'NSXT_VRF_TIER0', got: %s", uplinkType)
+	}
+
+	if refresh {
+		err := egw.Refresh(ctx)
+		if err != nil {
+			return 0, fmt.Errorf("error refreshing Edge Gateway: %s", err)
+		}
+	}
+
+	allocatedIpCount := 0
+
+	for _, uplink := range egw.EdgeGateway.EdgeGatewayUplinks {
+		// counting IPs only for specific uplink type
+		if uplink.BackingType != nil && *uplink.BackingType != uplinkType {
+			continue
+		}
 		for _, subnet := range uplink.Subnets.Values {
 			if subnet.TotalIPCount != nil {
 				allocatedIpCount += *subnet.TotalIPCount
@@ -659,11 +804,129 @@ func (egw *NsxtEdgeGateway) UpdateQoS(ctx context.Context, qosConfig *types.Nsxt
 	return updatedQos, nil
 }
 
-func getAllUnusedExternalIPAddresses(uplinks []types.EdgeGatewayUplinks, usedIpAddresses []*types.GatewayUsedIpAddress, optionalSubnet netip.Prefix) ([]netip.Addr, error) {
+// GetDhcpForwarder gets DHCP forwarder configuration for an NSX-T Edge Gateway
+func (egw *NsxtEdgeGateway) GetDhcpForwarder(ctx context.Context) (*types.NsxtEdgeGatewayDhcpForwarder, error) {
+	if egw.EdgeGateway == nil || egw.client == nil || egw.EdgeGateway.ID == "" {
+		return nil, fmt.Errorf("cannot get DHCP forwarder for NSX-T Edge Gateway without ID")
+	}
+
+	client := egw.client
+	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeGatewayDhcpForwarder
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	urlRef, err := client.OpenApiBuildEndpoint(fmt.Sprintf(endpoint, egw.EdgeGateway.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	dhcpForwarder := &types.NsxtEdgeGatewayDhcpForwarder{}
+	err = client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, dhcpForwarder, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return dhcpForwarder, nil
+}
+
+// UpdateDhcpForwarder updates DHCP forwarder configuration for an NSX-T Edge Gateway
+func (egw *NsxtEdgeGateway) UpdateDhcpForwarder(ctx context.Context, dhcpForwarderConfig *types.NsxtEdgeGatewayDhcpForwarder) (*types.NsxtEdgeGatewayDhcpForwarder, error) {
+	if egw.EdgeGateway == nil || egw.client == nil || egw.EdgeGateway.ID == "" {
+		return nil, fmt.Errorf("cannot update DHCP forwarder for NSX-T Edge Gateway without ID")
+	}
+
+	client := egw.client
+	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeGatewayDhcpForwarder
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	urlRef, err := client.OpenApiBuildEndpoint(fmt.Sprintf(endpoint, egw.EdgeGateway.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	// update DHCP forwarder with given dhcpForwarderConfig
+	updatedDhcpForwarder, err := egw.GetDhcpForwarder(ctx)
+	if err != nil {
+		return nil, err
+	}
+	dhcpForwarderConfig.Version = updatedDhcpForwarder.Version
+
+	err = client.OpenApiPutItem(ctx, apiVersion, urlRef, nil, dhcpForwarderConfig, updatedDhcpForwarder, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return updatedDhcpForwarder, nil
+}
+
+// GetSlaacProfile gets SLAAC (Stateless Address Autoconfiguration) Profile configuration for an
+// NSX-T Edge Gateway.
+// Note. It represents DHCPv6 Edge Gateway configuration in UI
+func (egw *NsxtEdgeGateway) GetSlaacProfile(ctx context.Context) (*types.NsxtEdgeGatewaySlaacProfile, error) {
+	if egw.EdgeGateway == nil || egw.client == nil || egw.EdgeGateway.ID == "" {
+		return nil, fmt.Errorf("cannot get SLAAC Profile for NSX-T Edge Gateway without ID")
+	}
+
+	client := egw.client
+	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeGatewaySlaacProfile
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	urlRef, err := client.OpenApiBuildEndpoint(fmt.Sprintf(endpoint, egw.EdgeGateway.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	slaacProfile := &types.NsxtEdgeGatewaySlaacProfile{}
+	err = client.OpenApiGetItem(ctx, apiVersion, urlRef, nil, slaacProfile, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return slaacProfile, nil
+}
+
+// UpdateSlaacProfile creates a SLAAC (Stateless Address Autoconfiguration) profile or updates the
+// existing one if it already exists.
+// Note. It represents DHCPv6 Edge Gateway configuration in UI
+func (egw *NsxtEdgeGateway) UpdateSlaacProfile(ctx context.Context, slaacProfileConfig *types.NsxtEdgeGatewaySlaacProfile) (*types.NsxtEdgeGatewaySlaacProfile, error) {
+	if egw.EdgeGateway == nil || egw.client == nil || egw.EdgeGateway.ID == "" {
+		return nil, fmt.Errorf("cannot update SLAAC Profile for NSX-T Edge Gateway without ID")
+	}
+
+	client := egw.client
+	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeGatewaySlaacProfile
+	apiVersion, err := client.getOpenApiHighestElevatedVersion(ctx, endpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	urlRef, err := client.OpenApiBuildEndpoint(fmt.Sprintf(endpoint, egw.EdgeGateway.ID))
+	if err != nil {
+		return nil, err
+	}
+
+	updatedSlaacProfile := &types.NsxtEdgeGatewaySlaacProfile{}
+	err = client.OpenApiPutItem(ctx, apiVersion, urlRef, nil, slaacProfileConfig, updatedSlaacProfile, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return updatedSlaacProfile, nil
+}
+
+func getAllUnusedExternalIPAddresses(uplinks []types.EdgeGatewayUplinks, usedIpAddresses []*types.GatewayUsedIpAddress, optionalSubnet netip.Prefix, limitTo int64) ([]netip.Addr, error) {
 	// 1. Flatten all IP ranges in Edge Gateway using Go's native 'netip.Addr' IP container instead
 	// of plain strings because it is more robust (supports IPv4 and IPv6 and also comparison
 	// operator)
-	assignedIpSlice, err := flattenEdgeGatewayUplinkToIpSlice(uplinks)
+	assignedIpSlice, err := flattenEdgeGatewayUplinkToIpSlice(uplinks, limitTo)
 	if err != nil {
 		return nil, fmt.Errorf("error listing all IPs in Edge Gateway: %s", err)
 	}
@@ -672,7 +935,7 @@ func getAllUnusedExternalIPAddresses(uplinks []types.EdgeGatewayUplinks, usedIpA
 		return nil, fmt.Errorf("no IPs found in Edge Gateway configuration")
 	}
 
-	// 2. Optionally filter given IP ranges by optionalSubnet value (if specified)
+	// 2. Optionally, filter given IP ranges by optionalSubnet value (if specified)
 	if optionalSubnet != (netip.Prefix{}) {
 		assignedIpSlice, err = filterIpSlicesBySubnet(assignedIpSlice, optionalSubnet)
 		if err != nil {
@@ -694,7 +957,7 @@ func getAllUnusedExternalIPAddresses(uplinks []types.EdgeGatewayUplinks, usedIpA
 }
 
 func getUnusedExternalIPAddress(uplinks []types.EdgeGatewayUplinks, usedIpAddresses []*types.GatewayUsedIpAddress, requiredIpCount int, optionalSubnet netip.Prefix) ([]netip.Addr, error) {
-	unusedIps, err := getAllUnusedExternalIPAddresses(uplinks, usedIpAddresses, optionalSubnet)
+	unusedIps, err := getAllUnusedExternalIPAddresses(uplinks, usedIpAddresses, optionalSubnet, 0)
 	if err != nil {
 		return nil, fmt.Errorf("error getting all unused IPs: %s", err)
 	}
@@ -710,8 +973,16 @@ func getUnusedExternalIPAddress(uplinks []types.EdgeGatewayUplinks, usedIpAddres
 
 // flattenEdgeGatewayUplinkToIpSlice processes Edge Gateway Uplink structure and creates a slice of
 // all available IPs
-func flattenEdgeGatewayUplinkToIpSlice(uplinks []types.EdgeGatewayUplinks) ([]netip.Addr, error) {
+// Note. Having a huge IPv6 block might become a long running task and potentially exhaust system
+// memory. One can use 'limitTo' setting to set upper limit for number of IPs that one wants to
+// retrieve. Setting `limitTo` to 0 means that not limitation is applied.
+func flattenEdgeGatewayUplinkToIpSlice(uplinks []types.EdgeGatewayUplinks, limitTo int64) ([]netip.Addr, error) {
+	start := time.Now()
+	util.Logger.Printf("[TRACE] flattenEdgeGatewayUplinkToIpSlice starting at %s with limitTo %d", start.String(), limitTo)
+	util.Logger.Printf("[TRACE] flattenEdgeGatewayUplinkToIpSlice Edge Gateway uplink count %d", len(uplinks))
 	assignedIpSlice := make([]netip.Addr, 0)
+
+	var counter int64
 
 	for _, edgeGatewayUplink := range uplinks {
 		for _, edgeGatewayUplinkSubnet := range edgeGatewayUplink.Subnets.Values {
@@ -739,13 +1010,24 @@ func flattenEdgeGatewayUplinkToIpSlice(uplinks []types.EdgeGatewayUplinks) ([]ne
 					// Expression 'ip.Compare(endIp) == 1'  means that 'ip > endIp' and the loop should stop
 					for ip := startIp; ip.Compare(endIp) != 1; ip = ip.Next() {
 						assignedIpSlice = append(assignedIpSlice, ip)
+						counter++
+						if limitTo != 0 && counter >= limitTo {
+							util.Logger.Printf("[TRACE] flattenEdgeGatewayUplinkToIpSlice hit limitTo %d at %s with IP range", limitTo, time.Since(start))
+							return assignedIpSlice, nil
+						}
 					}
 				} else { // if there is no end address in the range, then it is only a single IP - startIp
 					assignedIpSlice = append(assignedIpSlice, startIp)
+					counter++
+					if limitTo != 0 && counter >= limitTo {
+						util.Logger.Printf("[TRACE] flattenEdgeGatewayUplinkToIpSlice hit limitTo %d at %s with single IP", limitTo, time.Since(start))
+						return assignedIpSlice, nil
+					}
 				}
 			}
 		}
 	}
+	util.Logger.Printf("[TRACE] flattenEdgeGatewayUplinkToIpSlice finished %s", time.Since(start))
 
 	return assignedIpSlice, nil
 }
@@ -853,4 +1135,29 @@ func flattenGatewayUsedIpAddressesToIpSlice(usedIpAddresses []*types.GatewayUsed
 	}
 
 	return usedIpSlice, nil
+}
+
+func reorderEdgeGatewayUplinks(edgeGatewayUplinks []types.EdgeGatewayUplinks) []types.EdgeGatewayUplinks {
+	// If only 1 uplink is present - there is nothing to reorder, because only mandatory uplink is present
+	if len(edgeGatewayUplinks) == 1 {
+		return edgeGatewayUplinks
+	}
+
+	// Element 0 is External Network backed by Tier 0 Gateway or T0 Gateway VRF - nothing to do
+	if edgeGatewayUplinks[0].BackingType != nil && (*edgeGatewayUplinks[0].BackingType == "NSXT_TIER0" || *edgeGatewayUplinks[0].BackingType == "NSXT_VRF_TIER0") {
+		return edgeGatewayUplinks
+	}
+
+	for uplinkIndex := range edgeGatewayUplinks {
+		if edgeGatewayUplinks[uplinkIndex].BackingType != nil && (*edgeGatewayUplinks[uplinkIndex].BackingType == "NSXT_TIER0" || *edgeGatewayUplinks[uplinkIndex].BackingType == "NSXT_VRF_TIER0") {
+			// Swap elements so that 'NSXT_TIER0' or 'NSXT_VRF_TIER0' is at position 0
+			t0BackedUplink := edgeGatewayUplinks[uplinkIndex]
+			edgeGatewayUplinks[uplinkIndex] = edgeGatewayUplinks[0]
+			edgeGatewayUplinks[0] = t0BackedUplink
+
+			return edgeGatewayUplinks
+		}
+	}
+
+	return edgeGatewayUplinks
 }

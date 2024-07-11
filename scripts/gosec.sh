@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 scripts_dir=$(dirname $0)
 cd $scripts_dir
 scripts_dir=$PWD
@@ -11,6 +11,14 @@ then
     echo "source directory ./govcd not found"
     exit 1
 fi
+
+if [ ! -f ./scripts/gosec-config.sh ]
+then
+    echo "file ./scripts/gosec-config.sh not found"
+    exit 1
+fi
+
+source ./scripts/gosec-config.sh
 
 function exists_in_path {
     what=$1
@@ -35,14 +43,14 @@ function get_gosec {
             echo "'curl' executable not found - Skipping gosec"
             exit 0
         fi
-        $curl -sfL https://raw.githubusercontent.com/securego/gosec/master/install.sh > gosec_install.sh
+        $curl -sfL $GOSEC_URL > gosec_install.sh
         exit_code=$?
         if [ "$exit_code" != "0" ]
         then
           echo "Error downloading gosec installer"
           exit $exit_code
         fi
-        sh -x gosec_install.sh > gosec_install.log 2>&1
+        sh -x gosec_install.sh $GOSEC_VERSION > gosec_install.log 2>&1
         exit_code=$?
         if [ "$exit_code" != "0" ]
         then

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
+ * Copyright 2023 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
  */
 
 package govcd
@@ -61,7 +61,7 @@ type DhcpSettings struct {
 }
 
 // Returns the vdc where the vapp resides in.
-func (vapp *VApp) getParentVDC(ctx context.Context) (Vdc, error) {
+func (vapp *VApp) GetParentVDC(ctx context.Context) (Vdc, error) {
 	for _, link := range vapp.VApp.Link {
 		if (link.Type == types.MimeVDC || link.Type == types.MimeAdminVDC) && link.Rel == "up" {
 
@@ -160,9 +160,11 @@ func (vapp *VApp) AddRawVM(ctx context.Context, vAppComposition *types.ReCompose
 	apiEndpoint.Path += "/action/recomposeVApp"
 
 	// Return the task
-	task, err := vapp.client.ExecuteTaskRequest(ctx, apiEndpoint.String(), http.MethodPost, types.MimeRecomposeVappParams, "error instantiating a new VM: %s", vAppComposition)
+	task, err := vapp.client.ExecuteTaskRequestWithApiVersion(ctx, apiEndpoint.String(), http.MethodPost,
+		types.MimeRecomposeVappParams, "error instantiating a new VM: %s",
+		vAppComposition, vapp.client.GetSpecificApiVersionOnCondition(ctx, ">=37.1", "37.1"))
 	if err != nil {
-		return nil, fmt.Errorf("error instantiating a new VM: %s", err)
+		return nil, err
 	}
 
 	err = task.WaitTaskCompletion(ctx)
@@ -378,6 +380,7 @@ func (vapp *VApp) Reset(ctx context.Context) (Task, error) {
 		"", "error resetting vApp: %s", nil)
 }
 
+// Suspend suspends a vApp
 func (vapp *VApp) Suspend(ctx context.Context) (Task, error) {
 
 	apiEndpoint := urlParseRequestURI(vapp.VApp.HREF)
@@ -388,8 +391,25 @@ func (vapp *VApp) Suspend(ctx context.Context) (Task, error) {
 		"", "error suspending vApp: %s", nil)
 }
 
-func (vapp *VApp) Shutdown(ctx context.Context) (Task, error) {
+// DiscardSuspendedState takes back a vApp from suspension
+func (vapp *VApp) DiscardSuspendedState(ctx context.Context) error {
+	// Status 3 means that the vApp is suspended
+	if vapp.VApp.Status != 3 {
+		return nil
+	}
+	apiEndpoint := urlParseRequestURI(vapp.VApp.HREF)
+	apiEndpoint.Path += "/action/discardSuspendedState"
 
+	// Return the task
+	task, err := vapp.client.ExecuteTaskRequest(ctx, apiEndpoint.String(), http.MethodPost,
+		"", "error discarding suspended state for vApp: %s", nil)
+	if err != nil {
+		return err
+	}
+	return task.WaitTaskCompletion(ctx)
+}
+
+func (vapp *VApp) Shutdown(ctx context.Context) (Task, error) {
 	apiEndpoint := urlParseRequestURI(vapp.VApp.HREF)
 	apiEndpoint.Path += "/power/action/shutdown"
 
@@ -461,10 +481,10 @@ func (vapp *VApp) Customize(ctx context.Context, computername, script string, ch
 		HREF:                vapp.VApp.Children.VM[0].HREF,
 		Type:                types.MimeGuestCustomizationSection,
 		Info:                "Specifies Guest OS Customization Settings",
-		Enabled:             takeBoolPointer(true),
+		Enabled:             addrOf(true),
 		ComputerName:        computername,
 		CustomizationScript: script,
-		ChangeSid:           takeBoolPointer(changeSid),
+		ChangeSid:           &changeSid,
 	}
 
 	apiEndpoint := urlParseRequestURI(vapp.VApp.Children.VM[0].HREF)
@@ -598,7 +618,7 @@ func (vapp *VApp) ChangeStorageProfile(ctx context.Context, name string) (Task, 
 		return Task{}, fmt.Errorf("vApp doesn't contain any children, interrupting customization")
 	}
 
-	vdc, err := vapp.getParentVDC(ctx)
+	vdc, err := vapp.GetParentVDC(ctx)
 	if err != nil {
 		return Task{}, fmt.Errorf("error retrieving parent VDC for vApp %s", vapp.VApp.Name)
 	}
@@ -1420,7 +1440,7 @@ func (vapp *VApp) getOrgInfo(ctx context.Context) (*TenantContext, error) {
 		return previous, nil
 	}
 	var err error
-	vdc, err := vapp.getParentVDC(ctx)
+	vdc, err := vapp.GetParentVDC(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1492,7 +1512,7 @@ func (vapp *VApp) Rename(ctx context.Context, newName string) error {
 }
 
 func (vapp *VApp) getTenantContext(ctx context.Context) (*TenantContext, error) {
-	parentVdc, err := vapp.getParentVDC(ctx)
+	parentVdc, err := vapp.GetParentVDC(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1520,7 +1540,7 @@ func (vapp *VApp) RenewLease(ctx context.Context, deploymentLeaseInSeconds, stor
 		}
 	}
 	if href == "" {
-		return fmt.Errorf("link to update lease sttings not found for vApp %s", vapp.VApp.Name)
+		return fmt.Errorf("link to update lease settings not found for vApp %s", vapp.VApp.Name)
 	}
 
 	var leaseSettings = types.UpdateLeaseSettingsSection{
@@ -1529,8 +1549,8 @@ func (vapp *VApp) RenewLease(ctx context.Context, deploymentLeaseInSeconds, stor
 		Xmlns:                    types.XMLNamespaceVCloud,
 		OVFInfo:                  "Lease section settings",
 		Type:                     types.MimeLeaseSettingSection,
-		DeploymentLeaseInSeconds: takeIntAddress(deploymentLeaseInSeconds),
-		StorageLeaseInSeconds:    takeIntAddress(storageLeaseInSeconds),
+		DeploymentLeaseInSeconds: &deploymentLeaseInSeconds,
+		StorageLeaseInSeconds:    &storageLeaseInSeconds,
 	}
 
 	task, err := vapp.client.ExecuteTaskRequest(ctx, href, http.MethodPut,

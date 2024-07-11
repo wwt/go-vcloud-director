@@ -24,13 +24,13 @@ type VdcComputePolicyV2 struct {
 
 // GetVdcComputePolicyV2ById retrieves VDC Compute Policy (V2) by given ID
 func (client *VCDClient) GetVdcComputePolicyV2ById(ctx context.Context, id string) (*VdcComputePolicyV2, error) {
-	return getVdcComputePolicyV2ById(ctx, client, id)
+	return getVdcComputePolicyV2ById(ctx, &client.Client, id)
 }
 
 // getVdcComputePolicyV2ById retrieves VDC Compute Policy (V2) by given ID
-func getVdcComputePolicyV2ById(ctx context.Context, client *VCDClient, id string) (*VdcComputePolicyV2, error) {
+func getVdcComputePolicyV2ById(ctx context.Context, client *Client, id string) (*VdcComputePolicyV2, error) {
 	endpoint := types.OpenApiPathVersion2_0_0 + types.OpenApiEndpointVdcComputePolicies
-	minimumApiVersion, err := client.Client.checkOpenApiEndpointCompatibility(ctx, endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func getVdcComputePolicyV2ById(ctx context.Context, client *VCDClient, id string
 		return nil, fmt.Errorf("empty VDC id")
 	}
 
-	urlRef, err := client.Client.OpenApiBuildEndpoint(endpoint, id)
+	urlRef, err := client.OpenApiBuildEndpoint(endpoint, id)
 
 	if err != nil {
 		return nil, err
@@ -48,10 +48,10 @@ func getVdcComputePolicyV2ById(ctx context.Context, client *VCDClient, id string
 	vdcComputePolicy := &VdcComputePolicyV2{
 		VdcComputePolicyV2: &types.VdcComputePolicyV2{},
 		Href:               urlRef.String(),
-		client:             &client.Client,
+		client:             client,
 	}
 
-	err = client.Client.OpenApiGetItem(ctx, minimumApiVersion, urlRef, nil, vdcComputePolicy.VdcComputePolicyV2, nil)
+	err = client.OpenApiGetItem(ctx, minimumApiVersion, urlRef, nil, vdcComputePolicy.VdcComputePolicyV2, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -62,26 +62,25 @@ func getVdcComputePolicyV2ById(ctx context.Context, client *VCDClient, id string
 // GetAllVdcComputePoliciesV2 retrieves all VDC Compute Policies (V2) using OpenAPI endpoint. Query parameters can be supplied to perform additional
 // filtering
 func (client *VCDClient) GetAllVdcComputePoliciesV2(ctx context.Context, queryParameters url.Values) ([]*VdcComputePolicyV2, error) {
-	return getAllVdcComputePoliciesV2(ctx, client, queryParameters)
+	return getAllVdcComputePoliciesV2(ctx, &client.Client, queryParameters)
 }
 
 // getAllVdcComputePolicies retrieves all VDC Compute Policies (V2) using OpenAPI endpoint. Query parameters can be supplied to perform additional
 // filtering
-func getAllVdcComputePoliciesV2(ctx context.Context, client *VCDClient, queryParameters url.Values) ([]*VdcComputePolicyV2, error) {
+func getAllVdcComputePoliciesV2(ctx context.Context, client *Client, queryParameters url.Values) ([]*VdcComputePolicyV2, error) {
 	endpoint := types.OpenApiPathVersion2_0_0 + types.OpenApiEndpointVdcComputePolicies
-	minimumApiVersion, err := client.Client.checkOpenApiEndpointCompatibility(ctx, endpoint)
+	minimumApiVersion, err := client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
 
-	urlRef, err := client.Client.OpenApiBuildEndpoint(endpoint)
+	urlRef, err := client.OpenApiBuildEndpoint(endpoint)
 	if err != nil {
 		return nil, err
 	}
 
 	responses := []*types.VdcComputePolicyV2{{}}
-
-	err = client.Client.OpenApiGetAllItems(ctx, minimumApiVersion, urlRef, queryParameters, &responses, nil)
+	err = client.OpenApiGetAllItems(ctx, minimumApiVersion, urlRef, queryParameters, &responses, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +88,7 @@ func getAllVdcComputePoliciesV2(ctx context.Context, client *VCDClient, queryPar
 	var wrappedVdcComputePolicies []*VdcComputePolicyV2
 	for _, response := range responses {
 		wrappedVdcComputePolicy := &VdcComputePolicyV2{
-			client:             &client.Client,
+			client:             client,
 			VdcComputePolicyV2: response,
 		}
 		wrappedVdcComputePolicies = append(wrappedVdcComputePolicies, wrappedVdcComputePolicy)

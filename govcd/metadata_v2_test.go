@@ -1,4 +1,4 @@
-//go:build vapp || vdc || metadata || functional || ALL
+//go:build (vapp || vdc || metadata || functional || ALL) && !skipLong
 
 /*
  * Copyright 2022 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -9,9 +9,10 @@ package govcd
 import (
 	"context"
 	"fmt"
-	. "gopkg.in/check.v1"
-
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
+	. "gopkg.in/check.v1"
+	"regexp"
+	"strings"
 )
 
 func init() {
@@ -38,11 +39,13 @@ func (vcd *TestVCD) TestVmMetadata(check *C) {
 	vm := NewVM(&vcd.client.Client)
 	vm.VM = &vmType
 
-	testMetadataCRUDActions(vm, check, nil)
+	vcd.testMetadataCRUDActions(vm, check, nil)
+	vcd.testMetadataIgnore(vm, "vApp", vm.VM.Name, check)
 }
 
 func (vcd *TestVCD) TestAdminVdcMetadata(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
+	vcd.skipIfNotSysAdmin(check)
 	if vcd.config.VCD.Nsxt.Vdc == "" {
 		check.Skip("skipping test because VDC name is empty")
 	}
@@ -55,9 +58,10 @@ func (vcd *TestVCD) TestAdminVdcMetadata(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(adminVdc, NotNil)
 
-	testMetadataCRUDActions(adminVdc, check, func(testCase metadataTest) {
+	vcd.testMetadataCRUDActions(adminVdc, check, func(testCase metadataTest) {
 		testVdcMetadata(vcd, check, testCase)
 	})
+	vcd.testMetadataIgnore(adminVdc, "vdc", adminVdc.AdminVdc.Name, check)
 }
 
 func testVdcMetadata(vcd *TestVCD, check *C, testCase metadataTest) {
@@ -77,12 +81,14 @@ func testVdcMetadata(vcd *TestVCD, check *C, testCase metadataTest) {
 
 func (vcd *TestVCD) TestProviderVdcMetadata(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
-	providerVdc, err := vcd.client.GetProviderVdcByName(ctx, vcd.config.VCD.NsxtProviderVdc.Name)
+	vcd.skipIfNotSysAdmin(check)
+	providerVdc, err := vcd.client.GetProviderVdcByName(vcd.config.VCD.NsxtProviderVdc.Name)
 	if err != nil {
 		check.Skip(fmt.Sprintf("%s: Provider VDC %s not found. Test can't proceed", check.TestName(), vcd.config.VCD.NsxtProviderVdc.Name))
 		return
 	}
-	testMetadataCRUDActions(providerVdc, check, nil)
+	vcd.testMetadataCRUDActions(providerVdc, check, nil)
+	vcd.testMetadataIgnore(providerVdc, "providervdc", providerVdc.ProviderVdc.Name, check)
 }
 
 func (vcd *TestVCD) TestVAppMetadata(check *C) {
@@ -90,7 +96,8 @@ func (vcd *TestVCD) TestVAppMetadata(check *C) {
 	if vcd.skipVappTests {
 		check.Skip("Skipping test because vApp was not successfully created at setup")
 	}
-	testMetadataCRUDActions(vcd.vapp, check, nil)
+	vcd.testMetadataCRUDActions(vcd.vapp, check, nil)
+	vcd.testMetadataIgnore(vcd.vapp, "vApp", vcd.vapp.VApp.Name, check)
 }
 
 func (vcd *TestVCD) TestVAppTemplateMetadata(check *C) {
@@ -103,7 +110,8 @@ func (vcd *TestVCD) TestVAppTemplateMetadata(check *C) {
 	check.Assert(vAppTemplate, NotNil)
 	check.Assert(vAppTemplate.VAppTemplate.Name, Equals, vcd.config.VCD.Catalog.NsxtCatalogItem)
 
-	testMetadataCRUDActions(vAppTemplate, check, nil)
+	vcd.testMetadataCRUDActions(vAppTemplate, check, nil)
+	vcd.testMetadataIgnore(vAppTemplate, "vAppTemplate", vAppTemplate.VAppTemplate.Name, check)
 }
 
 func (vcd *TestVCD) TestMediaRecordMetadata(check *C) {
@@ -125,6 +133,18 @@ func (vcd *TestVCD) TestMediaRecordMetadata(check *C) {
 	check.Assert(uploadTask, NotNil)
 	err = uploadTask.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
+	// cleanup uploaded media so that other tests don't fail
+	defer func() {
+		media, err := catalog.GetMediaByName(check.TestName(), true)
+		check.Assert(err, IsNil)
+		check.Assert(media, NotNil)
+
+		deleteTask, err := media.Delete()
+		check.Assert(err, IsNil)
+		check.Assert(deleteTask, NotNil)
+		err = deleteTask.WaitTaskCompletion()
+		check.Assert(err, IsNil)
+	}()
 
 	AddToCleanupList(check.TestName(), "mediaCatalogImage", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.Name, "Test_AddMetadataOnMediaRecord")
 
@@ -135,19 +155,8 @@ func (vcd *TestVCD) TestMediaRecordMetadata(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(mediaRecord, NotNil)
 	check.Assert(mediaRecord.MediaRecord.Name, Equals, check.TestName())
-
-	testMetadataCRUDActions(mediaRecord, check, nil)
-
-	// cleanup uploaded media so that other tests don't fail
-	media, err := catalog.GetMediaByName(ctx, check.TestName(), true)
-	check.Assert(err, IsNil)
-	check.Assert(media, NotNil)
-
-	deleteTask, err := media.Delete(ctx)
-	check.Assert(err, IsNil)
-	check.Assert(deleteTask, NotNil)
-	err = deleteTask.WaitTaskCompletion(ctx)
-	check.Assert(err, IsNil)
+	vcd.testMetadataCRUDActions(mediaRecord, check, nil)
+	vcd.testMetadataIgnore(mediaRecord, "media", mediaRecord.MediaRecord.Name, check)
 }
 
 func (vcd *TestVCD) TestMediaMetadata(check *C) {
@@ -167,7 +176,8 @@ func (vcd *TestVCD) TestMediaMetadata(check *C) {
 	media, err := catalog.GetMediaByName(ctx, vcd.config.Media.Media, false)
 	check.Assert(err, IsNil)
 
-	testMetadataCRUDActions(media, check, nil)
+	vcd.testMetadataCRUDActions(media, check, nil)
+	vcd.testMetadataIgnore(media, "media", media.Media.Name, check)
 }
 
 func (vcd *TestVCD) TestAdminCatalogMetadata(check *C) {
@@ -182,9 +192,10 @@ func (vcd *TestVCD) TestAdminCatalogMetadata(check *C) {
 	check.Assert(adminCatalog, NotNil)
 	check.Assert(adminCatalog.AdminCatalog.Name, Equals, vcd.config.VCD.Catalog.NsxtBackedCatalogName)
 
-	testMetadataCRUDActions(adminCatalog, check, func(testCase metadataTest) {
+	vcd.testMetadataCRUDActions(adminCatalog, check, func(testCase metadataTest) {
 		testCatalogMetadata(vcd, check, testCase)
 	})
+	vcd.testMetadataIgnore(adminCatalog, "catalog", adminCatalog.AdminCatalog.Name, check)
 }
 
 func testCatalogMetadata(vcd *TestVCD, check *C, testCase metadataTest) {
@@ -209,9 +220,10 @@ func (vcd *TestVCD) TestAdminOrgMetadata(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
-	testMetadataCRUDActions(adminOrg, check, func(testCase metadataTest) {
+	vcd.testMetadataCRUDActions(adminOrg, check, func(testCase metadataTest) {
 		testOrgMetadata(vcd, check, testCase)
 	})
+	vcd.testMetadataIgnore(adminOrg, "org", adminOrg.AdminOrg.Name, check)
 }
 
 func testOrgMetadata(vcd *TestVCD, check *C, testCase metadataTest) {
@@ -247,7 +259,13 @@ func (vcd *TestVCD) TestDiskMetadata(check *C) {
 	disk, err := vcd.vdc.GetDiskByHref(ctx, diskHREF)
 	check.Assert(err, IsNil)
 
-	testMetadataCRUDActions(disk, check, nil)
+	vcd.testMetadataCRUDActions(disk, check, nil)
+	vcd.testMetadataIgnore(disk, "disk", disk.Disk.Name, check)
+
+	task, err = disk.Delete()
+	check.Assert(err, IsNil)
+	err = task.WaitTaskCompletion()
+	check.Assert(err, IsNil)
 }
 
 func (vcd *TestVCD) TestOrgVDCNetworkMetadata(check *C) {
@@ -257,7 +275,8 @@ func (vcd *TestVCD) TestOrgVDCNetworkMetadata(check *C) {
 		check.Skip(fmt.Sprintf("network %s not found. Test can't proceed", vcd.config.VCD.Network.Net1))
 		return
 	}
-	testMetadataCRUDActions(net, check, nil)
+	vcd.testMetadataCRUDActions(net, check, nil)
+	vcd.testMetadataIgnore(net, "network", net.OrgVDCNetwork.Name, check)
 }
 
 func (vcd *TestVCD) TestCatalogItemMetadata(check *C) {
@@ -274,7 +293,162 @@ func (vcd *TestVCD) TestCatalogItemMetadata(check *C) {
 		return
 	}
 
-	testMetadataCRUDActions(catalogItem, check, nil)
+	vcd.testMetadataCRUDActions(catalogItem, check, nil)
+	vcd.testMetadataIgnore(catalogItem, "catalogItem", catalogItem.CatalogItem.Name, check)
+}
+
+func (vcd *TestVCD) testMetadataIgnore(resource metadataCompatible, objectType, objectName string, check *C) {
+	existingMetadata, err := resource.GetMetadata()
+	check.Assert(err, IsNil)
+
+	err = resource.AddMetadataEntryWithVisibility("foo", "bar", types.MetadataStringValue, types.MetadataReadWriteVisibility, false)
+	check.Assert(err, IsNil)
+
+	// Add a new entry that won't be filtered out
+	err = resource.AddMetadataEntryWithVisibility("not_ignored", "bar2", types.MetadataStringValue, types.MetadataReadWriteVisibility, false)
+	check.Assert(err, IsNil)
+
+	cleanup := func() {
+		vcd.client.Client.IgnoredMetadata = nil
+		metadata, err := resource.GetMetadata()
+		check.Assert(err, IsNil)
+		for _, entry := range metadata.MetadataEntry {
+			itWasAlreadyPresent := false
+			for _, existingEntry := range existingMetadata.MetadataEntry {
+				if existingEntry.Key == entry.Key && existingEntry.TypedValue.Value == entry.TypedValue.Value &&
+					existingEntry.Type == entry.Type {
+					itWasAlreadyPresent = true
+				}
+			}
+			if !itWasAlreadyPresent {
+				err = resource.DeleteMetadataEntryWithDomain(entry.Key, entry.Domain != nil && entry.Domain.Domain == "SYSTEM")
+				check.Assert(err, IsNil)
+			}
+		}
+		metadata, err = resource.GetMetadata()
+		check.Assert(err, IsNil)
+		check.Assert(metadata, NotNil)
+		check.Assert(len(metadata.MetadataEntry), Equals, len(existingMetadata.MetadataEntry))
+	}
+	defer cleanup()
+
+	tests := []struct {
+		ignoredMetadata   []IgnoredMetadata
+		metadataIsIgnored bool
+	}{
+		{
+			ignoredMetadata:   []IgnoredMetadata{{ObjectType: &objectType, KeyRegex: regexp.MustCompile(`^foo$`)}},
+			metadataIsIgnored: true,
+		},
+		{
+			ignoredMetadata:   []IgnoredMetadata{{ObjectType: &objectType, ValueRegex: regexp.MustCompile(`^bar$`)}},
+			metadataIsIgnored: true,
+		},
+		{
+			ignoredMetadata:   []IgnoredMetadata{{ObjectType: &objectType, KeyRegex: regexp.MustCompile(`^fizz$`)}},
+			metadataIsIgnored: false,
+		},
+		{
+			ignoredMetadata:   []IgnoredMetadata{{ObjectType: &objectType, ValueRegex: regexp.MustCompile(`^buzz$`)}},
+			metadataIsIgnored: false,
+		},
+		{
+			ignoredMetadata:   []IgnoredMetadata{{ObjectName: &objectName, KeyRegex: regexp.MustCompile(`^foo$`)}},
+			metadataIsIgnored: true,
+		},
+		{
+			ignoredMetadata:   []IgnoredMetadata{{ObjectName: &objectName, ValueRegex: regexp.MustCompile(`^bar$`)}},
+			metadataIsIgnored: true,
+		},
+		{
+			ignoredMetadata:   []IgnoredMetadata{{ObjectName: &objectName, KeyRegex: regexp.MustCompile(`^fizz$`)}},
+			metadataIsIgnored: false,
+		},
+		{
+			ignoredMetadata:   []IgnoredMetadata{{ObjectName: &objectName, ValueRegex: regexp.MustCompile(`^buzz$`)}},
+			metadataIsIgnored: false,
+		},
+		{
+			ignoredMetadata:   []IgnoredMetadata{{ObjectType: &objectType, ObjectName: &objectName, KeyRegex: regexp.MustCompile(`foo`), ValueRegex: regexp.MustCompile(`bar`)}},
+			metadataIsIgnored: true,
+		},
+	}
+
+	// Tests that the ignored metadata setter works as expected
+	vcd.client.Client.IgnoredMetadata = []IgnoredMetadata{{ObjectType: &objectType, ValueRegex: regexp.MustCompile(`dummy`)}}
+	previousIgnoredMetadata := vcd.client.SetMetadataToIgnore(nil)
+	check.Assert(vcd.client.Client.IgnoredMetadata, IsNil)
+	check.Assert(len(previousIgnoredMetadata) > 0, Equals, true)
+	previousIgnoredMetadata = vcd.client.SetMetadataToIgnore(previousIgnoredMetadata)
+	check.Assert(previousIgnoredMetadata, IsNil)
+	check.Assert(len(vcd.client.Client.IgnoredMetadata) > 0, Equals, true)
+
+	for _, tt := range tests {
+		vcd.client.Client.IgnoredMetadata = tt.ignoredMetadata
+
+		// Tests getting a simple metadata entry by its key
+		singleMetadata, err := resource.GetMetadataByKey("foo", false)
+		if tt.metadataIsIgnored {
+			check.Assert(err, NotNil)
+			check.Assert(true, Equals, strings.Contains(err.Error(), "ignored"))
+		} else {
+			check.Assert(err, IsNil)
+			check.Assert(singleMetadata, NotNil)
+			check.Assert(singleMetadata.TypedValue.Value, Equals, "bar")
+		}
+
+		// Retrieve all metadata
+		allMetadata, err := resource.GetMetadata()
+		check.Assert(err, IsNil)
+		check.Assert(allMetadata, NotNil)
+		if tt.metadataIsIgnored {
+			// If metadata is ignored, there should be an offset of 1 entry (with key "test")
+			check.Assert(len(allMetadata.MetadataEntry), Equals, len(existingMetadata.MetadataEntry)+1)
+			for _, entry := range allMetadata.MetadataEntry {
+				if tt.metadataIsIgnored {
+					check.Assert(entry.Key, Not(Equals), "foo")
+					check.Assert(entry.TypedValue.Value, Not(Equals), "bar")
+				}
+			}
+		} else {
+			// If metadata is NOT ignored, there should be an offset of 2 entries (with key "foo" and "test")
+			check.Assert(len(allMetadata.MetadataEntry), Equals, len(existingMetadata.MetadataEntry)+2)
+		}
+	}
+
+	// Tries to delete a metadata entry that is ignored, it should hence fail
+	err = resource.DeleteMetadataEntryWithDomain("foo", false)
+	check.Assert(err, NotNil)
+	check.Assert(true, Equals, strings.Contains(err.Error(), "ignored"))
+
+	// Tries to merge metadata that is filtered out, hence it should fail
+	err = resource.MergeMetadataWithMetadataValues(map[string]types.MetadataValue{
+		"foo": {
+			TypedValue: &types.MetadataTypedValue{
+				XsiType: types.MetadataStringValue,
+				Value:   "bar3",
+			},
+		},
+	})
+	check.Assert(err, NotNil)
+	check.Assert(true, Equals, strings.Contains(err.Error(), "after filtering metadata, there is no metadata to merge"))
+
+	// Tries to merge metadata, one entry is filtered out, another is not
+	err = resource.MergeMetadataWithMetadataValues(map[string]types.MetadataValue{
+		"foo": {
+			TypedValue: &types.MetadataTypedValue{
+				XsiType: types.MetadataStringValue,
+				Value:   "bar3",
+			},
+		},
+		"not_ignored": {
+			TypedValue: &types.MetadataTypedValue{
+				XsiType: types.MetadataStringValue,
+				Value:   "bar",
+			},
+		},
+	})
+	check.Assert(err, IsNil)
 }
 
 // metadataCompatible allows centralizing and generalizing the tests for metadata compatible resources.
@@ -300,7 +474,7 @@ type metadataTest struct {
 // The function parameter extraReadStep performs an extra read step that can be passed as a function. Useful to perform a test
 // on "admin+not admin" resource combinations, where the "not admin" only has a GetMetadata function.
 // For example, AdminOrg and Org, where Org only has GetMetadata.
-func testMetadataCRUDActions(resource metadataCompatible, check *C, extraReadStep func(testCase metadataTest)) {
+func (vcd *TestVCD) testMetadataCRUDActions(resource metadataCompatible, check *C, extraReadStep func(testCase metadataTest)) {
 	// Check how much metadata exists
 	metadata, err := resource.GetMetadata(ctx)
 	check.Assert(err, IsNil)
@@ -398,7 +572,13 @@ func testMetadataCRUDActions(resource metadataCompatible, check *C, extraReadSte
 
 	for _, testCase := range testCases {
 
-		err = resource.AddMetadataEntryWithVisibility(ctx, testCase.Key, testCase.Value, testCase.Type, testCase.Visibility, testCase.IsSystem)
+		// The SYSTEM domain can only be set by a system administrator.
+		// If this test runs as org user, we skip the cases containing 'IsSystem' constraints
+		if !vcd.client.Client.IsSysAdmin && testCase.IsSystem {
+			continue
+		}
+
+		err = resource.AddMetadataEntryWithVisibility(testCase.Key, testCase.Value, testCase.Type, testCase.Visibility, testCase.IsSystem)
 		if testCase.ExpectErrorOnFirstAdd {
 			check.Assert(err, NotNil)
 			continue

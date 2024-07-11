@@ -76,7 +76,7 @@ func (vcd *TestVCD) Test_CreateOrgVdcWithFlex(check *C) {
 				},
 			},
 			VdcStorageProfile: []*types.VdcStorageProfileConfiguration{{
-				Enabled: takeBoolPointer(true),
+				Enabled: addrOf(true),
 				Units:   "MB",
 				Limit:   1024,
 				Default: true,
@@ -99,11 +99,12 @@ func (vcd *TestVCD) Test_CreateOrgVdcWithFlex(check *C) {
 		if allocationModel == "Flex" {
 			vdcConfiguration.IsElastic = &trueValue
 			vdcConfiguration.IncludeMemoryOverhead = &trueValue
+			vdcConfiguration.ResourceGuaranteedMemory = addrOf(1.00)
 		}
 
 		if secondStorageProfileHref != "" {
 			vdcConfiguration.VdcStorageProfile = append(vdcConfiguration.VdcStorageProfile, &types.VdcStorageProfileConfiguration{
-				Enabled: takeBoolPointer(false),
+				Enabled: addrOf(false),
 				Units:   "MB",
 				Limit:   1024,
 				Default: false,
@@ -198,7 +199,7 @@ func (vcd *TestVCD) Test_UpdateVdcFlex(check *C) {
 	check.Assert(err, IsNil)
 
 	err = adminVdc.AddStorageProfileWait(ctx, &types.VdcStorageProfileConfiguration{
-		Enabled:                   takeBoolPointer(true),
+		Enabled:                   addrOf(true),
 		Default:                   false,
 		Units:                     "MB",
 		ProviderVdcStorageProfile: &types.Reference{HREF: pvdcStorageProfile.HREF},
@@ -276,6 +277,12 @@ func (vcd *TestVCD) Test_UpdateVdcFlex(check *C) {
 	check.Assert(math.Abs(*updatedVdc.AdminVdc.ResourceGuaranteedMemory-guaranteed) < 0.001, Equals, true)
 	check.Assert(*updatedVdc.AdminVdc.IsElastic, Equals, true)
 	check.Assert(*updatedVdc.AdminVdc.IncludeMemoryOverhead, Equals, false)
+	vdc, err = adminOrg.GetVDCByName(updatedVdc.AdminVdc.Name, true)
+	check.Assert(err, IsNil)
+	task, err := vdc.Delete(true, true)
+	check.Assert(err, IsNil)
+	err = task.WaitTaskCompletion()
+	check.Assert(err, IsNil)
 }
 
 // Tests VDC storage profile update
@@ -289,6 +296,9 @@ func (vcd *TestVCD) Test_VdcUpdateStorageProfile(check *C) {
 	check.Assert(err, IsNil)
 
 	adminVdc, err := adminOrg.GetAdminVDCByName(ctx, vdcConfiguration.Name, true)
+	check.Assert(err, IsNil)
+	check.Assert(adminVdc, NotNil)
+	vdc, err := adminOrg.GetVDCByName(vdcConfiguration.Name, true)
 	check.Assert(err, IsNil)
 	check.Assert(adminVdc, NotNil)
 
@@ -305,7 +315,7 @@ func (vcd *TestVCD) Test_VdcUpdateStorageProfile(check *C) {
 		Name:                      foundStorageProfile.Name,
 		Default:                   true,
 		Limit:                     9081,
-		Enabled:                   takeBoolPointer(true),
+		Enabled:                   addrOf(true),
 		Units:                     "MB",
 		IopsSettings:              nil,
 		ProviderVdcStorageProfile: &types.Reference{HREF: foundStorageProfile.ProviderVdcStorageProfile.HREF},
@@ -322,4 +332,8 @@ func (vcd *TestVCD) Test_VdcUpdateStorageProfile(check *C) {
 	check.Assert(updatedStorageProfile.Limit, Equals, int64(9081))
 	check.Assert(updatedStorageProfile.Default, Equals, true)
 	check.Assert(updatedStorageProfile.Units, Equals, "MB")
+	task, err := vdc.Delete(true, true)
+	check.Assert(err, IsNil)
+	err = task.WaitTaskCompletion()
+	check.Assert(err, IsNil)
 }

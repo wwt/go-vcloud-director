@@ -99,7 +99,7 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 
 	// Set access control to every user and group
 	allUsersSettings := types.ControlAccessParams{
-		EveryoneAccessLevel: takeStringPointer(types.ControlAccessReadOnly),
+		EveryoneAccessLevel: addrOf(types.ControlAccessReadOnly),
 		IsSharedToEveryone:  true,
 	}
 
@@ -108,7 +108,7 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 	check.Assert(err, IsNil)
 
 	allUsersSettings = types.ControlAccessParams{
-		EveryoneAccessLevel: takeStringPointer(types.ControlAccessReadWrite),
+		EveryoneAccessLevel: addrOf(types.ControlAccessReadWrite),
 		IsSharedToEveryone:  true,
 	}
 	err = testAccessControl(ctx, "vapp all users R/W", vapp, allUsersSettings, allUsersSettings, true, vappTenantContext, check)

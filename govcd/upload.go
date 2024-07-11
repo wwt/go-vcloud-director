@@ -160,8 +160,9 @@ func newFileUploadRequest(ctx context.Context, client *Client, requestUrl string
 	rangeExpression := "bytes " + strconv.FormatInt(int64(offset), 10) + "-" + strconv.FormatInt(int64(offset+filePartSize-1), 10) + "/" + strconv.FormatInt(int64(fileSizeToUpload), 10)
 	uploadReq.Header.Set("Content-Range", rangeExpression)
 
-	for key, value := range uploadReq.Header {
-		util.Logger.Printf("[TRACE] Header: %s :%s \n", key, value)
+	sanitizedHeader := util.SanitizedHeader(uploadReq.Header)
+	for key, value := range sanitizedHeader {
+		util.Logger.Printf("[TRACE] Header: %s: %s \n", key, value)
 	}
 
 	return uploadReq, nil

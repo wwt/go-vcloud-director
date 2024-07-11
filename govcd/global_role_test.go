@@ -220,6 +220,8 @@ func testRightsContainerTenants(vcd *TestVCD, check *C, rpc rightsProviderCollec
 	tenants, err = rpc.GetTenants(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(tenants), Equals, 0)
+	err = newOrg.Delete(true, true)
+	check.Assert(err, IsNil)
 }
 
 // getRightsSet is a convenience function that retrieves a list of rights

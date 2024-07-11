@@ -251,6 +251,10 @@ func (client *Client) OpenApiPostItemAsyncWithHeaders(ctx context.Context, apiVe
 		return Task{}, fmt.Errorf("POST request expected async task (HTTP response 202), got %d", resp.StatusCode)
 	}
 
+	// The response shouldn't have payload as the main information should be in "Location" header
+	util.ProcessResponseOutput(util.FuncNameCallStack(), resp, "")
+	debugShowResponse(resp, []byte("SKIPPED RESPONSE"))
+
 	err = resp.Body.Close()
 	if err != nil {
 		return Task{}, fmt.Errorf("error closing response body: %s", err)
@@ -333,6 +337,56 @@ func (client *Client) OpenApiPostItemAndGetHeaders(ctx context.Context, apiVersi
 	return resp.Header, nil
 }
 
+// OpenApiPostUrlEncoded is a non-standard function used to send a POST request with `x-www-form-urlencoded` format.
+// Accepts a map in format of key:value, marshals the response body in JSON format to outType.
+// If additionalHeader contains a "Content-Type" header, it will be overwritten to "x-www-form-urlencoded"
+func (client *Client) OpenApiPostUrlEncoded(apiVersion string, urlRef *url.URL, params url.Values, payloadMap map[string]string, outType interface{}, additionalHeaders map[string]string) error {
+	urlRefCopy := copyUrlRef(urlRef)
+
+	util.Logger.Printf("[TRACE] Sending a POST request with 'Content-Type: x-www-form-urlencoded' header to endpoint %s with expected response of type %s", urlRefCopy.String(), reflect.TypeOf(outType))
+
+	// Add all values of the payloadMap to the actual payload
+	urlValues := url.Values{}
+	for key, value := range payloadMap {
+		urlValues.Add(key, value)
+	}
+	body := strings.NewReader(urlValues.Encode())
+
+	// Create the header map if it's nil
+	if additionalHeaders == nil {
+		additionalHeaders = make(map[string]string)
+	}
+	// Overwrite the Content-Type header as this is a method only usable for x-www-form-urlencoded
+	additionalHeaders["Content-Type"] = "application/x-www-form-urlencoded"
+
+	req := client.newOpenApiRequest(apiVersion, params, http.MethodPost, urlRef, body, additionalHeaders)
+	resp, err := client.Http.Do(req)
+	if err != nil {
+		return err
+	}
+
+	// resp is ignored below because it is the same the one above
+	_, err = checkRespWithErrType(types.BodyTypeJSON, resp, err, &types.OpenApiError{})
+	if err != nil {
+		return fmt.Errorf("error in HTTP %s request: %s", http.MethodPost, err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		util.Logger.Printf("[TRACE] HTTP status code 200 expected. Got %d", resp.StatusCode)
+	}
+
+	if err = decodeBody(types.BodyTypeJSON, resp, outType); err != nil {
+		return fmt.Errorf("error decoding JSON response after POST: %s", err)
+	}
+
+	err = resp.Body.Close()
+	if err != nil {
+		return fmt.Errorf("error closing response body: %s", err)
+	}
+
+	return nil
+}
+
 // OpenApiPutItemSync is a low level OpenAPI client function to perform PUT request for items that support synchronous
 // requests. The urlRef must point to ID of exact item (e.g. '/1.0.0/edgeGateways/{EDGE_ID}') and support synchronous
 // requests. It will return an error when endpoint does not support synchronous requests (HTTP response status code is not 201).
@@ -358,7 +412,6 @@ func (client *Client) OpenApiPutItemSync(ctx context.Context, apiVersion string,
 
 	if resp.StatusCode != http.StatusCreated {
 		util.Logger.Printf("[TRACE] Synchronous task expected (HTTP status code 201). Got %d", resp.StatusCode)
-
 	}
 
 	if err = decodeBody(types.BodyTypeJSON, resp, outType); err != nil {
@@ -496,6 +549,13 @@ func (client *Client) OpenApiDeleteItem(ctx context.Context, apiVersion string, 
 	if err != nil {
 		return err
 	}
+
+	bodyBytes, err := rewrapRespBodyNoopCloser(resp)
+	if err != nil {
+		return err
+	}
+	util.ProcessResponseOutput(util.FuncNameCallStack(), resp, string(bodyBytes))
+	debugShowResponse(resp, bodyBytes)
 
 	// resp is ignored below because it would be the same as above
 	_, err = checkRespWithErrType(types.BodyTypeJSON, resp, err, &types.OpenApiError{})
@@ -702,13 +762,22 @@ func (client *Client) newOpenApiRequest(ctx context.Context, apiVersion string, 
 		}
 	}
 	for k, v := range additionalHeader {
-		req.Header.Add(k, v)
+		if strings.Contains(v, "{{MEDIA_TYPE}}") || strings.Contains(v, "{{API_VERSION}}") {
+			v = strings.Replace(v, "{{MEDIA_TYPE}}", types.JSONMime, 1)
+			v = strings.Replace(v, "{{API_VERSION}}", apiVersion, 1)
+			req.Header.Set(k, v)
+		} else {
+			req.Header.Add(k, v)
+		}
 	}
 
-	// Inject JSON mime type
-	req.Header.Add("Content-Type", types.JSONMime)
+	// Inject JSON mime type if there are no overwrites
+	if req.Header.Get("Content-Type") == "" {
+		req.Header.Add("Content-Type", types.JSONMime)
+	}
 
 	setHttpUserAgent(client.UserAgent, req)
+	setVcloudClientRequestId(client.RequestIdFunc, req)
 
 	// Avoids passing data if the logging of requests is disabled
 	if util.LogHttpRequest {
@@ -821,27 +890,23 @@ func copyUrlRef(in *url.URL) *url.URL {
 	return newUrlRef
 }
 
-// shouldDoSlowSearch returns true if query isn't working or added needed params if returns false.
-// When the name contains commas, semicolons or asterisks, the encoding is rejected by the API in VCD 10.2 version.
-// For this reason, when one or more commas, semicolons or asterisks are present we run the search brute force,
-// by fetching all and comparing the name. Yet, this is not needed anymore in VCD 10.3 version.
-// Also, url.QueryEscape as well as url.Values.Encode() both encode the space as a + character. So we use
-// search brute force too. Reference to issue:
+// shouldDoSlowSearch returns true and nil url.Values if the filter value contains commas, semicolons or asterisks,
+// as the encoding is rejected by VCD with an error: QueryParseException: Cannot parse the supplied filter, so
+// the caller knows that it needs to run a brute force search and NOT use filtering in any case.
+// Also, url.QueryEscape as well as url.Values.Encode() both encode the space as a + character, so in this case
+// it returns true and nil to specify a brute force search too. Reference to issue:
 // https://github.com/golang/go/issues/4013
 // https://github.com/czos/goamz/pull/11/files
-func shouldDoSlowSearch(ctx context.Context, filterKey, name string, client *Client) (bool, url.Values, error) {
-	var params = url.Values{}
-	slowSearch := false
-	versionWithNoBug, err := client.VersionEqualOrGreater(ctx, "10.3", 2)
-	if err != nil {
-		return false, params, err
-	}
-	if (!versionWithNoBug && (strings.Contains(name, ",") || strings.Contains(name, ";"))) ||
-		strings.Contains(name, " ") || strings.Contains(name, "+") || strings.Contains(name, "*") {
-		slowSearch = true
+// When this function returns false, it returns the url.Values that are not encoded, so make sure that the
+// client encodes them before sending them.
+func shouldDoSlowSearch(filterKey, filterValue string) (bool, url.Values) {
+	if strings.Contains(filterValue, ",") || strings.Contains(filterValue, ";") ||
+		strings.Contains(filterValue, " ") || strings.Contains(filterValue, "+") || strings.Contains(filterValue, "*") {
+		return true, nil
 	} else {
-		params.Set("filter", fmt.Sprintf(filterKey+"==%s", url.QueryEscape(name)))
+		params := url.Values{}
+		params.Set("filter", fmt.Sprintf(filterKey+"==%s", filterValue))
 		params.Set("filterEncoded", "true")
+		return false, params
 	}
-	return slowSearch, params, err
 }

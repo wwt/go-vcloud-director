@@ -367,6 +367,7 @@ func Test_ipSliceDifference(t *testing.T) {
 func Test_flattenEdgeGatewayUplinkToIpSlice(t *testing.T) {
 	type args struct {
 		uplinks []types.EdgeGatewayUplinks
+		limitTo int64
 	}
 	tests := []struct {
 		name    string
@@ -399,6 +400,64 @@ func Test_flattenEdgeGatewayUplinkToIpSlice(t *testing.T) {
 			want: []netip.Addr{
 				netip.MustParseAddr("10.10.10.1"),
 				netip.MustParseAddr("10.10.10.2"),
+			},
+			wantErr: false,
+		},
+		{
+			name: "IPv6BigSubnetLimit3",
+			args: args{
+				uplinks: []types.EdgeGatewayUplinks{
+					{
+						Subnets: types.OpenAPIEdgeGatewaySubnets{
+							Values: []types.OpenAPIEdgeGatewaySubnetValue{
+								{
+									IPRanges: &types.OpenApiIPRanges{
+										Values: []types.OpenApiIPRangeValues{
+											{
+												StartAddress: "2a02:a404:11:0:0:0:0:1",
+												EndAddress:   "2a02:a404:11:0:ffff:ffff:ffff:fffd",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				limitTo: 3,
+			},
+			want: []netip.Addr{
+				netip.MustParseAddr("2a02:a404:11:0:0:0:0:1"),
+				netip.MustParseAddr("2a02:a404:11:0:0:0:0:2"),
+				netip.MustParseAddr("2a02:a404:11:0:0:0:0:3"),
+			},
+			wantErr: false,
+		},
+		{
+			name: "IPv6BigSubnetLimit1",
+			args: args{
+				uplinks: []types.EdgeGatewayUplinks{
+					{
+						Subnets: types.OpenAPIEdgeGatewaySubnets{
+							Values: []types.OpenAPIEdgeGatewaySubnetValue{
+								{
+									IPRanges: &types.OpenApiIPRanges{
+										Values: []types.OpenApiIPRangeValues{
+											{
+												StartAddress: "2a02:a404:11:0:0:0:0:1",
+												EndAddress:   "2a02:a404:11:0:ffff:ffff:ffff:fffd",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				limitTo: 1,
+			},
+			want: []netip.Addr{
+				netip.MustParseAddr("2a02:a404:11:0:0:0:0:1"),
 			},
 			wantErr: false,
 		},
@@ -557,7 +616,7 @@ func Test_flattenEdgeGatewayUplinkToIpSlice(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := flattenEdgeGatewayUplinkToIpSlice(tt.args.uplinks)
+			got, err := flattenEdgeGatewayUplinkToIpSlice(tt.args.uplinks, tt.args.limitTo)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ipSliceFromEdgeGatewayUplinks() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1460,7 +1519,7 @@ func TestOpenAPIEdgeGateway_DeallocateIpCount(t *testing.T) {
 											},
 										},
 									},
-									TotalIPCount: takeIntAddress(2),
+									TotalIPCount: addrOf(2),
 								},
 							},
 						},
@@ -1491,7 +1550,7 @@ func TestOpenAPIEdgeGateway_DeallocateIpCount(t *testing.T) {
 											},
 										},
 									},
-									TotalIPCount: takeIntAddress(1),
+									TotalIPCount: addrOf(1),
 								},
 							},
 						},
@@ -1519,7 +1578,7 @@ func TestOpenAPIEdgeGateway_DeallocateIpCount(t *testing.T) {
 											},
 										},
 									},
-									TotalIPCount: takeIntAddress(2),
+									TotalIPCount: addrOf(2),
 								},
 							},
 						},
@@ -1547,7 +1606,7 @@ func TestOpenAPIEdgeGateway_DeallocateIpCount(t *testing.T) {
 											},
 										},
 									},
-									TotalIPCount: takeIntAddress(2),
+									TotalIPCount: addrOf(2),
 								},
 								{
 									IPRanges: &types.OpenApiIPRanges{
@@ -1558,7 +1617,7 @@ func TestOpenAPIEdgeGateway_DeallocateIpCount(t *testing.T) {
 											},
 										},
 									},
-									TotalIPCount: takeIntAddress(2),
+									TotalIPCount: addrOf(2),
 								},
 							},
 						},
@@ -1586,7 +1645,7 @@ func TestOpenAPIEdgeGateway_DeallocateIpCount(t *testing.T) {
 											},
 										},
 									},
-									TotalIPCount: takeIntAddress(2),
+									TotalIPCount: addrOf(2),
 								},
 								{
 									IPRanges: &types.OpenApiIPRanges{
@@ -1597,7 +1656,7 @@ func TestOpenAPIEdgeGateway_DeallocateIpCount(t *testing.T) {
 											},
 										},
 									},
-									TotalIPCount: takeIntAddress(2),
+									TotalIPCount: addrOf(2),
 								},
 							},
 						},
@@ -1637,6 +1696,122 @@ func TestOpenAPIEdgeGateway_DeallocateIpCount(t *testing.T) {
 				t.Errorf("Allocated IP count %d != desired IP count %d", allocatedIpCount, tt.args.expectedCount)
 			}
 
+		})
+	}
+}
+
+func Test_reorderEdgeGatewayUplinks(t *testing.T) {
+	type args struct {
+		edgeGatewayUplinks []types.EdgeGatewayUplinks
+	}
+	tests := []struct {
+		name string
+		args args
+		want args
+	}{
+		{
+			name: "OneT0Uplink",
+			args: args{edgeGatewayUplinks: []types.EdgeGatewayUplinks{{BackingType: addrOf("NSXT_TIER0"), UplinkID: "1"}}},
+			want: args{edgeGatewayUplinks: []types.EdgeGatewayUplinks{{BackingType: addrOf("NSXT_TIER0"), UplinkID: "1"}}},
+		},
+		{
+			name: "ImpossibleOneSegmentUplink",
+			args: args{edgeGatewayUplinks: []types.EdgeGatewayUplinks{{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "1"}}},
+			want: args{edgeGatewayUplinks: []types.EdgeGatewayUplinks{{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "1"}}},
+		},
+		{
+			name: "OrderedOneT0OneSegmentUplink",
+			args: args{edgeGatewayUplinks: []types.EdgeGatewayUplinks{
+				{BackingType: addrOf("NSXT_TIER0"), UplinkID: "1"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "2"},
+			}},
+			want: args{edgeGatewayUplinks: []types.EdgeGatewayUplinks{
+				{BackingType: addrOf("NSXT_TIER0"), UplinkID: "1"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "2"},
+			}},
+		},
+		{
+			name: "OrderedOneT0OneManySegments",
+			args: args{edgeGatewayUplinks: []types.EdgeGatewayUplinks{
+				{BackingType: addrOf("NSXT_TIER0"), UplinkID: "1"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "2"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "3"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "4"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "5"},
+			}},
+			want: args{edgeGatewayUplinks: []types.EdgeGatewayUplinks{
+				{BackingType: addrOf("NSXT_TIER0"), UplinkID: "1"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "2"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "3"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "4"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "5"},
+			}},
+		},
+		{
+			name: "ReverseOneT0OneSegmentUplink",
+			args: args{edgeGatewayUplinks: []types.EdgeGatewayUplinks{
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "1"},
+				{BackingType: addrOf("NSXT_TIER0"), UplinkID: "2"},
+			}},
+			want: args{edgeGatewayUplinks: []types.EdgeGatewayUplinks{
+				{BackingType: addrOf("NSXT_TIER0"), UplinkID: "2"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "1"},
+			}},
+		},
+		{
+			name: "ReverseOneT0ManySegmentUplinks",
+			args: args{edgeGatewayUplinks: []types.EdgeGatewayUplinks{
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "1"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "2"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "3"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "4"},
+				{BackingType: addrOf("NSXT_TIER0"), UplinkID: "5"},
+			}},
+			want: args{edgeGatewayUplinks: []types.EdgeGatewayUplinks{
+				{BackingType: addrOf("NSXT_TIER0"), UplinkID: "5"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "2"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "3"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "4"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "1"},
+			}},
+		},
+		{
+			name: "ReverseOneT0ManySegmentUplinksVRF",
+			args: args{edgeGatewayUplinks: []types.EdgeGatewayUplinks{
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "1"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "2"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "3"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "4"},
+				{BackingType: addrOf("NSXT_VRF_TIER0"), UplinkID: "5"},
+			}},
+			want: args{edgeGatewayUplinks: []types.EdgeGatewayUplinks{
+				{BackingType: addrOf("NSXT_VRF_TIER0"), UplinkID: "5"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "2"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "3"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "4"},
+				{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH"), UplinkID: "1"},
+			}},
+		},
+		// A failing test example - commented on purpose
+		// {
+		// 	name: "FailingTest",
+		// 	args: args{edgeGatewayUplinks: []types.EdgeGatewayUplinks{
+		// 		types.EdgeGatewayUplinks{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH")},
+		// 		types.EdgeGatewayUplinks{BackingType: addrOf("NSXT_TIER0")},
+		// 	}},
+		// 	want: args{edgeGatewayUplinks: []types.EdgeGatewayUplinks{
+		// 		types.EdgeGatewayUplinks{BackingType: addrOf("IMPORTED_T_LOGICAL_SWITCH")},
+		// 		types.EdgeGatewayUplinks{BackingType: addrOf("NSXT_TIER0")},
+		// 	}},
+		// },
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reorderedUplinks := reorderEdgeGatewayUplinks(tt.args.edgeGatewayUplinks)
+
+			if !reflect.DeepEqual(reorderedUplinks, tt.want.edgeGatewayUplinks) {
+				t.Errorf("Expected %+v, got %+v", tt.args.edgeGatewayUplinks, tt.want.edgeGatewayUplinks)
+			}
 		})
 	}
 }

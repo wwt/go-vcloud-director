@@ -174,6 +174,9 @@ func (adminOrg *AdminOrg) CreateVdc(ctx context.Context, vdcConfiguration *types
 
 	// Return the task
 	task := NewTask(adminOrg.client)
+	if adminVdc.AdminVdc.Tasks == nil || len(adminVdc.AdminVdc.Tasks.Task) == 0 {
+		return Task{}, fmt.Errorf("no task found after VDC %s creation", vdcConfiguration.Name)
+	}
 	task.Task = adminVdc.AdminVdc.Tasks.Task[0]
 	return *task, nil
 }
@@ -377,6 +380,9 @@ func createVdcAsyncV97(ctx context.Context, adminOrg *AdminOrg, vdcConfiguration
 
 	// Return the task
 	task := NewTask(adminOrg.client)
+	if adminVdc.AdminVdc.Tasks == nil || len(adminVdc.AdminVdc.Tasks.Task) == 0 {
+		return Task{}, fmt.Errorf("no task found after VDC %s creation", vdcConfiguration.Name)
+	}
 	task.Task = adminVdc.AdminVdc.Tasks.Task[0]
 	return *task, nil
 }
@@ -494,7 +500,7 @@ func (vdc *AdminVdc) RemoveStorageProfile(ctx context.Context, storageProfileNam
 			Units:   vdcStorageProfileDetails.Units,
 			Limit:   vdcStorageProfileDetails.Limit,
 			Default: false,
-			Enabled: takeBoolPointer(false),
+			Enabled: addrOf(false),
 			ProviderVdcStorageProfile: &types.Reference{
 				HREF: vdcStorageProfileDetails.ProviderVdcStorageProfile.HREF,
 			},
@@ -562,7 +568,7 @@ func (vdc *AdminVdc) SetDefaultStorageProfile(ctx context.Context, storageProfil
 		Units:   vdcStorageProfileDetails.Units,
 		Limit:   vdcStorageProfileDetails.Limit,
 		Default: true,
-		Enabled: takeBoolPointer(true),
+		Enabled: addrOf(true),
 		ProviderVdcStorageProfile: &types.Reference{
 			HREF: vdcStorageProfileDetails.ProviderVdcStorageProfile.HREF,
 		},

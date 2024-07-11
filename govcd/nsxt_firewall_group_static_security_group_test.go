@@ -124,9 +124,9 @@ func (vcd *TestVCD) Test_NsxtSecurityGroupGetAssociatedVms(check *C) {
 	vapp, vappVm := createVappVmAndAttachNetwork(check, vcd, nsxtVdc, routedNet)
 	PrependToCleanupList(vapp.VApp.Name, "vapp", vcd.nsxtVdc.Vdc.Name, check.TestName())
 
-	// VMs are prependend to cleanup list to make sure they are removed before routed network
+	// VMs are prependend to clean up list to make sure they are removed before routed network
 	standaloneVm := createStandaloneVm(check, vcd, nsxtVdc, routedNet)
-	PrependToCleanupList(standaloneVm.VM.ID, "standaloneVm", "", standaloneVm.VM.Name)
+	PrependToCleanupList(standaloneVm.VM.ID, "standaloneVm", "", check.TestName())
 
 	secGroupDefinition := &types.NsxtFirewallGroup{
 		Name:           check.TestName(),
@@ -165,6 +165,16 @@ func (vcd *TestVCD) Test_NsxtSecurityGroupGetAssociatedVms(check *C) {
 
 	check.Assert(foundStandalone, Equals, true)
 	check.Assert(foundVappVm, Equals, true)
+	task, err := vapp.Delete()
+	check.Assert(err, IsNil)
+	err = task.WaitTaskCompletion()
+	check.Assert(err, IsNil)
+	err = standaloneVm.Delete()
+	check.Assert(err, IsNil)
+	err = createdSecGroup.Delete()
+	check.Assert(err, IsNil)
+	err = routedNet.Delete()
+	check.Assert(err, IsNil)
 }
 
 func createNsxtRoutedNetwork(check *C, vcd *TestVCD, vdc *Vdc, edgeGatewayId string) *OpenApiOrgVdcNetwork {
@@ -230,11 +240,11 @@ func createStandaloneVm(check *C, vcd *TestVCD, vdc *Vdc, net *OpenApiOrgVdcNetw
 				Link: nil,
 			},
 			VmSpecSection: &types.VmSpecSection{
-				Modified:          takeBoolPointer(true),
+				Modified:          addrOf(true),
 				Info:              "Virtual Machine specification",
 				OsType:            "debian10Guest",
-				NumCpus:           takeIntAddress(1),
-				NumCoresPerSocket: takeIntAddress(1),
+				NumCpus:           addrOf(1),
+				NumCoresPerSocket: addrOf(1),
 				CpuResourceMhz: &types.CpuResourceMhz{
 					Configured: 0,
 				},
@@ -248,7 +258,7 @@ func createStandaloneVm(check *C, vcd *TestVCD, vdc *Vdc, net *OpenApiOrgVdcNetw
 							UnitNumber:        0,
 							BusNumber:         0,
 							AdapterType:       "5",
-							ThinProvisioned:   takeBoolPointer(true),
+							ThinProvisioned:   addrOf(true),
 							OverrideVmDefault: false,
 						},
 					},
@@ -289,7 +299,7 @@ func createVappVmAndAttachNetwork(check *C, vcd *TestVCD, vdc *Vdc, net *OpenApi
 			ParentNetwork: &types.Reference{
 				HREF: orgVdcNetworkWithHREF.OrgVDCNetwork.HREF,
 			},
-			RetainNetInfoAcrossDeployments: takeBoolPointer(false),
+			RetainNetInfoAcrossDeployments: addrOf(false),
 			FenceMode:                      types.FenceModeBridged,
 		},
 		IsDeployed: false,
@@ -322,11 +332,11 @@ func createVappVmAndAttachNetwork(check *C, vcd *TestVCD, vdc *Vdc, net *OpenApi
 			Description:               "created by " + check.TestName(),
 			GuestCustomizationSection: nil,
 			VmSpecSection: &types.VmSpecSection{
-				Modified:          takeBoolPointer(true),
+				Modified:          addrOf(true),
 				Info:              "Virtual Machine specification",
 				OsType:            "debian10Guest",
-				NumCpus:           takeIntAddress(2),
-				NumCoresPerSocket: takeIntAddress(1),
+				NumCpus:           addrOf(2),
+				NumCoresPerSocket: addrOf(1),
 				CpuResourceMhz:    &types.CpuResourceMhz{Configured: 1},
 				MemoryResourceMb:  &types.MemoryResourceMb{Configured: 1024},
 				DiskSection: &types.DiskSection{DiskSettings: []*types.DiskSettings{
@@ -335,7 +345,7 @@ func createVappVmAndAttachNetwork(check *C, vcd *TestVCD, vdc *Vdc, net *OpenApi
 						SizeMb:            int64(16384),
 						BusNumber:         0,
 						UnitNumber:        0,
-						ThinProvisioned:   takeBoolPointer(true),
+						ThinProvisioned:   addrOf(true),
 						OverrideVmDefault: true,
 					},
 				}},

@@ -14,13 +14,14 @@ import (
 
 func (vcd *TestVCD) Test_NsxtEdgeRouteAdvertisement(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointNsxtRouteAdvertisement)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointNsxtRouteAdvertisement)
+	vcd.skipIfNotSysAdmin(check)
 
-	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
-	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
+	nsxtVdc, err := org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	// Make sure we are using a dedicated Tier-0 gateway (otherwise route advertisement won't be available)
@@ -36,7 +37,7 @@ func (vcd *TestVCD) Test_NsxtEdgeRouteAdvertisement(check *C) {
 	networksToAdvertise := []string{network1, network2} // Sample networks to advertise
 
 	// Test UpdateNsxtRouteAdvertisement
-	nsxtEdgeRouteAdvertisement, err := edge.UpdateNsxtRouteAdvertisement(ctx, true, networksToAdvertise)
+	nsxtEdgeRouteAdvertisement, err := edge.UpdateNsxtRouteAdvertisement(true, networksToAdvertise)
 	check.Assert(err, IsNil)
 	check.Assert(nsxtEdgeRouteAdvertisement, NotNil)
 	check.Assert(nsxtEdgeRouteAdvertisement.Enable, Equals, true)
@@ -45,9 +46,9 @@ func (vcd *TestVCD) Test_NsxtEdgeRouteAdvertisement(check *C) {
 	check.Assert(checkNetworkInSubnetsSlice(network2, networksToAdvertise), IsNil)
 
 	// Test DeleteNsxtRouteAdvertisement
-	err = edge.DeleteNsxtRouteAdvertisement(ctx)
+	err = edge.DeleteNsxtRouteAdvertisement()
 	check.Assert(err, IsNil)
-	nsxtEdgeRouteAdvertisement, err = edge.GetNsxtRouteAdvertisement(ctx)
+	nsxtEdgeRouteAdvertisement, err = edge.GetNsxtRouteAdvertisement()
 	check.Assert(err, IsNil)
 	check.Assert(nsxtEdgeRouteAdvertisement, NotNil)
 	check.Assert(nsxtEdgeRouteAdvertisement.Enable, Equals, false)
@@ -65,7 +66,7 @@ func checkNetworkInSubnetsSlice(network string, subnets []string) error {
 
 func setDedicateTier0Gateway(edgeGateway *NsxtEdgeGateway, dedicate bool) (*NsxtEdgeGateway, error) {
 	edgeGateway.EdgeGateway.EdgeGatewayUplinks[0].Dedicated = dedicate
-	edgeGateway, err := edgeGateway.Update(ctx, edgeGateway.EdgeGateway)
+	edgeGateway, err := edgeGateway.Update(edgeGateway.EdgeGateway)
 	if err != nil {
 		return nil, err
 	}

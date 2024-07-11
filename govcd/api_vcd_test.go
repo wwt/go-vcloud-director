@@ -1,4 +1,4 @@
-//go:build api || openapi || functional || catalog || vapp || gateway || network || org || query || extnetwork || task || vm || vdc || system || disk || lb || lbAppRule || lbAppProfile || lbServerPool || lbServiceMonitor || lbVirtualServer || user || search || nsxv || nsxt || auth || affinity || role || alb || certificate || vdcGroup || metadata || providervdc || rde || ALL
+//go:build api || openapi || functional || catalog || vapp || gateway || network || org || query || extnetwork || task || vm || vdc || system || disk || lb || lbAppRule || lbAppProfile || lbServerPool || lbServiceMonitor || lbVirtualServer || user || search || nsxv || nsxt || auth || affinity || role || alb || certificate || vdcGroup || metadata || providervdc || rde || vsphere || uiPlugin || cse || slz || ALL
 
 /*
  * Copyright 2022 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -21,9 +21,11 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
+
+	"gopkg.in/yaml.v2"
 
 	. "gopkg.in/check.v1"
-	"gopkg.in/yaml.v2"
 
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 	"github.com/vmware/go-vcloud-director/v2/util"
@@ -78,19 +80,20 @@ const (
 	TestVdcFindDiskByHREF         = "TestVdcFindDiskByHREF"
 	TestFindDiskByHREF            = "TestFindDiskByHREF"
 	TestDisk                      = "TestDisk"
-	TestVMAttachOrDetachDisk      = "TestVMAttachOrDetachDisk"
-	TestVMAttachDisk              = "TestVMAttachDisk"
-	TestVMDetachDisk              = "TestVMDetachDisk"
-	TestCreateExternalNetwork     = "TestCreateExternalNetwork"
-	TestDeleteExternalNetwork     = "TestDeleteExternalNetwork"
-	TestLbServiceMonitor          = "TestLbServiceMonitor"
-	TestLbServerPool              = "TestLbServerPool"
-	TestLbAppProfile              = "TestLbAppProfile"
-	TestLbAppRule                 = "TestLbAppRule"
-	TestLbVirtualServer           = "TestLbVirtualServer"
-	TestLb                        = "TestLb"
-	TestNsxvSnatRule              = "TestNsxvSnatRule"
-	TestNsxvDnatRule              = "TestNsxvDnatRule"
+	// #nosec G101 -- Not a credential
+	TestVMAttachOrDetachDisk  = "TestVMAttachOrDetachDisk"
+	TestVMAttachDisk          = "TestVMAttachDisk"
+	TestVMDetachDisk          = "TestVMDetachDisk"
+	TestCreateExternalNetwork = "TestCreateExternalNetwork"
+	TestDeleteExternalNetwork = "TestDeleteExternalNetwork"
+	TestLbServiceMonitor      = "TestLbServiceMonitor"
+	TestLbServerPool          = "TestLbServerPool"
+	TestLbAppProfile          = "TestLbAppProfile"
+	TestLbAppRule             = "TestLbAppRule"
+	TestLbVirtualServer       = "TestLbVirtualServer"
+	TestLb                    = "TestLb"
+	TestNsxvSnatRule          = "TestNsxvSnatRule"
+	TestNsxvDnatRule          = "TestNsxvDnatRule"
 )
 
 const (
@@ -109,10 +112,12 @@ type Tenant struct {
 // specifies
 type TestConfig struct {
 	Provider struct {
-		User     string `yaml:"user"`
-		Password string `yaml:"password"`
-		Token    string `yaml:"token"`
-		ApiToken string `yaml:"api_token"`
+		User       string `yaml:"user"`
+		Password   string `yaml:"password"`
+		Token      string `yaml:"token"`
+		ApiToken   string `yaml:"api_token"`
+		VcdVersion string `yaml:"vcdVersion,omitempty"`
+		ApiVersion string `yaml:"apiVersion,omitempty"`
 
 		// UseSamlAdfs specifies if SAML auth is used for authenticating vCD instead of local login.
 		// The above `User` and `Password` will be used to authenticate against ADFS IdP when true.
@@ -147,18 +152,21 @@ type TestConfig struct {
 		NsxtProviderVdc struct {
 			Name                   string `yaml:"name"`
 			StorageProfile         string `yaml:"storage_profile"`
+			StorageProfile2        string `yaml:"storage_profile_2"`
 			NetworkPool            string `yaml:"network_pool"`
 			PlacementPolicyVmGroup string `yaml:"placementPolicyVmGroup,omitempty"`
 		} `yaml:"nsxt_provider_vdc"`
 		Catalog struct {
-			Name                    string `yaml:"name,omitempty"`
-			NsxtBackedCatalogName   string `yaml:"nsxtBackedCatalogName,omitempty"`
-			Description             string `yaml:"description,omitempty"`
-			CatalogItem             string `yaml:"catalogItem,omitempty"`
-			NsxtCatalogItem         string `yaml:"nsxtCatalogItem,omitempty"`
-			CatalogItemDescription  string `yaml:"catalogItemDescription,omitempty"`
-			CatalogItemWithMultiVms string `yaml:"catalogItemWithMultiVms,omitempty"`
-			VmNameInMultiVmItem     string `yaml:"vmNameInMultiVmItem,omitempty"`
+			Name                      string `yaml:"name,omitempty"`
+			NsxtBackedCatalogName     string `yaml:"nsxtBackedCatalogName,omitempty"`
+			Description               string `yaml:"description,omitempty"`
+			CatalogItem               string `yaml:"catalogItem,omitempty"`
+			CatalogItemWithEfiSupport string `yaml:"catalogItemWithEfiSupport,omitempty"`
+			NsxtCatalogItem           string `yaml:"nsxtCatalogItem,omitempty"`
+			NsxtCatalogAddonDse       string `yaml:"nsxtCatalogAddonDse,omitempty"`
+			CatalogItemDescription    string `yaml:"catalogItemDescription,omitempty"`
+			CatalogItemWithMultiVms   string `yaml:"catalogItemWithMultiVms,omitempty"`
+			VmNameInMultiVmItem       string `yaml:"vmNameInMultiVmItem,omitempty"`
 		} `yaml:"catalog"`
 		Network struct {
 			Net1 string `yaml:"network1"`
@@ -178,27 +186,42 @@ type TestConfig struct {
 		ExternalNetworkPortGroupType string `yaml:"externalNetworkPortGroupType,omitempty"`
 		VimServer                    string `yaml:"vimServer,omitempty"`
 		LdapServer                   string `yaml:"ldapServer,omitempty"`
-		Nsxt                         struct {
-			Manager             string `yaml:"manager"`
-			Tier0router         string `yaml:"tier0router"`
-			Tier0routerVrf      string `yaml:"tier0routerVrf"`
-			NsxtDvpg            string `yaml:"nsxtDvpg"`
-			GatewayQosProfile   string `yaml:"gatewayQosProfile"`
-			Vdc                 string `yaml:"vdc"`
-			ExternalNetwork     string `yaml:"externalNetwork"`
-			EdgeGateway         string `yaml:"edgeGateway"`
-			NsxtImportSegment   string `yaml:"nsxtImportSegment"`
-			VdcGroup            string `yaml:"vdcGroup"`
-			VdcGroupEdgeGateway string `yaml:"vdcGroupEdgeGateway"`
-			NsxtEdgeCluster     string `yaml:"nsxtEdgeCluster"`
-
+		OidcServer                   struct {
+			Url               string `yaml:"url,omitempty"`
+			WellKnownEndpoint string `yaml:"wellKnownEndpoint,omitempty"`
+		} `yaml:"oidcServer,omitempty"`
+		Nsxt struct {
+			Manager                   string `yaml:"manager"`
+			Tier0router               string `yaml:"tier0router"`
+			Tier0routerVrf            string `yaml:"tier0routerVrf"`
+			NsxtDvpg                  string `yaml:"nsxtDvpg"`
+			GatewayQosProfile         string `yaml:"gatewayQosProfile"`
+			Vdc                       string `yaml:"vdc"`
+			ExternalNetwork           string `yaml:"externalNetwork"`
+			EdgeGateway               string `yaml:"edgeGateway"`
+			NsxtImportSegment         string `yaml:"nsxtImportSegment"`
+			NsxtImportSegment2        string `yaml:"nsxtImportSegment2"`
+			VdcGroup                  string `yaml:"vdcGroup"`
+			VdcGroupEdgeGateway       string `yaml:"vdcGroupEdgeGateway"`
+			NsxtEdgeCluster           string `yaml:"nsxtEdgeCluster"`
+			RoutedNetwork             string `yaml:"routedNetwork"`
+			IsolatedNetwork           string `yaml:"isolatedNetwork"`
 			NsxtAlbControllerUrl      string `yaml:"nsxtAlbControllerUrl"`
 			NsxtAlbControllerUser     string `yaml:"nsxtAlbControllerUser"`
 			NsxtAlbControllerPassword string `yaml:"nsxtAlbControllerPassword"`
 			NsxtAlbImportableCloud    string `yaml:"nsxtAlbImportableCloud"`
 			NsxtAlbServiceEngineGroup string `yaml:"nsxtAlbServiceEngineGroup"`
+			IpDiscoveryProfile        string `yaml:"ipDiscoveryProfile"`
+			MacDiscoveryProfile       string `yaml:"macDiscoveryProfile"`
+			SpoofGuardProfile         string `yaml:"spoofGuardProfile"`
+			QosProfile                string `yaml:"qosProfile"`
+			SegmentSecurityProfile    string `yaml:"segmentSecurityProfile"`
 		} `yaml:"nsxt"`
 	} `yaml:"vcd"`
+	Vsphere struct {
+		ResourcePoolForVcd1 string `yaml:"resourcePoolForVcd1,omitempty"`
+		ResourcePoolForVcd2 string `yaml:"resourcePoolForVcd2,omitempty"`
+	} `yaml:"vsphere,omitempty"`
 	Logging struct {
 		Enabled          bool   `yaml:"enabled,omitempty"`
 		LogFileName      string `yaml:"logFileName,omitempty"`
@@ -222,7 +245,32 @@ type TestConfig struct {
 		NsxtMedia        string `yaml:"nsxtBackedMediaName,omitempty"`
 		PhotonOsOvaPath  string `yaml:"photonOsOvaPath,omitempty"`
 		MediaUdfTypePath string `yaml:"mediaUdfTypePath,omitempty"`
+		UiPluginPath     string `yaml:"uiPluginPath,omitempty"`
 	} `yaml:"media"`
+	Cse struct {
+		Version        string `yaml:"version,omitempty"`
+		SolutionsOrg   string `yaml:"solutionsOrg,omitempty"`
+		TenantOrg      string `yaml:"tenantOrg,omitempty"`
+		TenantVdc      string `yaml:"tenantVdc,omitempty"`
+		RoutedNetwork  string `yaml:"routedNetwork,omitempty"`
+		EdgeGateway    string `yaml:"edgeGateway,omitempty"`
+		StorageProfile string `yaml:"storageProfile,omitempty"`
+		OvaCatalog     string `yaml:"ovaCatalog,omitempty"`
+		OvaName        string `yaml:"ovaName,omitempty"`
+	} `yaml:"cse,omitempty"`
+	SolutionAddOn struct {
+		Org           string `yaml:"org"`
+		Vdc           string `yaml:"vdc"`
+		RoutedNetwork string `yaml:"routedNetwork"`
+		ComputePolicy string `yaml:"computePolicy"`
+		StoragePolicy string `yaml:"storagePolicy"`
+		Catalog       string `yaml:"catalog"`
+		AddonImageDse string `yaml:"addonImageDse"`
+		// DseSolutions contains a nested map of maps. This is done so that the structure is dynamic
+		// enough to add new entries, yet maintain the flexibility to have different fields for each
+		// of those entities
+		DseSolutions map[string]map[string]string `yaml:"dseSolutions,omitempty"`
+	} `yaml:"solutionAddOn,omitempty"`
 }
 
 // Test struct for vcloud-director.
@@ -783,9 +831,13 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 
 		// RDE Framework has a bug in VCD 10.3.0 that causes "not found" errors to return as "400 bad request",
 		// so we need to amend them
-		isBuggyRdeError := strings.Contains(entity.OpenApiEndpoint, types.OpenApiEndpointRdeInterfaces)
-		if isBuggyRdeError {
+		if strings.Contains(entity.OpenApiEndpoint, types.OpenApiEndpointRdeInterfaces) {
 			err = amendRdeApiError(&vcd.client.Client, err)
+		}
+		// UI Plugin has a bug in VCD 10.4.x that causes "not found" errors to return a NullPointerException,
+		// so we need to amend them
+		if strings.Contains(entity.OpenApiEndpoint, types.OpenApiEndpointExtensionsUi) {
+			err = amendUIPluginGetByIdError(entity.Name, err)
 		}
 
 		if ContainsNotFound(err) {
@@ -827,6 +879,26 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 
 		// Attempt to use supplied path in entity.Parent for element deletion
 		err = vcd.client.Client.OpenApiDeleteItem(ctx, apiVersion, urlRef, nil, nil)
+		if err != nil {
+			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
+			return
+		}
+
+		vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
+	case "OpenApiEntityGlobalDefaultSegmentProfileTemplate":
+		// Check if any default settings are applied
+		gdSpt, err := vcd.client.GetGlobalDefaultSegmentProfileTemplates()
+		if err != nil {
+			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
+			return
+		}
+
+		if gdSpt.VappNetworkSegmentProfileTemplateRef == nil && gdSpt.VdcNetworkSegmentProfileTemplateRef == nil {
+			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
+			return
+		}
+
+		_, err = vcd.client.UpdateGlobalDefaultSegmentProfileTemplates(&types.NsxtGlobalDefaultSegmentProfileTemplate{})
 		if err != nil {
 			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
 			return
@@ -929,6 +1001,29 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 		}
 		vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
 		return
+	case "provider_vdc":
+		pvdc, err := vcd.client.GetProviderVdcExtendedByName(entity.Name)
+		if err != nil {
+			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
+			return
+		}
+		err = pvdc.Disable()
+		if err != nil {
+			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
+			return
+		}
+		task, err := pvdc.Delete()
+		if err != nil {
+			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
+			return
+		}
+		err = task.WaitTaskCompletion()
+		if err != nil {
+			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
+			return
+		}
+		vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
+		return
 	case "catalogItem":
 		if entity.Parent == "" {
 			vcd.infoCleanup("removeLeftoverEntries: [ERROR] No Org provided for catalogItem '%s'\n", strings.Split(entity.Parent, "|")[0])
@@ -944,22 +1039,16 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
 			return
 		}
-		for _, catalogItems := range catalog.Catalog.CatalogItems {
-			for _, catalogItem := range catalogItems.CatalogItem {
-				if catalogItem.Name == entity.Name {
-					catalogItemApi, err := catalog.GetCatalogItemByName(ctx, catalogItem.Name, false)
-					if catalogItemApi == nil || err != nil {
-						vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
-						return
-					}
-					err = catalogItemApi.Delete(ctx)
-					vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
-					if err != nil {
-						vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
-					}
-				}
-			}
+		catalogItem, err := catalog.GetCatalogItemByName(entity.Name, false)
+		if err != nil {
+			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
+			return
 		}
+		err = catalogItem.Delete()
+		if err != nil {
+			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
+		}
+		vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
 		return
 	case "edgegateway":
 		_, vdc, err := vcd.getAdminOrgAndVdcFromCleanupEntity(ctx, entity)
@@ -1068,8 +1157,12 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
 			return
 		}
-
-		err = adminCatalog.RemoveMediaIfExists(ctx, entity.Name)
+		_, err = adminCatalog.GetMediaByName(entity.Name, true)
+		if ContainsNotFound(err) {
+			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
+			return
+		}
+		err = adminCatalog.RemoveMediaIfExists(entity.Name)
 		if err == nil {
 			vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
 		} else {
@@ -1617,6 +1710,66 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 		}
 		return
 
+	case "nsxtDhcpForwarder":
+		edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(entity.Name)
+		if err != nil {
+			vcd.infoCleanup("removeLeftoverEntries: [ERROR] %s \n", err)
+		}
+
+		dhcpForwarder, err := edge.GetDhcpForwarder()
+		if err != nil {
+			vcd.infoCleanup("removeLeftoverEntries: [ERROR] %s \n", err)
+		}
+
+		if dhcpForwarder.Enabled == false && len(dhcpForwarder.DhcpServers) == 0 {
+			vcd.infoCleanup(notFoundMsg, "dhcpForwarder", entity.Name)
+			return
+		}
+
+		_, err = edge.UpdateDhcpForwarder(&types.NsxtEdgeGatewayDhcpForwarder{})
+		if err != nil {
+			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
+		}
+
+		vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
+		return
+	case "nsxtEdgeGatewayDns":
+		edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(entity.Name)
+		if err != nil {
+			vcd.infoCleanup("removeLeftoverEntries: [ERROR] %s \n", err)
+		}
+
+		dns, err := edge.GetDnsConfig()
+		if err != nil {
+			vcd.infoCleanup("removeLeftoverEntries: [ERROR] %s \n", err)
+		}
+
+		if dns.NsxtEdgeGatewayDns.Enabled == false && dns.NsxtEdgeGatewayDns.DefaultForwarderZone == nil {
+			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
+			return
+		}
+
+		err = dns.Delete()
+		if err != nil {
+			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
+		}
+
+		vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
+		return
+	case "slaacProfile":
+		edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(entity.Name)
+		if err != nil {
+			vcd.infoCleanup("removeLeftoverEntries: [ERROR] %s \n", err)
+		}
+
+		_, err = edge.UpdateSlaacProfile(&types.NsxtEdgeGatewaySlaacProfile{Enabled: false, Mode: "SLAAC"})
+		if err != nil {
+			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
+		}
+
+		vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
+		return
+
 	default:
 		// If we reach this point, we are trying to clean up an entity that
 		// we aren't prepared for yet.
@@ -1788,6 +1941,12 @@ func (vcd *TestVCD) Test_NewRequestWitNotEncodedParamsWithApiVersion(check *C) {
 
 	check.Assert(resp.Header.Get("Content-Type"), Equals, types.MimeQueryRecords+";version="+apiVersion)
 
+	bodyBytes, err := rewrapRespBodyNoopCloser(resp)
+	check.Assert(err, IsNil)
+
+	util.ProcessResponseOutput(util.FuncNameCallStack(), resp, string(bodyBytes))
+	debugShowResponse(resp, bodyBytes)
+
 	// Repeats the call without API version change
 	req = vcd.client.Client.NewRequestWitNotEncodedParams(ctx, nil, map[string]string{"type": "media",
 		"filter": "name==any"}, http.MethodGet, queryUlr, nil)
@@ -1797,6 +1956,11 @@ func (vcd *TestVCD) Test_NewRequestWitNotEncodedParamsWithApiVersion(check *C) {
 
 	// Checks that the regularAPI version was not affected by the previous call
 	check.Assert(resp.Header.Get("Content-Type"), Equals, types.MimeQueryRecords+";version="+vcd.client.Client.APIVersion)
+
+	bodyBytes, err = rewrapRespBodyNoopCloser(resp)
+	check.Assert(err, IsNil)
+	util.ProcessResponseOutput(util.FuncNameCallStack(), resp, string(bodyBytes))
+	debugShowResponse(resp, bodyBytes)
 
 	fmt.Printf("Test: %s run with api Version: %s\n", check.TestName(), apiVersion)
 }
@@ -1866,6 +2030,14 @@ func skipNoNsxtConfiguration(vcd *TestVCD, check *C) {
 	if vcd.config.VCD.Nsxt.EdgeGateway == "" {
 		check.Skip(generalMessage + "No NSX-T Edge Gateway specified in configuration")
 	}
+
+	if vcd.config.VCD.Nsxt.IpDiscoveryProfile == "" ||
+		vcd.config.VCD.Nsxt.MacDiscoveryProfile == "" ||
+		vcd.config.VCD.Nsxt.SpoofGuardProfile == "" ||
+		vcd.config.VCD.Nsxt.QosProfile == "" ||
+		vcd.config.VCD.Nsxt.SegmentSecurityProfile == "" {
+		check.Skip(generalMessage + "NSX-T Segment Profiles are not specified in configuration")
+	}
 }
 
 func skipNoNsxtAlbConfiguration(vcd *TestVCD, check *C) {
@@ -1908,16 +2080,25 @@ func skipOpenApiEndpointTest(ctx context.Context, vcd *TestVCD, check *C, endpoi
 	}
 }
 
+// newUserConnection returns a connection for a given user
+func newUserConnection(href, userName, password, orgName string, insecure bool) (*VCDClient, error) {
+	u, err := url.ParseRequestURI(href)
+	if err != nil {
+		return nil, fmt.Errorf("[newUserConnection] unable to pass url: %s", err)
+	}
+	vcdClient := NewVCDClient(*u, insecure)
+	err = vcdClient.Authenticate(userName, password, orgName)
+	if err != nil {
+		return nil, fmt.Errorf("[newUserConnection] unable to authenticate: %s", err)
+	}
+	return vcdClient, nil
+}
+
 // newOrgUserConnection creates a new Org User and returns a connection to it.
 // Attention: Set the user to use only lowercase letters. If you put upper case letters the function fails on waiting
 // because VCD creates the user with lowercase letters.
 func newOrgUserConnection(adminOrg *AdminOrg, userName, password, href string, insecure bool) (*VCDClient, *OrgUser, error) {
-	u, err := url.ParseRequestURI(href)
-	if err != nil {
-		return nil, nil, fmt.Errorf("[newOrgUserConnection] unable to pass url: %s", err)
-	}
-
-	_, err = adminOrg.GetUserByName(ctx, userName, false)
+	_, err := adminOrg.GetUserByName(userName, false)
 	if err == nil {
 		// user exists
 		return nil, nil, fmt.Errorf("user %s already exists", userName)
@@ -1938,19 +2119,41 @@ func newOrgUserConnection(adminOrg *AdminOrg, userName, password, href string, i
 	}
 
 	AddToCleanupList(userName, "user", adminOrg.AdminOrg.Name, "newOrgUserConnection")
-
-	_ = adminOrg.Refresh(ctx)
-	vcdClient := NewVCDClient(*u, insecure)
-	err = vcdClient.Authenticate(ctx, userName, password, adminOrg.AdminOrg.Name)
-	if err != nil {
-		return nil, nil, fmt.Errorf("[newOrgUserConnection] unable to authenticate: %s", err)
-	}
-
-	// return newUser
-	newUser, err := adminOrg.GetUserByName(ctx, userName, false)
+	_ = adminOrg.Refresh()
+	newUser, err := adminOrg.GetUserByName(userName, false)
 	if err != nil {
 		return nil, nil, fmt.Errorf("[newOrgUserConnection] unable to retrieve newly created user: %s", err)
 	}
 
+	vcdClient, err := newUserConnection(href, userName, password, adminOrg.AdminOrg.Name, insecure)
+	if err != nil {
+		return nil, nil, fmt.Errorf("[newOrgUserConnection] error connecting new user: %s", err)
+	}
+
 	return vcdClient, newUser, nil
+}
+
+func (vcd *TestVCD) skipIfNotSysAdmin(check *C) {
+	if !vcd.client.Client.IsSysAdmin {
+		check.Skip(fmt.Sprintf("Skipping %s: requires system administrator privileges", check.TestName()))
+	}
+}
+
+// retryOnError is a function that will attempt to execute function with signature `func() error`
+// multiple times (until maxRetries) and waiting given retryInterval between tries. It will return
+// original deletion error for troubleshooting.
+func retryOnError(operation func() error, maxRetries int, retryInterval time.Duration) error {
+	var err error
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		err = operation()
+		if err == nil {
+			return nil
+		}
+
+		fmt.Printf("# retrying after %v (Attempt %d/%d)\n", retryInterval, attempt+1, maxRetries)
+		fmt.Printf("# error was: %s", err)
+		time.Sleep(retryInterval)
+	}
+
+	return fmt.Errorf("exceeded maximum retries, final error: %s", err)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
+ * Copyright 2023 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
  */
 
 package govcd
@@ -391,6 +391,14 @@ func (vdc *Vdc) GetEdgeGatewayByHref(ctx context.Context, href string) (*EdgeGat
 	if err != nil {
 		return nil, err
 	}
+
+	// Edge gateways can sometimes come without any configured services which
+	// lead to nil pointer dereference when adding e.g a DNAT rule
+	// https://github.com/vmware/go-vcloud-director/issues/585
+	if edge.EdgeGateway.Configuration.EdgeGatewayServiceConfiguration == nil {
+		edge.EdgeGateway.Configuration.EdgeGatewayServiceConfiguration = &types.GatewayFeatures{}
+	}
+
 	return edge, nil
 }
 
@@ -1033,7 +1041,10 @@ func (vdc *Vdc) CreateStandaloneVmAsync(ctx context.Context, params *types.Creat
 	}
 	params.XmlnsOvf = types.XMLNamespaceOVF
 
-	return vdc.client.ExecuteTaskRequest(ctx, href, http.MethodPost, types.MimeCreateVmParams, "error creating standalone VM: %s", params)
+	// 37.1 Introduced new parameters to VM configuration
+	return vdc.client.ExecuteTaskRequestWithApiVersion(ctx, href, http.MethodPost,
+		types.MimeCreateVmParams, "error creating standalone VM: %s", params,
+		vdc.client.GetSpecificApiVersionOnCondition(ctx, ">=37.1", "37.1"))
 }
 
 // getVmFromTask finds a VM from a running standalone VM creation task
@@ -1274,4 +1285,141 @@ func (vdc *Vdc) getParentOrg(ctx context.Context) (organization, error) {
 		}
 	}
 	return nil, fmt.Errorf("no parent found for VDC %s", vdc.Vdc.Name)
+}
+
+// CreateVappFromTemplate instantiates a new vApp from a vApp template
+// The template argument must contain at least:
+// * Name
+// * Source (a reference to the source vApp template)
+func (vdc *Vdc) CreateVappFromTemplate(ctx context.Context, template *types.InstantiateVAppTemplateParams) (*VApp, error) {
+	vdcHref, err := url.ParseRequestURI(vdc.Vdc.HREF)
+	if err != nil {
+		return nil, fmt.Errorf("error getting VDC href: %s", err)
+	}
+	vdcHref.Path += "/action/instantiateVAppTemplate"
+
+	vapp := NewVApp(vdc.client)
+
+	template.Xmlns = types.XMLNamespaceVCloud
+	template.Ovf = types.XMLNamespaceOVF
+	template.Deploy = true
+
+	_, err = vdc.client.ExecuteRequest(ctx, vdcHref.String(), http.MethodPost,
+		types.MimeInstantiateVappTemplateParams, "error instantiating a new vApp from Template: %s", template, vapp.VApp)
+	if err != nil {
+		return nil, err
+	}
+
+	task := NewTask(vdc.client)
+	for _, taskItem := range vapp.VApp.Tasks.Task {
+		task.Task = taskItem
+		err = task.WaitTaskCompletion(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("error performing task: %s", err)
+		}
+	}
+	err = vapp.Refresh(ctx)
+	return vapp, err
+}
+
+// CloneVapp makes a copy of a vApp into a new one
+// The sourceVapp argument must contain at least:
+// * Name
+// * Source (a reference to the source vApp)
+func (vdc *Vdc) CloneVapp(ctx context.Context, sourceVapp *types.CloneVAppParams) (*VApp, error) {
+	vdcHref, err := url.ParseRequestURI(vdc.Vdc.HREF)
+	if err != nil {
+		return nil, fmt.Errorf("error getting VDC href: %s", err)
+	}
+	vdcHref.Path += "/action/cloneVApp"
+
+	vapp := NewVApp(vdc.client)
+
+	sourceVapp.Xmlns = types.XMLNamespaceVCloud
+	sourceVapp.Ovf = types.XMLNamespaceOVF
+	sourceVapp.Deploy = true
+
+	_, err = vdc.client.ExecuteRequest(ctx, vdcHref.String(), http.MethodPost,
+		types.MimeCloneVapp, "error cloning a vApp : %s", sourceVapp, vapp.VApp)
+	if err != nil {
+		return nil, err
+	}
+
+	task := NewTask(vdc.client)
+	for _, taskItem := range vapp.VApp.Tasks.Task {
+		task.Task = taskItem
+		err = task.WaitTaskCompletion(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("error performing task: %s", err)
+		}
+	}
+	err = vapp.Refresh(ctx)
+	return vapp, err
+}
+
+// Get the details of a hardware version
+func (vdc *Vdc) GetHardwareVersion(ctx context.Context, name string) (*types.VirtualHardwareVersion, error) {
+	if len(vdc.Vdc.Capabilities) == 0 {
+		return nil, fmt.Errorf("VDC doesn't have any virtual hardware version support information stored")
+	}
+
+	found := false
+	for _, hwVersion := range vdc.Vdc.Capabilities[0].SupportedHardwareVersions.SupportedHardwareVersion {
+		if hwVersion.Name == name {
+			found = true
+		}
+	}
+	if !found {
+		return nil, fmt.Errorf("hardware version %s not found or not supported", name)
+	}
+
+	vdcHref, err := url.ParseRequestURI(vdc.Vdc.HREF)
+	if err != nil {
+		return nil, fmt.Errorf("error getting VDC href: %s", err)
+	}
+	vdcHref.Path += "/hwv/" + name
+
+	hardwareVersion := &types.VirtualHardwareVersion{}
+
+	_, err = vdc.client.ExecuteRequest(ctx, vdcHref.String(), http.MethodGet, types.MimeVirtualHardwareVersion, "error getting hardware version: %s", nil, hardwareVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	return hardwareVersion, nil
+}
+
+// Get highest supported hardware version of a VDC
+func (vdc *Vdc) GetHighestHardwareVersion(ctx context.Context) (*types.VirtualHardwareVersion, error) {
+	err := vdc.Refresh(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(vdc.Vdc.Capabilities) == 0 {
+		return nil, fmt.Errorf("VDC doesn't have any virtual hardware version support information stored")
+	}
+
+	hardwareVersions := vdc.Vdc.Capabilities[0].SupportedHardwareVersions.SupportedHardwareVersion
+	// Get last item (highest version) of SupportedHardwareVersions
+	highestVersion := hardwareVersions[len(hardwareVersions)-1].Name
+
+	hardwareVersion, err := vdc.GetHardwareVersion(ctx, highestVersion)
+	if err != nil {
+		return nil, err
+	}
+	return hardwareVersion, nil
+}
+
+// FindOsFromId attempts to find a OS by ID using the given hardware version
+func (vdc *Vdc) FindOsFromId(hardwareVersion *types.VirtualHardwareVersion, osId string) (*types.OperatingSystemInfoType, error) {
+	for _, osFamily := range hardwareVersion.SupportedOperatingSystems.OperatingSystemFamilyInfo {
+		for _, os := range osFamily.OperatingSystems {
+			if osId == os.InternalName {
+				return os, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("no OS found with ID: %s", osId)
 }

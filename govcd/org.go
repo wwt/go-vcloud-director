@@ -131,8 +131,15 @@ func CreateCatalogWithStorageProfile(ctx context.Context, client *Client, links 
 	catalog := NewAdminCatalog(client)
 	_, err := client.ExecuteRequest(ctx, createOrgLink.HREF, http.MethodPost,
 		"application/vnd.vmware.admin.catalog+xml", "error creating catalog: %s", vcomp, catalog.AdminCatalog)
+	if err != nil {
+		return nil, err
+	}
 
-	return catalog, err
+	err = catalog.WaitForTasks(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return catalog, nil
 }
 
 // CreateCatalog creates a catalog with given name and description under
@@ -141,6 +148,17 @@ func CreateCatalogWithStorageProfile(ctx context.Context, client *Client, links 
 // API Documentation: https://code.vmware.com/apis/220/vcloud#/doc/doc/operations/POST-CreateCatalog.html
 func (org *Org) CreateCatalog(ctx context.Context, name, description string) (Catalog, error) {
 	catalog, err := org.CreateCatalogWithStorageProfile(ctx, name, description, nil)
+	if err != nil {
+		return Catalog{}, err
+	}
+	catalog.parent = org
+
+	err = catalog.Refresh(ctx)
+	if err != nil {
+		return Catalog{}, err
+	}
+	// Make sure that the creation task is finished
+	err = catalog.WaitForTasks()
 	if err != nil {
 		return Catalog{}, err
 	}
@@ -273,14 +291,25 @@ func (org *Org) GetCatalogByNameOrId(ctx context.Context, identifier string, ref
 // On success, returns a pointer to the VDC structure and a nil error
 // On failure, returns a nil pointer and an error
 func (org *Org) GetVDCByHref(ctx context.Context, vdcHref string) (*Vdc, error) {
-	vdc := NewVdc(org.client)
-	_, err := org.client.ExecuteRequest(ctx, vdcHref, http.MethodGet,
-		"", "error retrieving VDC: %s", nil, vdc.Vdc)
+	vdc, err := getVDCByHref(ctx, org.client, vdcHref)
 	if err != nil {
 		return nil, err
 	}
 	// The request was successful
-	vdc.parent = org
+	result := NewVdc(org.client)
+	result.Vdc = vdc
+	result.parent = org
+	return result, nil
+}
+
+// getVDCByHref gets a plain VDC object from its HREF.
+func getVDCByHref(ctx context.Context, client *Client, vdcHref string) (*types.Vdc, error) {
+	vdc := &types.Vdc{}
+	_, err := client.ExecuteRequest(ctx, vdcHref, http.MethodGet,
+		"", "error retrieving VDC: %s", nil, vdc)
+	if err != nil {
+		return nil, err
+	}
 	return vdc, nil
 }
 
@@ -366,6 +395,99 @@ func (org *Org) GetTaskList(ctx context.Context) (*types.TasksList, error) {
 	}
 
 	return nil, fmt.Errorf("link not found")
+}
+
+// QueryAllOrgs returns all Orgs using query endpoint
+func (vcdclient *VCDClient) QueryAllOrgs(ctx context.Context) ([]*types.QueryResultOrgRecordType, error) {
+	return vcdclient.Client.queryOrgList(ctx, nil)
+}
+
+// queryOrgList performs an `orgVdc` or `adminOrgVdc` (for System user) and optionally applies filterFields
+func (client *Client) queryOrgList(ctx context.Context, filterFields map[string]string) ([]*types.QueryResultOrgRecordType, error) {
+	util.Logger.Printf("[DEBUG] queryOrgList with filter %#v", filterFields)
+	queryType := client.GetQueryType(types.QtOrg)
+
+	filter := map[string]string{
+		"type": queryType,
+	}
+
+	// When a map of filters with non empty keys and values is supplied - apply it
+	if filterFields != nil {
+		filterSlice := make([]string, 0)
+
+		for filterFieldName, filterFieldValue := range filterFields {
+			// Do not inject 'org' filter for System user as API returns an error
+			if !client.IsSysAdmin && filterFieldName == "org" {
+				continue
+			}
+
+			if filterFieldName != "" && filterFieldValue != "" {
+				filterText := fmt.Sprintf("%s==%s", filterFieldName, url.QueryEscape(filterFieldValue))
+				filterSlice = append(filterSlice, filterText)
+			}
+		}
+
+		if len(filterSlice) > 0 {
+			filter["filter"] = strings.Join(filterSlice, ";")
+			filter["filterEncoded"] = "true"
+		}
+	}
+
+	results, err := client.cumulativeQuery(ctx, queryType, nil, filter)
+	if err != nil {
+		return nil, fmt.Errorf("error querying Orgs %s", err)
+	}
+
+	return results.Results.OrgRecord, nil
+}
+
+// QueryOrgByName retrieves an Org
+func (vcdclient *VCDClient) QueryOrgByName(ctx context.Context, name string) (*types.QueryResultOrgRecordType, error) {
+	return vcdclient.Client.queryOrgByName(ctx, name)
+}
+
+// queryOrgByName returns a single QueryResultOrgRecordType
+func (client *Client) queryOrgByName(ctx context.Context, orgName string) (*types.QueryResultOrgRecordType, error) {
+	filterMap := map[string]string{
+		"name": orgName,
+	}
+	allOrgs, err := client.queryOrgList(ctx, filterMap)
+	if err != nil {
+		return nil, err
+	}
+
+	if allOrgs == nil || len(allOrgs) < 1 {
+		return nil, ErrorEntityNotFound
+	}
+
+	if len(allOrgs) > 1 {
+		return nil, fmt.Errorf("found more than 1 Org with Name '%s'", orgName)
+	}
+
+	return allOrgs[0], nil
+}
+
+// QueryOrgByID retrieves an Org
+func (vcdclient *VCDClient) QueryOrgByID(ctx context.Context, id string) (*types.QueryResultOrgRecordType, error) {
+	return vcdclient.Client.queryOrgByID(ctx, id)
+}
+
+// queryOrgByID returns a single QueryResultOrgRecordType
+func (client *Client) queryOrgByID(ctx context.Context, orgId string) (*types.QueryResultOrgRecordType, error) {
+	filterMap := map[string]string{
+		"id": orgId,
+	}
+	allOrgs, err := client.queryOrgList(ctx, filterMap)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(allOrgs) < 1 {
+		return nil, ErrorEntityNotFound
+	}
+
+	return allOrgs[0], nil
 }
 
 // queryOrgVdcByName returns a single QueryResultOrgVdcRecordType
@@ -579,4 +701,18 @@ func queryCatalogList(ctx context.Context, client *Client, filterFields map[stri
 	}
 	util.Logger.Printf("[DEBUG] QueryCatalogList returned with : %#v and error: %s", catalogs, err)
 	return catalogs, nil
+}
+
+// GetVappByHref returns a vApp reference by running a VCD API call
+// If no valid vApp is found, it returns a nil VApp reference and an error
+func (org *Org) GetVAppByHref(ctx context.Context, vappHref string) (*VApp, error) {
+	newVapp := NewVApp(org.client)
+
+	_, err := org.client.ExecuteRequest(ctx, vappHref, http.MethodGet,
+		"", "error retrieving vApp: %s", nil, newVapp.VApp)
+
+	if err != nil {
+		return nil, err
+	}
+	return newVapp, nil
 }

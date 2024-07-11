@@ -42,7 +42,7 @@ func (vcd *TestVCD) Test_NsxtNatDnat(check *C) {
 			ID:   appPortProfiles[0].NsxtAppPortProfile.ID,
 			Name: appPortProfiles[0].NsxtAppPortProfile.Name},
 		SnatDestinationAddresses: "",
-		Logging:                  true,
+		Logging:                  vcd.client.Client.IsSysAdmin,
 		DnatExternalPort:         "",
 	}
 
@@ -82,7 +82,7 @@ func (vcd *TestVCD) Test_NsxtNatDnatExternalPortPort(check *C) {
 			ID:   appPortProfiles[0].NsxtAppPortProfile.ID,
 			Name: appPortProfiles[0].NsxtAppPortProfile.Name},
 		SnatDestinationAddresses: "",
-		Logging:                  true,
+		Logging:                  vcd.client.Client.IsSysAdmin,
 		DnatExternalPort:         "9898",
 	}
 
@@ -122,9 +122,9 @@ func (vcd *TestVCD) Test_NsxtNatDnatFirewallMatchPriority(check *C) {
 			ID:   appPortProfiles[0].NsxtAppPortProfile.ID,
 			Name: appPortProfiles[0].NsxtAppPortProfile.Name},
 		SnatDestinationAddresses: "",
-		Logging:                  true,
+		Logging:                  vcd.client.Client.IsSysAdmin,
 		FirewallMatch:            types.NsxtNatRuleFirewallMatchExternalAddress,
-		Priority:                 takeIntAddress(248),
+		Priority:                 addrOf(248),
 	}
 
 	nsxtNatRuleChecks(natRuleDefinition, edge, check, vcd)
@@ -250,9 +250,9 @@ func (vcd *TestVCD) Test_NsxtNatPriorityAndFirewallMatch(check *C) {
 		ExternalAddresses:        edgeGatewayPrimaryIp,
 		InternalAddresses:        "11.11.11.2",
 		SnatDestinationAddresses: "",
-		Logging:                  true,
+		Logging:                  vcd.client.Client.IsSysAdmin,
 		DnatExternalPort:         "",
-		Priority:                 takeIntAddress(100),
+		Priority:                 addrOf(100),
 		FirewallMatch:            types.NsxtNatRuleFirewallMatchExternalAddress,
 	}
 
@@ -287,7 +287,7 @@ func (vcd *TestVCD) Test_NsxtNatReflexive(check *C) {
 		Type:              types.NsxtNatRuleTypeReflexive,
 		ExternalAddresses: edgeGatewayPrimaryIp,
 		InternalAddresses: "11.11.11.2",
-		Priority:          takeIntAddress(100),
+		Priority:          addrOf(100),
 		FirewallMatch:     types.NsxtNatRuleFirewallMatchExternalAddress,
 	}
 

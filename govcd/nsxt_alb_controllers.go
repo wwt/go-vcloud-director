@@ -133,15 +133,7 @@ func (vcdClient *VCDClient) GetAlbControllerByUrl(ctx context.Context, url strin
 		}
 	}
 
-	if len(filteredControllers) == 0 {
-		return nil, fmt.Errorf("%s could not find ALB Controller by Url '%s'", ErrorEntityNotFound, url)
-	}
-
-	if len(filteredControllers) > 1 {
-		return nil, fmt.Errorf("found more than 1 ALB Controller by Url '%s'", url)
-	}
-
-	return filteredControllers[0], nil
+	return oneOrError("url", url, filteredControllers)
 }
 
 // CreateNsxtAlbController creates controller with supplied albControllerConfig configuration

@@ -7,7 +7,6 @@
 package govcd
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
@@ -27,10 +26,9 @@ func (vcd *TestVCD) Test_VMGetDhcpAddress(check *C) {
 	if vcd.config.VCD.EdgeGateway == "" {
 		check.Skip("Skipping test because no edge gateway given")
 	}
-	ctx := context.Background()
 
 	// Construct new VM for test
-	vapp, err := deployVappForTest(ctx, vcd, "GetDhcpAddress")
+	vapp, err := deployVappForTest(vcd, "GetDhcpAddress")
 	check.Assert(err, IsNil)
 	vmType, _ := vcd.findFirstVm(*vapp)
 	vm := &VM{
@@ -38,29 +36,29 @@ func (vcd *TestVCD) Test_VMGetDhcpAddress(check *C) {
 		client: vapp.client,
 	}
 
-	edgeGateway, err := vcd.vdc.GetEdgeGatewayByName(ctx, vcd.config.VCD.EdgeGateway, false)
+	edgeGateway, err := vcd.vdc.GetEdgeGatewayByName(vcd.config.VCD.EdgeGateway, false)
 	if err != nil {
 		check.Skip(fmt.Sprintf("Edge Gateway %s not found", vcd.config.VCD.EdgeGateway))
 	}
 
 	// Setup Org network with a single IP in DHCP pool
-	network := makeOrgVdcNetworkWithDhcp(ctx, vcd, check, edgeGateway)
+	network := makeOrgVdcNetworkWithDhcp(vcd, check, edgeGateway)
 
 	// Attach Org network to vApp
-	_, err = vapp.AddOrgNetwork(ctx, &VappNetworkSettings{}, network, false)
+	_, err = vapp.AddOrgNetwork(&VappNetworkSettings{}, network.OrgVDCNetwork, false)
 	check.Assert(err, IsNil)
 
 	// Get network config and update it to use DHCP
-	netCfg, err := vm.GetNetworkConnectionSection(ctx)
+	netCfg, err := vm.GetNetworkConnectionSection()
 	check.Assert(err, IsNil)
 	check.Assert(netCfg, NotNil)
 
-	netCfg.NetworkConnection[0].Network = network.Name
+	netCfg.NetworkConnection[0].Network = network.OrgVDCNetwork.Name
 	netCfg.NetworkConnection[0].IPAddressAllocationMode = types.IPAllocationModeDHCP
 	netCfg.NetworkConnection[0].IsConnected = true
 
 	secondNic := &types.NetworkConnection{
-		Network:                 network.Name,
+		Network:                 network.OrgVDCNetwork.Name,
 		IPAddressAllocationMode: types.IPAllocationModeDHCP,
 		NetworkConnectionIndex:  1,
 		IsConnected:             true,
@@ -68,14 +66,14 @@ func (vcd *TestVCD) Test_VMGetDhcpAddress(check *C) {
 	netCfg.NetworkConnection = append(netCfg.NetworkConnection, secondNic)
 
 	// Update network configuration to use DHCP
-	err = vm.UpdateNetworkConnectionSection(ctx, netCfg)
+	err = vm.UpdateNetworkConnectionSection(netCfg)
 	check.Assert(err, IsNil)
 
 	if testVerbose {
 		fmt.Printf("# Time out waiting for DHCP IPs on powered off VMs: ")
 	}
 	// Pretend we are waiting for DHCP addresses when VM is powered off - it must timeout
-	ips, hasTimedOut, err := vm.WaitForDhcpIpByNicIndexes(ctx, []int{0, 1}, 10, true)
+	ips, hasTimedOut, err := vm.WaitForDhcpIpByNicIndexes([]int{0, 1}, 10, true)
 	check.Assert(err, IsNil)
 	check.Assert(hasTimedOut, Equals, true)
 	check.Assert(ips, HasLen, 2)
@@ -87,16 +85,16 @@ func (vcd *TestVCD) Test_VMGetDhcpAddress(check *C) {
 	}
 
 	// err = vm.PowerOnAndForceCustomization()
-	task, err := vapp.PowerOn(ctx)
+	task, err := vapp.PowerOn()
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion(ctx)
+	err = task.WaitTaskCompletion()
 	check.Assert(err, IsNil)
 
 	if testVerbose {
 		fmt.Printf("# Get IPs for NICs 0 and 1: ")
 	}
 	// Wait and check DHCP lease acquired
-	ips, hasTimedOut, err = vm.WaitForDhcpIpByNicIndexes(ctx, []int{0, 1}, 300, true)
+	ips, hasTimedOut, err = vm.WaitForDhcpIpByNicIndexes([]int{0, 1}, 300, true)
 	check.Assert(err, IsNil)
 	check.Assert(hasTimedOut, Equals, false)
 	check.Assert(ips, HasLen, 2)
@@ -111,7 +109,7 @@ func (vcd *TestVCD) Test_VMGetDhcpAddress(check *C) {
 	if testVerbose {
 		fmt.Printf("# Get active lease for NICs with MAC 0: ")
 	}
-	lease, err := edgeGateway.GetNsxvActiveDhcpLeaseByMac(ctx, netCfg.NetworkConnection[0].MACAddress)
+	lease, err := edgeGateway.GetNsxvActiveDhcpLeaseByMac(netCfg.NetworkConnection[0].MACAddress)
 	check.Assert(err, IsNil)
 	check.Assert(lease, NotNil)
 	// This check fails for a known bug in vCD
@@ -123,7 +121,7 @@ func (vcd *TestVCD) Test_VMGetDhcpAddress(check *C) {
 	if testVerbose {
 		fmt.Printf("# Check number of leases on Edge Gateway: ")
 	}
-	allLeases, err := edgeGateway.GetAllNsxvDhcpLeases(ctx)
+	allLeases, err := edgeGateway.GetAllNsxvDhcpLeases()
 	check.Assert(err, IsNil)
 	check.Assert(allLeases, NotNil)
 	check.Assert(len(allLeases) > 0, Equals, true)
@@ -135,7 +133,7 @@ func (vcd *TestVCD) Test_VMGetDhcpAddress(check *C) {
 	if testVerbose {
 		fmt.Printf("# Get IP for single NIC 0: ")
 	}
-	ips, hasTimedOut, err = vm.WaitForDhcpIpByNicIndexes(ctx, []int{0}, 300, true)
+	ips, hasTimedOut, err = vm.WaitForDhcpIpByNicIndexes([]int{0}, 300, true)
 	check.Assert(err, IsNil)
 	check.Assert(hasTimedOut, Equals, false)
 	check.Assert(ips, HasLen, 1)
@@ -151,7 +149,7 @@ func (vcd *TestVCD) Test_VMGetDhcpAddress(check *C) {
 	if testVerbose {
 		fmt.Printf("# Get IPs for NICs 0 and 1 (only using guest tools): ")
 	}
-	ips, hasTimedOut, err = vm.WaitForDhcpIpByNicIndexes(ctx, []int{0, 1}, 300, false)
+	ips, hasTimedOut, err = vm.WaitForDhcpIpByNicIndexes([]int{0, 1}, 300, false)
 	check.Assert(err, IsNil)
 	check.Assert(hasTimedOut, Equals, false)
 	check.Assert(ips, HasLen, 2)
@@ -163,14 +161,18 @@ func (vcd *TestVCD) Test_VMGetDhcpAddress(check *C) {
 	}
 
 	// Cleanup vApp
-	err = deleteVapp(ctx, vcd, vapp.VApp.Name)
+	err = deleteVapp(vcd, vapp.VApp.Name)
+	check.Assert(err, IsNil)
+	task, err = network.Delete()
+	check.Assert(err, IsNil)
+	err = task.WaitTaskCompletion()
 	check.Assert(err, IsNil)
 }
 
 // makeOrgVdcNetworkWithDhcp is a helper that creates a routed Org network and a DHCP pool with
 // single IP address to be assigned. Org vDC network and IP address assigned to DHCP pool are
 // returned
-func makeOrgVdcNetworkWithDhcp(ctx context.Context, vcd *TestVCD, check *C, edgeGateway *EdgeGateway) *types.OrgVDCNetwork {
+func makeOrgVdcNetworkWithDhcp(vcd *TestVCD, check *C, edgeGateway *EdgeGateway) *OrgVDCNetwork {
 	var networkConfig = types.OrgVDCNetwork{
 		Xmlns:       types.XMLNamespaceVCloud,
 		Name:        TestCreateOrgVdcNetworkDhcp,
@@ -205,13 +207,13 @@ func makeOrgVdcNetworkWithDhcp(ctx context.Context, vcd *TestVCD, check *C, edge
 	}
 
 	// Create network
-	err := vcd.vdc.CreateOrgVDCNetworkWait(ctx, &networkConfig)
+	err := vcd.vdc.CreateOrgVDCNetworkWait(&networkConfig)
 	if err != nil {
 		fmt.Printf("error creating Network <%s>: %s\n", TestCreateOrgVdcNetworkDhcp, err)
 	}
 	check.Assert(err, IsNil)
 	AddToCleanupList(TestCreateOrgVdcNetworkDhcp, "network", vcd.org.Org.Name+"|"+vcd.vdc.Vdc.Name, "TestCreateOrgVdcNetworkDhcp")
-	network, err := vcd.vdc.GetOrgVdcNetworkByName(ctx, TestCreateOrgVdcNetworkDhcp, true)
+	network, err := vcd.vdc.GetOrgVdcNetworkByName(TestCreateOrgVdcNetworkDhcp, true)
 	check.Assert(err, IsNil)
 
 	// Add DHCP pool
@@ -222,10 +224,10 @@ func makeOrgVdcNetworkWithDhcp(ctx context.Context, vcd *TestVCD, check *C, edge
 	dhcpPool["default_lease_time"] = 3600
 	dhcpPool["max_lease_time"] = 7200
 	dhcpPoolConfig[0] = dhcpPool
-	task, err := edgeGateway.AddDhcpPool(ctx, network.OrgVDCNetwork, dhcpPoolConfig)
+	task, err := edgeGateway.AddDhcpPool(network.OrgVDCNetwork, dhcpPoolConfig)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion(ctx)
+	err = task.WaitTaskCompletion()
 	check.Assert(err, IsNil)
 
-	return network.OrgVDCNetwork
+	return network
 }

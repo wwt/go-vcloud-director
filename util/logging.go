@@ -41,6 +41,7 @@ const (
 	envLogSkipHttpReq = "GOVCD_LOG_SKIP_HTTP_REQ"
 
 	// Name of the environment variable that enables logging of HTTP responses
+	// #nosec G101 -- Not a credential
 	envLogSkipHttpResp = "GOVCD_LOG_SKIP_HTTP_RESP"
 
 	// Name of the environment variable with a custom list of of responses to skip from logging
@@ -195,6 +196,18 @@ func hideSensitive(in string, onScreen bool) string {
 	re7 := regexp.MustCompile(`(refresh_token)=(\S+)`)
 	out = re7.ReplaceAllString(out, `${1}=*******`)
 
+	// Bearer token inside JSON response
+	re8 := regexp.MustCompile(`("access_token":\s*)"[^"]*`)
+	out = re8.ReplaceAllString(out, `${1}*******`)
+
+	// Token inside JSON response
+	re9 := regexp.MustCompile(`("refresh_token":\s*)"[^"]*`)
+	out = re9.ReplaceAllString(out, `${1}*******`)
+
+	// API Token inside CSE JSON payloads
+	re10 := regexp.MustCompile(`("apiToken":\s*)"[^"]*`)
+	out = re10.ReplaceAllString(out, `${1}*******`)
+
 	return out
 }
 
@@ -203,6 +216,13 @@ func isBinary(data string, req *http.Request) bool {
 	reContentRange := regexp.MustCompile(`(?i)content-range`)
 	reMultipart := regexp.MustCompile(`(?i)multipart/form`)
 	reMediaXml := regexp.MustCompile(`(?i)media+xml;`)
+	// Skip data transferred for vApp template or catalog item upload
+	if strings.Contains(req.URL.String(), "/transfer/") &&
+		(strings.HasSuffix(req.URL.String(), ".vmdk") || strings.HasSuffix(req.URL.String(), "/file")) &&
+		(req.Method == http.MethodPut || req.Method == http.MethodPost) {
+		return true
+	}
+	uiPlugin := regexp.MustCompile(`manifest\.json|bundle\.js`)
 	for key, value := range req.Header {
 		if reContentRange.MatchString(key) {
 			return true
@@ -216,7 +236,7 @@ func isBinary(data string, req *http.Request) bool {
 			}
 		}
 	}
-	return false
+	return uiPlugin.MatchString(data)
 }
 
 // SanitizedHeader returns a http.Header with sensitive fields masked
@@ -353,6 +373,8 @@ func ProcessResponseOutput(caller string, resp *http.Response, result string) {
 	outTextSize := len(outText)
 	if outTextSize != dataSize {
 		Logger.Printf("Response text: [%d -> %d]\n%s\n", dataSize, outTextSize, hideSensitive(outText, false))
+	} else if dataSize == 0 {
+		Logger.Printf("Response text: [%d]\n", dataSize)
 	} else {
 		Logger.Printf("Response text: [%d]\n%s\n", dataSize, hideSensitive(outText, false))
 	}

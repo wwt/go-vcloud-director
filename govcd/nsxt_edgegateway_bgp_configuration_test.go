@@ -9,13 +9,14 @@ import (
 
 func (vcd *TestVCD) Test_NsxEdgeBgpConfiguration(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointEdgeBgpConfig)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointEdgeBgpConfig)
+	vcd.skipIfNotSysAdmin(check)
 
-	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
-	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
+	nsxtVdc, err := org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	// Switch Edge Gateway to use dedicated uplink for the time of this test and then turn it off
@@ -24,12 +25,12 @@ func (vcd *TestVCD) Test_NsxEdgeBgpConfiguration(check *C) {
 	defer switchEdgeGatewayDedication(edge, false) // Turn off Dedicated Tier 0 gateway
 
 	// Get and store existing BGP configuration
-	bgpConfig, err := edge.GetBgpConfiguration(ctx)
+	bgpConfig, err := edge.GetBgpConfiguration()
 	check.Assert(err, IsNil)
 	check.Assert(bgpConfig, NotNil)
 
 	// Disable BGP
-	err = edge.DisableBgpConfiguration(ctx)
+	err = edge.DisableBgpConfiguration()
 	check.Assert(err, IsNil)
 
 	newBgpConfig := &types.EdgeBgpConfig{
@@ -43,7 +44,7 @@ func (vcd *TestVCD) Test_NsxEdgeBgpConfiguration(check *C) {
 		},
 	}
 
-	updatedBgpConfig, err := edge.UpdateBgpConfiguration(ctx, newBgpConfig)
+	updatedBgpConfig, err := edge.UpdateBgpConfiguration(newBgpConfig)
 	check.Assert(err, IsNil)
 	check.Assert(updatedBgpConfig, NotNil)
 
@@ -51,10 +52,10 @@ func (vcd *TestVCD) Test_NsxEdgeBgpConfiguration(check *C) {
 	check.Assert(updatedBgpConfig, DeepEquals, newBgpConfig)
 
 	// Check "disable" function which keeps all fields the same, but sets "Enabled: false"
-	err = edge.DisableBgpConfiguration(ctx)
+	err = edge.DisableBgpConfiguration()
 	check.Assert(err, IsNil)
 
-	bgpConfigAfterDisabling, err := edge.GetBgpConfiguration(ctx)
+	bgpConfigAfterDisabling, err := edge.GetBgpConfiguration()
 	check.Assert(err, IsNil)
 	check.Assert(bgpConfig, NotNil)
 	check.Assert(bgpConfigAfterDisabling.Enabled, Equals, false)
@@ -63,7 +64,7 @@ func (vcd *TestVCD) Test_NsxEdgeBgpConfiguration(check *C) {
 
 func switchEdgeGatewayDedication(edge *NsxtEdgeGateway, isDedicated bool) error {
 	edge.EdgeGateway.EdgeGatewayUplinks[0].Dedicated = isDedicated
-	_, err := edge.Update(ctx, edge.EdgeGateway)
+	_, err := edge.Update(edge.EdgeGateway)
 
 	return err
 }

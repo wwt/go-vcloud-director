@@ -84,9 +84,8 @@ func (vdc *Vdc) CreateDisk(ctx context.Context, diskCreateParams *types.DiskCrea
 
 	disk := NewDisk(vdc.client)
 
-	_, err = vdc.client.ExecuteRequestWithApiVersion(ctx, createDiskLink.HREF, http.MethodPost,
-		createDiskLink.Type, "error create disk: %s", diskCreateParams, disk.Disk,
-		vdc.client.GetSpecificApiVersionOnCondition(ctx, ">= 36.0", "36.0"))
+	_, err = vdc.client.ExecuteRequest(ctx, createDiskLink.HREF, http.MethodPost,
+		createDiskLink.Type, "error create disk: %s", diskCreateParams, disk.Disk)
 	if err != nil {
 		return Task{}, err
 	}
@@ -95,6 +94,9 @@ func (vdc *Vdc) CreateDisk(ctx context.Context, diskCreateParams *types.DiskCrea
 		return Task{}, errors.New("error cannot find disk creation task in API response")
 	}
 	task := NewTask(vdc.client)
+	if disk.Disk.Tasks == nil || len(disk.Disk.Tasks.Task) == 0 {
+		return Task{}, fmt.Errorf("no task found after disk %s creation", diskCreateParams.Disk.Name)
+	}
 	task.Task = disk.Disk.Tasks.Task[0]
 
 	util.Logger.Printf("[TRACE] AFTER CREATE DISK\n %s\n", prettyDisk(*disk.Disk))
@@ -163,9 +165,8 @@ func (disk *Disk) Update(ctx context.Context, newDiskInfo *types.Disk) (Task, er
 	}
 
 	// Return the task
-	return disk.client.ExecuteTaskRequestWithApiVersion(ctx, updateDiskLink.HREF, http.MethodPut,
-		updateDiskLink.Type, "error updating disk: %s", xmlPayload,
-		disk.client.GetSpecificApiVersionOnCondition(ctx, ">= 36.0", "36.0"))
+	return disk.client.ExecuteTaskRequest(ctx, updateDiskLink.HREF, http.MethodPut,
+		updateDiskLink.Type, "error updating disk: %s", xmlPayload)
 }
 
 // Remove an independent disk
@@ -223,10 +224,8 @@ func (disk *Disk) Refresh(ctx context.Context) error {
 	util.Logger.Printf("[TRACE] Disk refresh, HREF: %s\n", disk.Disk.HREF)
 
 	unmarshalledDisk := &types.Disk{}
-
-	_, err := disk.client.ExecuteRequestWithApiVersion(ctx, disk.Disk.HREF, http.MethodGet,
-		"", "error refreshing independent disk: %s", nil, unmarshalledDisk,
-		disk.client.GetSpecificApiVersionOnCondition(ctx, ">= 36.0", "36.0"))
+	_, err := disk.client.ExecuteRequest(ctx, disk.Disk.HREF, http.MethodGet,
+		"", "error refreshing independent disk: %s", nil, unmarshalledDisk)
 	if err != nil {
 		return err
 	}
@@ -320,9 +319,8 @@ func (vdc *Vdc) QueryDisk(ctx context.Context, diskName string) (DiskRecord, err
 		typeMedia = "adminDisk"
 	}
 
-	results, err := vdc.QueryWithNotEncodedParamsWithApiVersion(ctx, nil, map[string]string{"type": typeMedia,
-		"filter": "name==" + url.QueryEscape(diskName) + ";vdc==" + vdc.vdcId(), "filterEncoded": "true"},
-		vdc.client.GetSpecificApiVersionOnCondition(ctx, ">= 36.0", "36.0"))
+	results, err := vdc.QueryWithNotEncodedParams(ctx, nil, map[string]string{"type": typeMedia,
+		"filter": "name==" + url.QueryEscape(diskName) + ";vdc==" + vdc.vdcId(), "filterEncoded": "true"})
 	if err != nil {
 		return DiskRecord{}, fmt.Errorf("error querying disk %s", err)
 	}
@@ -355,9 +353,8 @@ func (vdc *Vdc) QueryDisks(ctx context.Context, diskName string) (*[]*types.Disk
 		typeMedia = "adminDisk"
 	}
 
-	results, err := vdc.QueryWithNotEncodedParamsWithApiVersion(ctx, nil, map[string]string{"type": typeMedia,
-		"filter": "name==" + url.QueryEscape(diskName) + ";vdc==" + vdc.vdcId(), "filterEncoded": "true"},
-		vdc.client.GetSpecificApiVersionOnCondition(ctx, ">= 36.0", "36.0"))
+	results, err := vdc.QueryWithNotEncodedParams(ctx, nil, map[string]string{"type": typeMedia,
+		"filter": "name==" + url.QueryEscape(diskName) + ";vdc==" + vdc.vdcId(), "filterEncoded": "true"})
 	if err != nil {
 		return nil, fmt.Errorf("error querying disks %s", err)
 	}
@@ -377,9 +374,8 @@ func (vdc *Vdc) GetDiskByHref(ctx context.Context, diskHref string) (*Disk, erro
 	util.Logger.Printf("[TRACE] Get Disk By Href: %s\n", diskHref)
 	Disk := NewDisk(vdc.client)
 
-	_, err := vdc.client.ExecuteRequestWithApiVersion(ctx, diskHref, http.MethodGet,
-		"", "error retrieving Disk: %s", nil, Disk.Disk,
-		vdc.client.GetSpecificApiVersionOnCondition(ctx, ">= 36.0", "36.0"))
+	_, err := vdc.client.ExecuteRequest(ctx, diskHref, http.MethodGet,
+		"", "error retrieving Disk: %s", nil, Disk.Disk)
 	if err != nil && (strings.Contains(err.Error(), "MajorErrorCode:403") || strings.Contains(err.Error(), "does not exist")) {
 		return nil, ErrorEntityNotFound
 	}

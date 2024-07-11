@@ -109,9 +109,13 @@ func queryVappTemplateListWithFilter(ctx context.Context, client *Client, filter
 	for k, v := range filter {
 		filterEncoded += fmt.Sprintf("%s==%s;", url.QueryEscape(k), url.QueryEscape(v))
 	}
+
+	if len(filterEncoded) > 0 {
+		filterEncoded = filterEncoded[:len(filterEncoded)-1] // Removes the trailing ';'
+	}
 	results, err := client.cumulativeQuery(ctx, vappTemplateType, nil, map[string]string{
 		"type":   vappTemplateType,
-		"filter": filterEncoded[:len(filterEncoded)-1], // Removes the trailing ';'
+		"filter": filterEncoded,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error querying vApp templates %s", err)

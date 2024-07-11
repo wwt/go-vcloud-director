@@ -7,10 +7,11 @@ package govcd
 import (
 	"context"
 	"fmt"
-	"github.com/vmware/go-vcloud-director/v2/types/v56"
-	"github.com/vmware/go-vcloud-director/v2/util"
 	"net/http"
 	"net/url"
+
+	"github.com/vmware/go-vcloud-director/v2/types/v56"
+	"github.com/vmware/go-vcloud-director/v2/util"
 )
 
 type VAppTemplate struct {
@@ -25,6 +26,7 @@ func NewVAppTemplate(cli *Client) *VAppTemplate {
 	}
 }
 
+// Deprecated: wrong implementation and result; Use vdc.CreateVappFromTemplate instead
 func (vdc *Vdc) InstantiateVAppTemplate(ctx context.Context, template *types.InstantiateVAppTemplateParams) error {
 	vdcHref, err := url.ParseRequestURI(vdc.Vdc.HREF)
 	if err != nil {
@@ -291,4 +293,94 @@ func (vcdClient *VCDClient) QuerySynchronizedVmInVAppTemplateByHref(ctx context.
 		return nil, fmt.Errorf("vApp template %s is not synchronized", extractUuid(vAppTemplateHref))
 	}
 	return vmRecord, nil
+}
+
+// RenewLease updates the lease terms for the vAppTemplate
+func (vAppTemplate *VAppTemplate) RenewLease(ctx context.Context, storageLeaseInSeconds int) error {
+
+	href := ""
+	if vAppTemplate.VAppTemplate.LeaseSettingsSection != nil {
+		if vAppTemplate.VAppTemplate.LeaseSettingsSection.StorageLeaseInSeconds == storageLeaseInSeconds {
+			// Requested parameters are the same as existing parameters: exit without updating
+			return nil
+		}
+		href = vAppTemplate.VAppTemplate.LeaseSettingsSection.HREF
+	}
+	if href == "" {
+		href = getUrlFromLink(vAppTemplate.VAppTemplate.Link, "edit", types.MimeLeaseSettingSection)
+	}
+
+	if href == "" {
+		return fmt.Errorf("link to update lease settings not found for vAppTemplate %s", vAppTemplate.VAppTemplate.Name)
+	}
+
+	var leaseSettings = types.UpdateLeaseSettingsSection{
+		HREF:                  href,
+		XmlnsOvf:              types.XMLNamespaceOVF,
+		Xmlns:                 types.XMLNamespaceVCloud,
+		OVFInfo:               "Lease section settings",
+		Type:                  types.MimeLeaseSettingSection,
+		StorageLeaseInSeconds: &storageLeaseInSeconds,
+	}
+
+	task, err := vAppTemplate.client.ExecuteTaskRequest(ctx, href, http.MethodPut,
+		types.MimeLeaseSettingSection, "error updating vAppTemplate lease : %s", &leaseSettings)
+
+	if err != nil {
+		return fmt.Errorf("unable to update vAppTemplate lease: %s", err)
+	}
+
+	err = task.WaitTaskCompletion(ctx)
+	if err != nil {
+		return fmt.Errorf("task for updating vAppTemplate lease failed: %s", err)
+	}
+	return vAppTemplate.Refresh(ctx)
+}
+
+// GetLease retrieves the lease terms for a vAppTemplate
+func (vAppTemplate *VAppTemplate) GetLease(ctx context.Context) (*types.LeaseSettingsSection, error) {
+
+	href := ""
+	if vAppTemplate.VAppTemplate.LeaseSettingsSection != nil {
+		href = vAppTemplate.VAppTemplate.LeaseSettingsSection.HREF
+	}
+	if href == "" {
+		for _, link := range vAppTemplate.VAppTemplate.Link {
+			if link.Type == types.MimeLeaseSettingSection {
+				href = link.HREF
+				break
+			}
+		}
+	}
+	if href == "" {
+		return nil, fmt.Errorf("link to retrieve lease settings not found for vApp %s", vAppTemplate.VAppTemplate.Name)
+	}
+	var leaseSettings types.LeaseSettingsSection
+
+	_, err := vAppTemplate.client.ExecuteRequest(ctx, href, http.MethodGet, "", "error getting vAppTemplate lease info: %s", nil, &leaseSettings)
+
+	if err != nil {
+		return nil, err
+	}
+	return &leaseSettings, nil
+}
+
+// GetCatalogItemHref looks up Href for catalog item in vApp template
+func (vAppTemplate *VAppTemplate) GetCatalogItemHref() (string, error) {
+	for _, link := range vAppTemplate.VAppTemplate.Link {
+		if link.Rel == "catalogItem" && link.Type == types.MimeCatalogItem {
+			return link.HREF, nil
+		}
+	}
+	return "", fmt.Errorf("error finding Catalog Item link in vApp template %s", vAppTemplate.VAppTemplate.ID)
+}
+
+// GetCatalogItemId returns ID for catalog item in vApp template
+func (vAppTemplate *VAppTemplate) GetCatalogItemId() (string, error) {
+	href, err := vAppTemplate.GetCatalogItemHref()
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("urn:vcloud:catalogitem:%s", extractUuid(href)), nil
 }

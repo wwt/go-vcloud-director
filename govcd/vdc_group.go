@@ -169,6 +169,11 @@ func (adminOrg *AdminOrg) GetAllVdcGroupCandidates(ctx context.Context, queryPar
 
 // Delete deletes VDC group
 func (vdcGroup *VdcGroup) Delete(ctx context.Context) error {
+	return vdcGroup.ForceDelete(ctx, false)
+}
+
+// ForceDelete deletes VDC group with force parameter if enabled
+func (vdcGroup *VdcGroup) ForceDelete(ctx context.Context, force bool) error {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointVdcGroups
 	minimumApiVersion, err := vdcGroup.client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	if err != nil {
@@ -184,10 +189,14 @@ func (vdcGroup *VdcGroup) Delete(ctx context.Context) error {
 		return err
 	}
 
-	err = vdcGroup.client.OpenApiDeleteItem(ctx, minimumApiVersion, urlRef, nil, nil)
+	params := copyOrNewUrlValues(nil)
+	if force {
+		params.Add("force", "true")
+	}
 
+	err = vdcGroup.client.OpenApiDeleteItem(ctx, minimumApiVersion, urlRef, params, nil)
 	if err != nil {
-		return fmt.Errorf("error deleting VDC group: %s", err)
+		return fmt.Errorf("error deleting VDC group (force %t): %s", force, err)
 	}
 
 	return nil
@@ -236,18 +245,15 @@ func (adminOrg *AdminOrg) GetAllVdcGroups(ctx context.Context, queryParameters u
 }
 
 // GetVdcGroupByName retrieves VDC group by given name
-// When the name contains commas, semicolons or asterisks, the encoding is rejected by the API in VCD 10.2 version.
+// When the name contains commas, semicolons or asterisks, the encoding is rejected by the API in VCD.
 // For this reason, when one or more commas, semicolons or asterisks are present we run the search brute force,
-// by fetching all VDC groups and comparing the names. Yet, this not needed anymore in VCD 10.3 version.
+// by fetching all VDC groups and comparing the names.
 // Also, url.QueryEscape as well as url.Values.Encode() both encode the space as a + character. So we use
 // search brute force too. Reference to issue:
 // https://github.com/golang/go/issues/4013
 // https://github.com/czos/goamz/pull/11/files
 func (adminOrg *AdminOrg) GetVdcGroupByName(ctx context.Context, name string) (*VdcGroup, error) {
-	slowSearch, params, err := shouldDoSlowSearch(ctx, "name", name, adminOrg.client)
-	if err != nil {
-		return nil, err
-	}
+	slowSearch, params := shouldDoSlowSearch("name", name)
 
 	var foundVdcGroups []*VdcGroup
 	vdcGroups, err := adminOrg.GetAllVdcGroups(ctx, params)
@@ -523,7 +529,7 @@ func (vdcGroup *VdcGroup) EnableDefaultPolicy(ctx context.Context) (*VdcGroup, e
 	if dfwPolicies.DefaultPolicy == nil {
 		return nil, fmt.Errorf("DFW has to be enabled before changing  Default policy")
 	}
-	dfwPolicies.DefaultPolicy.Enabled = takeBoolPointer(true)
+	dfwPolicies.DefaultPolicy.Enabled = addrOf(true)
 	return vdcGroup.UpdateDefaultDfwPolicies(ctx, *dfwPolicies.DefaultPolicy)
 }
 
@@ -537,7 +543,7 @@ func (vdcGroup *VdcGroup) DisableDefaultPolicy(ctx context.Context) (*VdcGroup, 
 	if dfwPolicies.DefaultPolicy == nil {
 		return nil, fmt.Errorf("DFW has to be enabled before changing Default policy")
 	}
-	dfwPolicies.DefaultPolicy.Enabled = takeBoolPointer(false)
+	dfwPolicies.DefaultPolicy.Enabled = addrOf(false)
 	return vdcGroup.UpdateDefaultDfwPolicies(ctx, *dfwPolicies.DefaultPolicy)
 }
 

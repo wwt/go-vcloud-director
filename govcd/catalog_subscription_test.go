@@ -40,7 +40,7 @@ type subscriptionTestData struct {
 // $ go test -tags catalog -check.f Test_SubscribedCatalog -vcd-verbose -check.vv -timeout 0
 // When running this way, you will see the tasks originated by the catalogs and the ones started by the catalog items
 func (vcd *TestVCD) Test_SubscribedCatalog(check *C) {
-
+	vcd.skipIfNotSysAdmin(check)
 	fromOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	toOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org+"-1")
@@ -169,10 +169,10 @@ func testSubscribedCatalog(testData subscriptionTestData, check *C) {
 
 	subscriptionPassword := "superUnknown"
 	err = fromCatalog.PublishToExternalOrganizations(ctx, types.PublishExternalCatalogParams{
-		IsPublishedExternally:    takeBoolPointer(true),
+		IsPublishedExternally:    addrOf(true),
 		Password:                 subscriptionPassword,
-		IsCachedEnabled:          takeBoolPointer(true),
-		PreserveIdentityInfoFlag: takeBoolPointer(true),
+		IsCachedEnabled:          addrOf(true),
+		PreserveIdentityInfoFlag: addrOf(true),
 	})
 	check.Assert(err, IsNil)
 

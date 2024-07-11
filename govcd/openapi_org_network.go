@@ -13,6 +13,8 @@ import (
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 )
 
+const labelOrgVdcNetworkSegmentProfile = "Org VDC Network Segment Profile"
+
 // OpenApiOrgVdcNetwork uses OpenAPI endpoint to operate both - NSX-T and NSX-V Org VDC networks
 type OpenApiOrgVdcNetwork struct {
 	OpenApiOrgVdcNetwork *types.OpenApiOrgVdcNetwork
@@ -34,7 +36,7 @@ func (org *Org) GetOpenApiOrgVdcNetworkByNameAndOwnerId(ctx context.Context, nam
 	queryParameters := url.Values{}
 	queryParameters = queryParameterFilterAnd(fmt.Sprintf("name==%s;ownerRef.id==%s", name, ownerId), queryParameters)
 
-	allEdges, err := getAllOpenApiOrgVdcNetworks(ctx, org.client, queryParameters)
+	allEdges, err := getAllOpenApiOrgVdcNetworks(ctx, org.client, queryParameters, nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve Org VDC network by name '%s' in Owner '%s': %s", name, ownerId, err)
 	}
@@ -97,7 +99,7 @@ func (vdcGroup *VdcGroup) GetOpenApiOrgVdcNetworkByName(ctx context.Context, nam
 // higher number
 func (org *Org) GetAllOpenApiOrgVdcNetworks(ctx context.Context, queryParameters url.Values) ([]*OpenApiOrgVdcNetwork, error) {
 	filteredQueryParams := queryParameterFilterAnd("orgRef.id=="+org.Org.ID, queryParameters)
-	return getAllOpenApiOrgVdcNetworks(ctx, org.client, filteredQueryParams)
+	return getAllOpenApiOrgVdcNetworks(ctx, org.client, filteredQueryParams, nil)
 }
 
 // GetAllOpenApiOrgVdcNetworks allows to retrieve all NSX-T or NSX-V Org VDC networks in Vdc
@@ -106,7 +108,7 @@ func (org *Org) GetAllOpenApiOrgVdcNetworks(ctx context.Context, queryParameters
 // higher number
 func (vdc *Vdc) GetAllOpenApiOrgVdcNetworks(ctx context.Context, queryParameters url.Values) ([]*OpenApiOrgVdcNetwork, error) {
 	filteredQueryParams := queryParameterFilterAnd("ownerRef.id=="+vdc.Vdc.ID, queryParameters)
-	return getAllOpenApiOrgVdcNetworks(ctx, vdc.client, filteredQueryParams)
+	return getAllOpenApiOrgVdcNetworks(ctx, vdc.client, filteredQueryParams, nil)
 }
 
 // GetAllOpenApiOrgVdcNetworks allows to retrieve all NSX-T or NSX-V Org VDC networks in Vdc
@@ -115,7 +117,7 @@ func (vdc *Vdc) GetAllOpenApiOrgVdcNetworks(ctx context.Context, queryParameters
 // higher number
 func (vdcGroup *VdcGroup) GetAllOpenApiOrgVdcNetworks(ctx context.Context, queryParameters url.Values) ([]*OpenApiOrgVdcNetwork, error) {
 	filteredQueryParams := queryParameterFilterAnd("ownerRef.id=="+vdcGroup.VdcGroup.Id, queryParameters)
-	return getAllOpenApiOrgVdcNetworks(ctx, vdcGroup.client, filteredQueryParams)
+	return getAllOpenApiOrgVdcNetworks(ctx, vdcGroup.client, filteredQueryParams, nil)
 }
 
 // CreateOpenApiOrgVdcNetwork allows to create NSX-T or NSX-V Org VDC network
@@ -301,7 +303,7 @@ func returnSingleOpenApiOrgVdcNetwork(name string, allEdges []*OpenApiOrgVdcNetw
 //
 // Note. If pageSize > 32 it will be limited to maximum of 32 in this function because API validation does not allow
 // higher number
-func getAllOpenApiOrgVdcNetworks(ctx context.Context, client *Client, queryParameters url.Values) ([]*OpenApiOrgVdcNetwork, error) {
+func getAllOpenApiOrgVdcNetworks(ctx context.Context, client *Client, queryParameters url.Values, additionalHeader map[string]string) ([]*OpenApiOrgVdcNetwork, error) {
 
 	// Enforce maximum pageSize to be 32 as API endpoint throws error if it is > 32
 	pageSizeString := queryParameters.Get("pageSize")
@@ -334,7 +336,7 @@ func getAllOpenApiOrgVdcNetworks(ctx context.Context, client *Client, queryParam
 	}
 
 	typeResponses := []*types.OpenApiOrgVdcNetwork{{}}
-	err = client.OpenApiGetAllItems(ctx, minimumApiVersion, urlRef, queryParameters, &typeResponses, nil)
+	err = client.OpenApiGetAllItems(ctx, minimumApiVersion, urlRef, queryParameters, &typeResponses, additionalHeader)
 	if err != nil {
 		return nil, err
 	}
@@ -375,4 +377,38 @@ func createOpenApiOrgVdcNetwork(ctx context.Context, client *Client, OrgVdcNetwo
 	}
 
 	return returnEgw, nil
+}
+
+// GetSegmentProfile retrieves Segment Profile configuration for a single Org VDC Network
+func (orgVdcNet *OpenApiOrgVdcNetwork) GetSegmentProfile() (*types.OrgVdcNetworkSegmentProfiles, error) {
+	c := crudConfig{
+		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointOrgVdcNetworkSegmentProfiles,
+		endpointParams: []string{orgVdcNet.OpenApiOrgVdcNetwork.ID},
+		entityLabel:    labelOrgVdcNetworkSegmentProfile,
+	}
+	return getInnerEntity[types.OrgVdcNetworkSegmentProfiles](orgVdcNet.client, c)
+}
+
+// UpdateSegmentProfile updates a Segment Profile with a given configuration
+func (orgVdcNet *OpenApiOrgVdcNetwork) UpdateSegmentProfile(entityConfig *types.OrgVdcNetworkSegmentProfiles) (*types.OrgVdcNetworkSegmentProfiles, error) {
+	c := crudConfig{
+		endpoint:       types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointOrgVdcNetworkSegmentProfiles,
+		endpointParams: []string{orgVdcNet.OpenApiOrgVdcNetwork.ID},
+		entityLabel:    labelOrgVdcNetworkSegmentProfile,
+	}
+	return updateInnerEntity(orgVdcNet.client, c, entityConfig)
+}
+
+// GetAllOpenApiOrgVdcNetworks checks all Org VDC networks available to the current user
+// When 'multiSite' is set, it will also check the networks available from associated organizations
+func (adminOrg *AdminOrg) GetAllOpenApiOrgVdcNetworks(ctx context.Context, queryParameters url.Values, multiSite bool) ([]*OpenApiOrgVdcNetwork, error) {
+	var additionalHeader map[string]string
+	if multiSite {
+		additionalHeader = map[string]string{"Accept": "{{MEDIA_TYPE}};version={{API_VERSION}};multisite=global"}
+	}
+	if queryParameters == nil {
+		queryParameters = make(url.Values)
+	}
+	result, err := getAllOpenApiOrgVdcNetworks(ctx, adminOrg.client, queryParameters, additionalHeader)
+	return result, err
 }

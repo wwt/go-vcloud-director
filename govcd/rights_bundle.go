@@ -36,7 +36,7 @@ func (client *Client) CreateRightsBundle(ctx context.Context, newRightsBundle *t
 		newRightsBundle.BundleKey = types.VcloudUndefinedKey
 	}
 	if newRightsBundle.PublishAll == nil {
-		newRightsBundle.PublishAll = takeBoolPointer(false)
+		newRightsBundle.PublishAll = addrOf(false)
 	}
 	returnBundle := &RightsBundle{
 		RightsBundle: &types.RightsBundle{},
