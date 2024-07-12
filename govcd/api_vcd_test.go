@@ -707,7 +707,7 @@ func (vcd *TestVCD) SetUpSuite(check *C) {
 	if !skipVappCreation && config.VCD.Network.Net1 != "" && config.VCD.StorageProfile.SP1 != "" &&
 		config.VCD.Catalog.Name != "" && config.VCD.Catalog.CatalogItem != "" {
 		// deployVappForTest replaces the old createTestVapp() because it was using bad implemented method vdc.ComposeVApp
-		vcd.vapp, err = deployVappForTest(ctx, vcd, TestSetUpSuite)
+		vcd.vapp, err = deployVappForTest(vcd, TestSetUpSuite)
 		// If no vApp is created, we skip all vApp tests
 		if err != nil {
 			fmt.Printf("%s\n", err)
@@ -887,7 +887,7 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 		vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
 	case "OpenApiEntityGlobalDefaultSegmentProfileTemplate":
 		// Check if any default settings are applied
-		gdSpt, err := vcd.client.GetGlobalDefaultSegmentProfileTemplates()
+		gdSpt, err := vcd.client.GetGlobalDefaultSegmentProfileTemplates(ctx)
 		if err != nil {
 			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
 			return
@@ -898,7 +898,7 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 			return
 		}
 
-		_, err = vcd.client.UpdateGlobalDefaultSegmentProfileTemplates(&types.NsxtGlobalDefaultSegmentProfileTemplate{})
+		_, err = vcd.client.UpdateGlobalDefaultSegmentProfileTemplates(ctx, &types.NsxtGlobalDefaultSegmentProfileTemplate{})
 		if err != nil {
 			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
 			return
@@ -1002,17 +1002,17 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 		vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
 		return
 	case "provider_vdc":
-		pvdc, err := vcd.client.GetProviderVdcExtendedByName(entity.Name)
+		pvdc, err := vcd.client.GetProviderVdcExtendedByName(ctx, entity.Name)
 		if err != nil {
 			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
 			return
 		}
-		err = pvdc.Disable()
+		err = pvdc.Disable(ctx)
 		if err != nil {
 			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
 			return
 		}
-		task, err := pvdc.Delete()
+		task, err := pvdc.Delete(ctx)
 		if err != nil {
 			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
 			return
@@ -1039,12 +1039,12 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
 			return
 		}
-		catalogItem, err := catalog.GetCatalogItemByName(entity.Name, false)
+		catalogItem, err := catalog.GetCatalogItemByName(ctx, entity.Name, false)
 		if err != nil {
 			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
 			return
 		}
-		err = catalogItem.Delete()
+		err = catalogItem.Delete(ctx)
 		if err != nil {
 			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
 		}
@@ -1157,12 +1157,12 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
 			return
 		}
-		_, err = adminCatalog.GetMediaByName(entity.Name, true)
+		_, err = adminCatalog.GetMediaByName(ctx, entity.Name, true)
 		if ContainsNotFound(err) {
 			vcd.infoCleanup(notFoundMsg, entity.EntityType, entity.Name)
 			return
 		}
-		err = adminCatalog.RemoveMediaIfExists(entity.Name)
+		err = adminCatalog.RemoveMediaIfExists(ctx, entity.Name)
 		if err == nil {
 			vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
 		} else {
@@ -1711,12 +1711,12 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 		return
 
 	case "nsxtDhcpForwarder":
-		edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(entity.Name)
+		edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(ctx, entity.Name)
 		if err != nil {
 			vcd.infoCleanup("removeLeftoverEntries: [ERROR] %s \n", err)
 		}
 
-		dhcpForwarder, err := edge.GetDhcpForwarder()
+		dhcpForwarder, err := edge.GetDhcpForwarder(ctx)
 		if err != nil {
 			vcd.infoCleanup("removeLeftoverEntries: [ERROR] %s \n", err)
 		}
@@ -1726,7 +1726,7 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 			return
 		}
 
-		_, err = edge.UpdateDhcpForwarder(&types.NsxtEdgeGatewayDhcpForwarder{})
+		_, err = edge.UpdateDhcpForwarder(ctx, &types.NsxtEdgeGatewayDhcpForwarder{})
 		if err != nil {
 			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
 		}
@@ -1734,12 +1734,12 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 		vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
 		return
 	case "nsxtEdgeGatewayDns":
-		edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(entity.Name)
+		edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(ctx, entity.Name)
 		if err != nil {
 			vcd.infoCleanup("removeLeftoverEntries: [ERROR] %s \n", err)
 		}
 
-		dns, err := edge.GetDnsConfig()
+		dns, err := edge.GetDnsConfig(ctx)
 		if err != nil {
 			vcd.infoCleanup("removeLeftoverEntries: [ERROR] %s \n", err)
 		}
@@ -1749,7 +1749,7 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 			return
 		}
 
-		err = dns.Delete()
+		err = dns.Delete(ctx)
 		if err != nil {
 			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
 		}
@@ -1757,12 +1757,12 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 		vcd.infoCleanup(removedMsg, entity.EntityType, entity.Name, entity.CreatedBy)
 		return
 	case "slaacProfile":
-		edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(entity.Name)
+		edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(ctx, entity.Name)
 		if err != nil {
 			vcd.infoCleanup("removeLeftoverEntries: [ERROR] %s \n", err)
 		}
 
-		_, err = edge.UpdateSlaacProfile(&types.NsxtEdgeGatewaySlaacProfile{Enabled: false, Mode: "SLAAC"})
+		_, err = edge.UpdateSlaacProfile(ctx, &types.NsxtEdgeGatewaySlaacProfile{Enabled: false, Mode: "SLAAC"})
 		if err != nil {
 			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
 		}
@@ -1784,7 +1784,7 @@ func (vcd *TestVCD) TearDownSuite(check *C) {
 	// functions will be ignored.
 	for i, cleanupEntity := range cleanupEntityList {
 		fmt.Printf("# %d of %d - ", i+1, len(cleanupEntityList))
-		vcd.removeLeftoverEntities(context.Background(), cleanupEntity)
+		vcd.removeLeftoverEntities(ctx, cleanupEntity)
 		removePersistentCleanupList()
 	}
 }
@@ -2065,7 +2065,7 @@ func skipNoNsxtAlbConfiguration(vcd *TestVCD, check *C) {
 }
 
 // skipOpenApiEndpointTest is a helper to skip tests for particular unsupported OpenAPI endpoints
-func skipOpenApiEndpointTest(ctx context.Context, vcd *TestVCD, check *C, endpoint string) {
+func skipOpenApiEndpointTest(vcd *TestVCD, check *C, endpoint string) {
 	minimumRequiredApiVersion := endpointMinApiVersions[endpoint]
 
 	constraint := ">= " + minimumRequiredApiVersion
@@ -2087,7 +2087,7 @@ func newUserConnection(href, userName, password, orgName string, insecure bool) 
 		return nil, fmt.Errorf("[newUserConnection] unable to pass url: %s", err)
 	}
 	vcdClient := NewVCDClient(*u, insecure)
-	err = vcdClient.Authenticate(userName, password, orgName)
+	err = vcdClient.Authenticate(ctx, userName, password, orgName)
 	if err != nil {
 		return nil, fmt.Errorf("[newUserConnection] unable to authenticate: %s", err)
 	}
@@ -2098,7 +2098,7 @@ func newUserConnection(href, userName, password, orgName string, insecure bool) 
 // Attention: Set the user to use only lowercase letters. If you put upper case letters the function fails on waiting
 // because VCD creates the user with lowercase letters.
 func newOrgUserConnection(adminOrg *AdminOrg, userName, password, href string, insecure bool) (*VCDClient, *OrgUser, error) {
-	_, err := adminOrg.GetUserByName(userName, false)
+	_, err := adminOrg.GetUserByName(ctx, userName, false)
 	if err == nil {
 		// user exists
 		return nil, nil, fmt.Errorf("user %s already exists", userName)
@@ -2119,8 +2119,8 @@ func newOrgUserConnection(adminOrg *AdminOrg, userName, password, href string, i
 	}
 
 	AddToCleanupList(userName, "user", adminOrg.AdminOrg.Name, "newOrgUserConnection")
-	_ = adminOrg.Refresh()
-	newUser, err := adminOrg.GetUserByName(userName, false)
+	_ = adminOrg.Refresh(ctx)
+	newUser, err := adminOrg.GetUserByName(ctx, userName, false)
 	if err != nil {
 		return nil, nil, fmt.Errorf("[newOrgUserConnection] unable to retrieve newly created user: %s", err)
 	}

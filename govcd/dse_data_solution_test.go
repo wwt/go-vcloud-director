@@ -7,7 +7,6 @@
 package govcd
 
 import (
-	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -168,7 +167,7 @@ func (vcd *TestVCD) Test_Dse(check *C) {
 		ds, err := vcdClient.GetDataSolutionByName(dsName)
 		check.Assert(err, IsNil)
 
-		dsAcl, dsoAcl, templateAcls, err := ds.Publish(context.Background(), recipientOrg.Org.ID)
+		dsAcl, dsoAcl, templateAcls, err := ds.Publish(ctx, recipientOrg.Org.ID)
 		check.Assert(err, IsNil)
 		check.Assert(dsAcl, NotNil)
 		check.Assert(dsoAcl, NotNil)

@@ -17,7 +17,7 @@ func (vcd *TestVCD) Test_GetStorageProfiles(check *C) {
 	if !vcd.client.Client.IsSysAdmin {
 		check.Skip("this test requires system administrator privileges")
 	}
-	vcenters, err := vcd.client.GetAllVCenters(nil)
+	vcenters, err := vcd.client.GetAllVCenters(ctx, nil)
 	check.Assert(err, IsNil)
 
 	check.Assert(len(vcenters) > 0, Equals, true)
@@ -28,18 +28,18 @@ func (vcd *TestVCD) Test_GetStorageProfiles(check *C) {
 		check.Skip("no resource pool found for this VCD")
 	}
 
-	resourcePool, err := vc.GetResourcePoolByName(vcd.config.Vsphere.ResourcePoolForVcd1)
+	resourcePool, err := vc.GetResourcePoolByName(ctx, vcd.config.Vsphere.ResourcePoolForVcd1)
 	check.Assert(err, IsNil)
 
-	allStorageProfiles, err := vc.GetAllStorageProfiles(resourcePool.ResourcePool.Moref, nil)
+	allStorageProfiles, err := vc.GetAllStorageProfiles(ctx, resourcePool.ResourcePool.Moref, nil)
 	check.Assert(err, IsNil)
 
 	for i, sp := range allStorageProfiles {
-		spById, err := vc.GetStorageProfileById(resourcePool.ResourcePool.Moref, sp.StorageProfile.Moref)
+		spById, err := vc.GetStorageProfileById(ctx, resourcePool.ResourcePool.Moref, sp.StorageProfile.Moref)
 		check.Assert(err, IsNil)
 		check.Assert(spById.StorageProfile.Moref, Equals, sp.StorageProfile.Moref)
 		check.Assert(spById.StorageProfile.Name, Equals, sp.StorageProfile.Name)
-		spByName, err := vc.GetStorageProfileByName(resourcePool.ResourcePool.Moref, sp.StorageProfile.Name)
+		spByName, err := vc.GetStorageProfileByName(ctx, resourcePool.ResourcePool.Moref, sp.StorageProfile.Name)
 		if err != nil && strings.Contains(err.Error(), "more than one") {
 			fmt.Printf("%s\n", err)
 			continue

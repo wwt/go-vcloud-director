@@ -11,7 +11,7 @@ import (
 
 func (vcd *TestVCD) Test_NsxtNatDnat(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
 	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
@@ -51,7 +51,7 @@ func (vcd *TestVCD) Test_NsxtNatDnat(check *C) {
 
 func (vcd *TestVCD) Test_NsxtNatDnatExternalPortPort(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
 	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
@@ -91,7 +91,7 @@ func (vcd *TestVCD) Test_NsxtNatDnatExternalPortPort(check *C) {
 
 func (vcd *TestVCD) Test_NsxtNatDnatFirewallMatchPriority(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
 	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
@@ -132,7 +132,7 @@ func (vcd *TestVCD) Test_NsxtNatDnatFirewallMatchPriority(check *C) {
 
 func (vcd *TestVCD) Test_NsxtNatNoDnat(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
 	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
@@ -162,7 +162,7 @@ func (vcd *TestVCD) Test_NsxtNatNoDnat(check *C) {
 
 func (vcd *TestVCD) Test_NsxtNatSnat(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
 	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
@@ -200,7 +200,7 @@ func (vcd *TestVCD) Test_NsxtNatSnat(check *C) {
 
 func (vcd *TestVCD) Test_NsxtNatNoSnat(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
 	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
@@ -225,7 +225,7 @@ func (vcd *TestVCD) Test_NsxtNatNoSnat(check *C) {
 
 func (vcd *TestVCD) Test_NsxtNatPriorityAndFirewallMatch(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
 	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
@@ -262,7 +262,7 @@ func (vcd *TestVCD) Test_NsxtNatPriorityAndFirewallMatch(check *C) {
 // Test_NsxtNatReflexive tests out REFLEXIVE rule type. This is only available in VCD 10.3 (API V36.0)
 func (vcd *TestVCD) Test_NsxtNatReflexive(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
 	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)

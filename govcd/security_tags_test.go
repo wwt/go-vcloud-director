@@ -16,7 +16,7 @@ func init() {
 
 func (vcd *TestVCD) Test_SecurityTags(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointSecurityTags)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointSecurityTags)
 
 	securityTagName1 := strings.ToLower(fmt.Sprintf("%s_%d", check.TestName(), 1)) // Security tags are always lowercase in server-side
 	securityTagName2 := strings.ToLower(fmt.Sprintf("%s_%d", check.TestName(), 2))

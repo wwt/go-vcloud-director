@@ -15,7 +15,7 @@ func (vcd *TestVCD) Test_GetAllEdgeAlbServiceEngineGroupAssignmentsDedicated(che
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
 	skipNoNsxtAlbConfiguration(vcd, check)
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointAlbEdgeGateway)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointAlbEdgeGateway)
 
 	controller, cloud, seGroup := spawnAlbControllerCloudServiceEngineGroup(vcd, check, "DEDICATED")
 	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
@@ -93,7 +93,7 @@ func (vcd *TestVCD) Test_GetAllEdgeAlbServiceEngineGroupAssignmentsShared(check 
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
 	skipNoNsxtAlbConfiguration(vcd, check)
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointAlbEdgeGateway)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointAlbEdgeGateway)
 
 	controller, cloud, seGroup := spawnAlbControllerCloudServiceEngineGroup(vcd, check, "SHARED")
 	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)

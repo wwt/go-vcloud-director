@@ -7,7 +7,6 @@
 package govcd
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -520,7 +519,7 @@ func testRdeBehaviorInvocation(check *C, rdeType *DefinedEntityType, behavior *t
 	check.Assert(err, IsNil)
 
 	var invocation map[string]interface{}
-	err = rde.InvokeBehaviorAndMarshal(context.Background(), behavior.ID, types.BehaviorInvocation{
+	err = rde.InvokeBehaviorAndMarshal(ctx, behavior.ID, types.BehaviorInvocation{
 		Arguments: map[string]interface{}{},
 		Metadata:  map[string]interface{}{},
 	}, &invocation)

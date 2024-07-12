@@ -19,7 +19,7 @@ import (
 // Test_NsxtFirewall creates 20 firewall rules with randomized parameters
 func (vcd *TestVCD) Test_NsxtFirewall(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
 	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)

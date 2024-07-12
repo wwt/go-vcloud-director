@@ -25,7 +25,7 @@ import (
 // how to fetch response from multiple pages in RAW json messages without having defined as struct.
 func (vcd *TestVCD) Test_OpenApiRawJsonAuditTrail(check *C) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAuditTrail
-	skipOpenApiEndpointTest(ctx, vcd, check, endpoint)
+	skipOpenApiEndpointTest(vcd, check, endpoint)
 	apiVersion, err := vcd.client.Client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	check.Assert(err, IsNil)
 
@@ -61,7 +61,7 @@ func (vcd *TestVCD) Test_OpenApiRawJsonAuditTrail(check *C) {
 // to user defined inline type
 func (vcd *TestVCD) Test_OpenApiInlineStructAuditTrail(check *C) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAuditTrail
-	skipOpenApiEndpointTest(ctx, vcd, check, endpoint)
+	skipOpenApiEndpointTest(vcd, check, endpoint)
 	apiVersion, err := vcd.client.Client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	check.Assert(err, IsNil)
 
@@ -140,7 +140,7 @@ func (vcd *TestVCD) Test_OpenApiInlineStructCRUDRoles(check *C) {
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointRoles
 	apiVersion, err := vcd.client.Client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	check.Assert(err, IsNil)
-	skipOpenApiEndpointTest(ctx, vcd, check, endpoint)
+	skipOpenApiEndpointTest(vcd, check, endpoint)
 
 	// Step 1 - Get all roles
 	urlRef, err := vcd.client.Client.OpenApiBuildEndpoint(endpoint)

@@ -751,34 +751,34 @@ func (vcd *TestVCD) Test_CseValidationErrors(check *C) {
 
 	// Wrong Service CIDR
 	settings.ServiceCidr = "256.700.1.278/800"
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(strings.Contains(err.Error(), "error creating the CSE Kubernetes cluster: the Service CIDR is malformed"), Equals, true)
 
 	// Wrong Virtual IP subnet
 	settings.ServiceCidr = "192.168.1.0/20"
 	settings.VirtualIpSubnet = "256.700.1.278/800"
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(strings.Contains(err.Error(), "error creating the CSE Kubernetes cluster: the Virtual IP Subnet is malformed"), Equals, true)
 
 	// Wrong Control Plane IP
 	settings.VirtualIpSubnet = "192.154.1.0/20"
 	settings.ControlPlane.Ip = "256.700.1.278"
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(strings.Contains(err.Error(), "error creating the CSE Kubernetes cluster: the Control Plane IP is malformed"), Equals, true)
 
 	// Wrong default storage class name
 	settings.ControlPlane.Ip = "1.1.1.1"
 	settings.DefaultStorageClass = &CseDefaultStorageClassSettings{Name: "NotAValidName%%%1"}
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == fmt.Sprintf("error creating the CSE Kubernetes cluster: the Default Storage Class name '%s' must contain only lowercase alphanumeric characters or '-', start with an alphabetic character, end with an alphanumeric, and contain at most 31 characters", settings.DefaultStorageClass.Name), Equals, true)
 
 	// Missing Storage profile ID
 	settings.DefaultStorageClass.Name = "sp-1"
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == "error creating the CSE Kubernetes cluster: the Storage Profile ID for the Default Storage Class is required", Equals, true)
 
@@ -794,14 +794,14 @@ func (vcd *TestVCD) Test_CseValidationErrors(check *C) {
 	// Wrong retaining policy in the default storage class
 	settings.DefaultStorageClass.StorageProfileId = sp.ID
 	settings.DefaultStorageClass.ReclaimPolicy = "whatever"
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == "error creating the CSE Kubernetes cluster: the Reclaim Policy for the Default Storage Class must be either 'delete' or 'retain', but it was 'whatever'", Equals, true)
 
 	// Wrong filesystem in the default storage class
 	settings.DefaultStorageClass.ReclaimPolicy = "delete"
 	settings.DefaultStorageClass.Filesystem = "oops"
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == "error creating the CSE Kubernetes cluster: the filesystem for the Default Storage Class must be either 'ext4' or 'xfs', but it was 'oops'", Equals, true)
 }

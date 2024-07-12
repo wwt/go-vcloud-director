@@ -24,7 +24,7 @@ func (vcd *TestVCD) Test_APIVCDMaxVersionIs_Unauthenticated(check *C) {
 	vcdClient, err := GetTestVCDFromYaml(config)
 	check.Assert(err, IsNil)
 
-	versionCheck := vcdClient.Client.APIVCDMaxVersionIs(context.Background(), ">= 27.0")
+	versionCheck := vcdClient.Client.APIVCDMaxVersionIs(ctx, ">= 27.0")
 	check.Assert(versionCheck, Equals, true)
 	check.Assert(vcdClient.Client.supportedVersions.VersionInfos, Not(Equals), 0)
 }
@@ -213,7 +213,7 @@ func (vcd *TestVCD) TestClient_GetSpecificApiVersionOnCondition(check *C) {
 	for _, tt := range tests {
 		fmt.Printf("## " + tt.name + ": ")
 
-		if got := vcd.client.Client.GetSpecificApiVersionOnCondition(tt.args.versionCondition, tt.args.wantedVersion); got != tt.want {
+		if got := vcd.client.Client.GetSpecificApiVersionOnCondition(ctx, tt.args.versionCondition, tt.args.wantedVersion); got != tt.want {
 			check.Errorf("Client.GetSpecificApiVersionOnCondition() = %v, want %v", got, tt.want)
 		} else {
 			fmt.Printf("Got %s from GetSpecificApiVersionOnCondition(\"%s\", \"%s\")\n",

@@ -17,7 +17,7 @@ func (vcd *TestVCD) Test_NsxtEdgeGatewayQosProfiles(check *C) {
 	if vcd.skipAdminTests {
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointQosProfiles)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointQosProfiles)
 
 	skipNoNsxtConfiguration(vcd, check)
 	if vcd.config.VCD.Nsxt.GatewayQosProfile == "" {

@@ -13,7 +13,7 @@ import (
 // Note. Security Group is one type of Firewall Group
 func (vcd *TestVCD) Test_NsxtStaticSecurityGroup(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
 	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
@@ -105,7 +105,7 @@ func (vcd *TestVCD) Test_NsxtStaticSecurityGroup(check *C) {
 // Note. Security Group is one type of Firewall Group
 func (vcd *TestVCD) Test_NsxtSecurityGroupGetAssociatedVms(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointFirewallGroups)
 
 	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)

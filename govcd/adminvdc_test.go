@@ -179,7 +179,6 @@ func (vcd *TestVCD) Test_UpdateVdcFlex(check *C) {
 	if vcd.skipAdminTests {
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
-	ctx := context.Background()
 
 	adminOrg, vdcConfiguration, err := setupVdc(vcd, check, "Flex")
 	check.Assert(err, IsNil)
@@ -212,9 +211,9 @@ func (vcd *TestVCD) Test_UpdateVdcFlex(check *C) {
 
 	vappName := check.TestName()
 	vmName := check.TestName()
-	vapp, err := makeEmptyVapp(ctx, vdc, vappName, "")
+	vapp, err := makeEmptyVapp(vdc, vappName, "")
 	check.Assert(err, IsNil)
-	_, err = makeEmptyVm(ctx, vapp, vmName)
+	_, err = makeEmptyVm(vapp, vmName)
 	check.Assert(err, IsNil)
 	AddToCleanupList(vappName, "vapp", "", vappName)
 
@@ -277,9 +276,9 @@ func (vcd *TestVCD) Test_UpdateVdcFlex(check *C) {
 	check.Assert(math.Abs(*updatedVdc.AdminVdc.ResourceGuaranteedMemory-guaranteed) < 0.001, Equals, true)
 	check.Assert(*updatedVdc.AdminVdc.IsElastic, Equals, true)
 	check.Assert(*updatedVdc.AdminVdc.IncludeMemoryOverhead, Equals, false)
-	vdc, err = adminOrg.GetVDCByName(updatedVdc.AdminVdc.Name, true)
+	vdc, err = adminOrg.GetVDCByName(ctx, updatedVdc.AdminVdc.Name, true)
 	check.Assert(err, IsNil)
-	task, err := vdc.Delete(true, true)
+	task, err := vdc.Delete(ctx, true, true)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
@@ -290,7 +289,6 @@ func (vcd *TestVCD) Test_VdcUpdateStorageProfile(check *C) {
 	if vcd.skipAdminTests {
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
-	ctx := context.Background()
 
 	adminOrg, vdcConfiguration, err := setupVdc(vcd, check, "Flex")
 	check.Assert(err, IsNil)
@@ -298,7 +296,7 @@ func (vcd *TestVCD) Test_VdcUpdateStorageProfile(check *C) {
 	adminVdc, err := adminOrg.GetAdminVDCByName(ctx, vdcConfiguration.Name, true)
 	check.Assert(err, IsNil)
 	check.Assert(adminVdc, NotNil)
-	vdc, err := adminOrg.GetVDCByName(vdcConfiguration.Name, true)
+	vdc, err := adminOrg.GetVDCByName(ctx, vdcConfiguration.Name, true)
 	check.Assert(err, IsNil)
 	check.Assert(adminVdc, NotNil)
 
@@ -332,7 +330,7 @@ func (vcd *TestVCD) Test_VdcUpdateStorageProfile(check *C) {
 	check.Assert(updatedStorageProfile.Limit, Equals, int64(9081))
 	check.Assert(updatedStorageProfile.Default, Equals, true)
 	check.Assert(updatedStorageProfile.Units, Equals, "MB")
-	task, err := vdc.Delete(true, true)
+	task, err := vdc.Delete(ctx, true, true)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)

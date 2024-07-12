@@ -11,7 +11,7 @@ import (
 
 func (vcd *TestVCD) Test_GetAllNetworkContextProfiles(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointNetworkContextProfiles)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointNetworkContextProfiles)
 
 	filteredTestGetAllNetworkContextProfiles(nil, &vcd.client.Client, check)
 
@@ -34,7 +34,7 @@ func (vcd *TestVCD) Test_GetAllNetworkContextProfiles(check *C) {
 func (vcd *TestVCD) Test_GetNetworkContextProfilesByNameScopeAndContext(check *C) {
 	vcd.skipIfNotSysAdmin(check)
 	skipNoNsxtConfiguration(vcd, check)
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointNetworkContextProfiles)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointNetworkContextProfiles)
 
 	// Expect error when fields are empty
 	profiles, err := GetNetworkContextProfilesByNameScopeAndContext(ctx, &vcd.client.Client, "", "", "")

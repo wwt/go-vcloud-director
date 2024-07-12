@@ -20,7 +20,7 @@ func (vcd *TestVCD) Test_DefinedInterface(check *C) {
 	if vcd.skipAdminTests {
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointRdeInterfaces)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointRdeInterfaces)
 	if len(vcd.config.Tenants) == 0 {
 		check.Skip("skipping as there is no configured tenant users")
 	}

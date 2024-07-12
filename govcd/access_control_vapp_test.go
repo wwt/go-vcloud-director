@@ -56,7 +56,7 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 	}
 
 	// Create a new vApp
-	vapp, err := makeEmptyVapp(ctx, vdc, vappName, "")
+	vapp, err := makeEmptyVapp(vdc, vappName, "")
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
 	AddToCleanupList(vappName, "vapp", vcd.config.VCD.Vdc, "Test_VappAccessControl")

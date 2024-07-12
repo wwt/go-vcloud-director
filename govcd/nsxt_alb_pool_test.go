@@ -15,7 +15,7 @@ func (vcd *TestVCD) Test_AlbPool(check *C) {
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
 	skipNoNsxtAlbConfiguration(vcd, check)
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointAlbEdgeGateway)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointAlbEdgeGateway)
 
 	// Setup prerequisite components
 	controller, cloud, seGroup, edge, assignment := setupAlbPoolPrerequisites(check, vcd)

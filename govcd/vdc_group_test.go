@@ -23,7 +23,7 @@ func (vcd *TestVCD) Test_CreateVdcGroup(check *C) {
 	if vcd.config.VCD.Nsxt.Vdc == "" {
 		check.Skip("Missing NSX-T config: No NSX-T VDC specified")
 	}
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointVdcGroups)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointVdcGroups)
 
 	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
@@ -47,7 +47,7 @@ func (vcd *TestVCD) Test_NsxtVdcGroup(check *C) {
 	if vcd.config.VCD.Nsxt.Vdc == "" {
 		check.Skip("Missing NSX-T config: No NSX-T VDC specified")
 	}
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointVdcGroups)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointVdcGroups)
 
 	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
@@ -211,7 +211,7 @@ func (vcd *TestVCD) Test_GetVdcGroupByName_ValidatesSymbolsInName(check *C) {
 	if vcd.config.VCD.Nsxt.Vdc == "" {
 		check.Skip("Missing NSX-T config: No NSX-T VDC specified")
 	}
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointVdcGroups)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointVdcGroups)
 
 	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
@@ -258,7 +258,7 @@ func (vcd *TestVCD) Test_NsxtVdcGroupWithOrgAdmin(check *C) {
 	if vcd.config.VCD.Nsxt.Vdc == "" {
 		check.Skip("Missing NSX-T config: No NSX-T VDC specified")
 	}
-	skipOpenApiEndpointTest(ctx, vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointVdcGroups)
+	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointVdcGroups)
 
 	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)

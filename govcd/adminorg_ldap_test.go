@@ -7,6 +7,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
@@ -76,7 +77,7 @@ func (vcd *TestVCD) Test_LDAPSystem(check *C) {
 	// Due to a bug in VCD, when configuring LDAP service, Org publishing catalog settings `Publish external catalogs` and
 	// `Subscribe to external catalogs ` gets disabled. For that reason we are getting the current values from those vars
 	// to set them at the end of the test, to avoid interference with other tests.
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
@@ -87,21 +88,21 @@ func (vcd *TestVCD) Test_LDAPSystem(check *C) {
 		CustomUsersOu: "ou=Foo,dc=domain,dc=local base DN",
 	}
 
-	_, err = adminOrg.LdapConfigure(&ldapSettings)
+	_, err = adminOrg.LdapConfigure(ctx, &ldapSettings)
 	check.Assert(err, IsNil)
 	defer func() {
 		fmt.Println("Unconfiguring LDAP")
 		// Clear LDAP configuration
-		err = adminOrg.LdapDisable()
+		err = adminOrg.LdapDisable(ctx)
 		check.Assert(err, IsNil)
 
 		// Due to the VCD bug mentioned above, we need to set the previous state from the publishing settings vars
-		check.Assert(adminOrg.Refresh(), IsNil)
+		check.Assert(adminOrg.Refresh(ctx), IsNil)
 
 		adminOrg.AdminOrg.OrgSettings.OrgGeneralSettings.CanPublishExternally = publishExternalCatalogs
 		adminOrg.AdminOrg.OrgSettings.OrgGeneralSettings.CanSubscribe = subscribeToExternalCatalogs
 
-		task, err := adminOrg.Update()
+		task, err := adminOrg.Update(ctx)
 		check.Assert(err, IsNil)
 
 		err = task.WaitTaskCompletion(context.Background())
