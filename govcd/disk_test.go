@@ -248,9 +248,9 @@ func (vcd *TestVCD) Test_AttachedVMDisk(check *C) {
 
 	// Ensure vApp and VM are suitable for this test
 	// Disk attach and detach operations are not working if VM is suspended
-	err := vcd.ensureVappIsSuitableForVMTest(ctx, vapp)
+	err := vcd.ensureVappIsSuitableForVMTest(vapp)
 	check.Assert(err, IsNil)
-	err = vcd.ensureVMIsSuitableForVMTest(ctx, vm)
+	err = vcd.ensureVMIsSuitableForVMTest(vm)
 	check.Assert(err, IsNil)
 
 	// Create disk
@@ -309,7 +309,7 @@ func (vcd *TestVCD) Test_AttachedVMDisk(check *C) {
 	check.Assert(vmHrefs[0], Equals, vm.VM.HREF)
 
 	// Detach disk
-	err = vcd.detachIndependentDisk(ctx, Disk{disk.Disk, &vcd.client.Client})
+	err = vcd.detachIndependentDisk(Disk{disk.Disk, &vcd.client.Client})
 	check.Assert(err, IsNil)
 }
 
@@ -418,9 +418,9 @@ func (vcd *TestVCD) Test_Disk(check *C) {
 
 	// Ensure vApp and VM are suitable for this test
 	// Disk attach and detach operations are not working if VM is suspended
-	err := vcd.ensureVappIsSuitableForVMTest(ctx, vapp)
+	err := vcd.ensureVappIsSuitableForVMTest(vapp)
 	check.Assert(err, IsNil)
-	err = vcd.ensureVMIsSuitableForVMTest(ctx, vm)
+	err = vcd.ensureVMIsSuitableForVMTest(vm)
 	check.Assert(err, IsNil)
 
 	// Create disk
