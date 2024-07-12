@@ -3,6 +3,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -172,7 +173,7 @@ func TestClient_getOpenApiHighestElevatedVersion(t *testing.T) {
 				client.APIVersion = tt.overrideClientMinApiVersion
 			}
 
-			got, err := client.getOpenApiHighestElevatedVersion(tt.endpoint)
+			got, err := client.getOpenApiHighestElevatedVersion(context.Background(), tt.endpoint)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getOpenApiHighestElevatedVersion() error = %v, wantErr %v", err, tt.wantErr)
 				return
