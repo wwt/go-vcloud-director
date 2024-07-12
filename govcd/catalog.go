@@ -1282,7 +1282,7 @@ func (client *Client) GetCatalogByName(ctx context.Context, parentOrg, catalogNa
 }
 
 // WaitForTasks waits for the catalog's tasks to complete
-func (cat *Catalog) WaitForTasks() error {
+func (cat *Catalog) WaitForTasks(ctx context.Context) error {
 	if ResourceInProgress(cat.Catalog.Tasks) {
 		err := WaitResource(func() (*types.TasksInProgress, error) {
 			err := cat.Refresh(ctx)

@@ -7,6 +7,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -18,7 +19,7 @@ import (
 // testGetVmAffinityRuleList tests that we can retrieve a list of VM affinity rules
 func testGetVmAffinityRuleList(vdc *Vdc, check *C) {
 	fmt.Printf("Running: test_GetVmAffinityRuleList\n")
-	_, err := vdc.GetAllVmAffinityRuleList()
+	_, err := vdc.GetAllVmAffinityRuleList(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -27,7 +28,7 @@ func (vcd *TestVCD) testGetVmAffinityRule(vdc *Vdc, check *C) {
 	fmt.Printf("Running: testGetVmAffinityRule \n")
 
 	affinityRuleName := ""
-	list, err := vdc.GetAllVmAffinityRuleList()
+	list, err := vdc.GetAllVmAffinityRuleList(ctx)
 	check.Assert(err, IsNil)
 	if len(list) == 0 {
 		check.Skip("No affinity rules found")
@@ -36,7 +37,7 @@ func (vcd *TestVCD) testGetVmAffinityRule(vdc *Vdc, check *C) {
 	affinityRuleName = list[0].Name
 
 	getByName := func(name string, refresh bool) (genericEntity, error) {
-		rules, err := vdc.GetVmAffinityRulesByName(name, "")
+		rules, err := vdc.GetVmAffinityRulesByName(ctx, name, "")
 		if err != nil {
 			return genericEntity(nil), err
 		}
@@ -50,7 +51,7 @@ func (vcd *TestVCD) testGetVmAffinityRule(vdc *Vdc, check *C) {
 		return &gRule, nil
 	}
 	getById := func(id string, refresh bool) (genericEntity, error) {
-		rule, err := vdc.GetVmAffinityRuleById(id)
+		rule, err := vdc.GetVmAffinityRuleById(ctx, id)
 		if err != nil {
 			return genericEntity(nil), err
 		}
@@ -58,7 +59,7 @@ func (vcd *TestVCD) testGetVmAffinityRule(vdc *Vdc, check *C) {
 		return &gRule, nil
 	}
 	getByNameOrId := func(id string, refresh bool) (genericEntity, error) {
-		rule, err := vdc.GetVmAffinityRuleByNameOrId(id)
+		rule, err := vdc.GetVmAffinityRuleByNameOrId(ctx, id)
 		if err != nil {
 			return genericEntity(nil), err
 		}
@@ -108,7 +109,7 @@ func (vcd *TestVCD) testCRUDVmAffinityRule(orgName string, vdc *Vdc, data affini
 			},
 		},
 	}
-	vmAffinityRule, err := vdc.CreateVmAffinityRule(affinityRuleDef)
+	vmAffinityRule, err := vdc.CreateVmAffinityRule(ctx, affinityRuleDef)
 	check.Assert(err, IsNil)
 	AddToCleanupList(vmAffinityRule.VmAffinityRule.ID, "affinity_rule", orgName+"|"+vdc.Vdc.Name, "testCRUDVmAffinityRule")
 
@@ -124,9 +125,9 @@ func (vcd *TestVCD) testCRUDVmAffinityRule(orgName string, vdc *Vdc, data affini
 	}
 
 	vmAffinityRule.VmAffinityRule.Name = data.name + "-with-change"
-	err = vmAffinityRule.Update()
+	err = vmAffinityRule.Update(ctx)
 	check.Assert(err, IsNil)
-	vmAffinityRule, err = vdc.GetVmAffinityRuleByHref(vmAffinityRule.VmAffinityRule.HREF)
+	vmAffinityRule, err = vdc.GetVmAffinityRuleByHref(ctx, vmAffinityRule.VmAffinityRule.HREF)
 	check.Assert(err, IsNil)
 	check.Assert(vmAffinityRule.VmAffinityRule.Name, Equals, data.name+"-with-change")
 
@@ -137,36 +138,36 @@ func (vcd *TestVCD) testCRUDVmAffinityRule(orgName string, vdc *Vdc, data affini
 		}
 		vmAffinityRule.VmAffinityRule.Name = data.name + "-with-removal"
 		vmAffinityRule.VmAffinityRule.VmReferences[0].VMReference[0] = nil
-		err = vmAffinityRule.Update()
+		err = vmAffinityRule.Update(ctx)
 		check.Assert(err, IsNil)
-		vmAffinityRule, err = vdc.GetVmAffinityRuleByHref(vmAffinityRule.VmAffinityRule.HREF)
+		vmAffinityRule, err = vdc.GetVmAffinityRuleByHref(ctx, vmAffinityRule.VmAffinityRule.HREF)
 		check.Assert(err, IsNil)
 		check.Assert(vmAffinityRule.VmAffinityRule.Name, Equals, data.name+"-with-removal")
 	}
 
-	err = vmAffinityRule.SetEnabled(false)
+	err = vmAffinityRule.SetEnabled(ctx, false)
 	check.Assert(err, IsNil)
-	vmAffinityRule, err = vdc.GetVmAffinityRuleByHref(vmAffinityRule.VmAffinityRule.HREF)
+	vmAffinityRule, err = vdc.GetVmAffinityRuleByHref(ctx, vmAffinityRule.VmAffinityRule.HREF)
 	check.Assert(err, IsNil)
 	check.Assert(*vmAffinityRule.VmAffinityRule.IsEnabled, Equals, false)
 	check.Assert(*vmAffinityRule.VmAffinityRule.IsMandatory, Equals, true)
 
-	err = vmAffinityRule.SetMandatory(false)
+	err = vmAffinityRule.SetMandatory(ctx, false)
 	check.Assert(err, IsNil)
-	vmAffinityRule, err = vdc.GetVmAffinityRuleByHref(vmAffinityRule.VmAffinityRule.HREF)
+	vmAffinityRule, err = vdc.GetVmAffinityRuleByHref(ctx, vmAffinityRule.VmAffinityRule.HREF)
 	check.Assert(err, IsNil)
 	check.Assert(*vmAffinityRule.VmAffinityRule.IsMandatory, Equals, false)
 
-	err = vmAffinityRule.SetEnabled(true)
+	err = vmAffinityRule.SetEnabled(ctx, true)
 	check.Assert(err, IsNil)
-	vmAffinityRule, err = vdc.GetVmAffinityRuleByHref(vmAffinityRule.VmAffinityRule.HREF)
+	vmAffinityRule, err = vdc.GetVmAffinityRuleByHref(ctx, vmAffinityRule.VmAffinityRule.HREF)
 	check.Assert(err, IsNil)
 	check.Assert(*vmAffinityRule.VmAffinityRule.IsEnabled, Equals, true)
 	check.Assert(*vmAffinityRule.VmAffinityRule.IsMandatory, Equals, false)
 
-	err = vmAffinityRule.SetMandatory(true)
+	err = vmAffinityRule.SetMandatory(ctx, true)
 	check.Assert(err, IsNil)
-	vmAffinityRule, err = vdc.GetVmAffinityRuleByHref(vmAffinityRule.VmAffinityRule.HREF)
+	vmAffinityRule, err = vdc.GetVmAffinityRuleByHref(ctx, vmAffinityRule.VmAffinityRule.HREF)
 	check.Assert(err, IsNil)
 	check.Assert(*vmAffinityRule.VmAffinityRule.IsMandatory, Equals, true)
 	check.Assert(*vmAffinityRule.VmAffinityRule.IsEnabled, Equals, true)
@@ -176,7 +177,7 @@ func (vcd *TestVCD) testCRUDVmAffinityRule(orgName string, vdc *Vdc, data affini
 	vcd.testGetVmAffinityRule(vdc, check)
 
 	// Delete
-	err = vmAffinityRule.Delete()
+	err = vmAffinityRule.Delete(ctx)
 	check.Assert(err, IsNil)
 	if testVerbose {
 		fmt.Println()
@@ -196,11 +197,11 @@ func (vcd *TestVCD) Test_VmAffinityRule(check *C) {
 		check.Skip("Test_VmAffinityRule: VDC name not given")
 		return
 	}
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	vdc, err := org.GetVDCByName(vcd.config.VCD.Vdc, false)
+	vdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Vdc, false)
 	check.Assert(err, IsNil)
 	check.Assert(vdc, NotNil)
 
@@ -223,7 +224,7 @@ func (vcd *TestVCD) Test_VmAffinityRule(check *C) {
 			if testVerbose {
 				fmt.Printf("Removing vApp %s\n", vapp.VApp.Name)
 			}
-			task, err := vapp.Delete()
+			task, err := vapp.Delete(ctx)
 			if err == nil {
 				_ = task.WaitTaskCompletion(context.Background())
 			}

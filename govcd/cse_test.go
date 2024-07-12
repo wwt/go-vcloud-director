@@ -37,42 +37,42 @@ func (vcd *TestVCD) Test_Cse(check *C) {
 	requireCseConfig(check, vcd.config)
 
 	// Prerequisites: We need to read several items before creating the cluster.
-	org, err := vcd.client.GetOrgByName(vcd.config.Cse.TenantOrg)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.Cse.TenantOrg)
 	check.Assert(err, IsNil)
 
-	catalog, err := org.GetCatalogByName(vcd.config.Cse.OvaCatalog, false)
+	catalog, err := org.GetCatalogByName(ctx, vcd.config.Cse.OvaCatalog, false)
 	check.Assert(err, IsNil)
 
-	ova, err := catalog.GetVAppTemplateByName(vcd.config.Cse.OvaName)
+	ova, err := catalog.GetVAppTemplateByName(ctx, vcd.config.Cse.OvaName)
 	check.Assert(err, IsNil)
 
 	tkgBundle, err := getTkgVersionBundleFromVAppTemplate(ova.VAppTemplate)
 	check.Assert(err, IsNil)
 
-	vdc, err := org.GetVDCByName(vcd.config.Cse.TenantVdc, false)
+	vdc, err := org.GetVDCByName(ctx, vcd.config.Cse.TenantVdc, false)
 	check.Assert(err, IsNil)
 
-	net, err := vdc.GetOrgVdcNetworkByName(vcd.config.Cse.RoutedNetwork, false)
+	net, err := vdc.GetOrgVdcNetworkByName(ctx, vcd.config.Cse.RoutedNetwork, false)
 	check.Assert(err, IsNil)
 
-	sp, err := vdc.FindStorageProfileReference(vcd.config.Cse.StorageProfile)
+	sp, err := vdc.FindStorageProfileReference(ctx, vcd.config.Cse.StorageProfile)
 	check.Assert(err, IsNil)
 
-	policies, err := vcd.client.GetAllVdcComputePoliciesV2(url.Values{
+	policies, err := vcd.client.GetAllVdcComputePoliciesV2(ctx, url.Values{
 		"filter": []string{"name==TKG small"},
 	})
 	check.Assert(err, IsNil)
 	check.Assert(len(policies), Equals, 1)
 
-	token, err := vcd.client.CreateToken(vcd.config.Provider.SysOrg, check.TestName())
+	token, err := vcd.client.CreateToken(ctx, vcd.config.Provider.SysOrg, check.TestName())
 	check.Assert(err, IsNil)
 	defer func() {
-		err = token.Delete()
+		err = token.Delete(ctx)
 		check.Assert(err, IsNil)
 	}()
 	AddToCleanupListOpenApi(token.Token.Name, check.TestName(), types.OpenApiPathVersion1_0_0+types.OpenApiEndpointTokens+token.Token.ID)
 
-	apiToken, err := token.GetInitialApiToken()
+	apiToken, err := token.GetInitialApiToken(ctx)
 	check.Assert(err, IsNil)
 
 	cseVersion, err := semver.NewVersion(vcd.config.Cse.Version)
@@ -116,7 +116,7 @@ func (vcd *TestVCD) Test_Cse(check *C) {
 		SshPublicKey:       sshPublicKey,
 		AutoRepairOnErrors: true,
 	}
-	cluster, err := org.CseCreateKubernetesCluster(clusterSettings, 150*time.Minute)
+	cluster, err := org.CseCreateKubernetesCluster(ctx, clusterSettings, 150*time.Minute)
 
 	// We assure that the cluster gets always deleted, even if the creation failed.
 	// Deletion process only needs the cluster ID
@@ -124,36 +124,36 @@ func (vcd *TestVCD) Test_Cse(check *C) {
 		check.Assert(cluster, NotNil)
 		check.Assert(cluster.client, NotNil)
 		check.Assert(cluster.ID, Not(Equals), "")
-		err = cluster.Delete(0)
+		err = cluster.Delete(ctx, 0)
 		check.Assert(err, IsNil)
 	}()
 
 	check.Assert(err, IsNil)
 	assertCseClusterCreation(check, cluster, clusterSettings, tkgBundle)
 
-	kubeconfig, err := cluster.GetKubeconfig(false)
+	kubeconfig, err := cluster.GetKubeconfig(ctx, false)
 	check.Assert(err, IsNil)
 	check.Assert(true, Equals, strings.Contains(kubeconfig, cluster.Name))
 	check.Assert(true, Equals, strings.Contains(kubeconfig, "client-certificate-data"))
 	check.Assert(true, Equals, strings.Contains(kubeconfig, "certificate-authority-data"))
 	check.Assert(true, Equals, strings.Contains(kubeconfig, "client-key-data"))
 
-	err = cluster.Refresh()
+	err = cluster.Refresh(ctx)
 	check.Assert(err, IsNil)
 
-	clusterGet, err := vcd.client.CseGetKubernetesClusterById(cluster.ID)
+	clusterGet, err := vcd.client.CseGetKubernetesClusterById(ctx, cluster.ID)
 	check.Assert(err, IsNil)
 	assertCseClusterEquals(check, clusterGet, cluster)
 	check.Assert(clusterGet.Etag, Not(Equals), "")
 
-	allClusters, err := org.CseGetKubernetesClustersByName(clusterGet.CseVersion, clusterGet.Name)
+	allClusters, err := org.CseGetKubernetesClustersByName(ctx, clusterGet.CseVersion, clusterGet.Name)
 	check.Assert(err, IsNil)
 	check.Assert(len(allClusters), Equals, 1)
 	assertCseClusterEquals(check, allClusters[0], clusterGet)
 	check.Assert(allClusters[0].Etag, Equals, "") // Can't recover ETag by name
 
 	// Update worker pool with autoscaler
-	err = cluster.UpdateWorkerPools(map[string]CseWorkerPoolUpdateInput{clusterSettings.WorkerPools[0].Name: {
+	err = cluster.UpdateWorkerPools(ctx, map[string]CseWorkerPoolUpdateInput{clusterSettings.WorkerPools[0].Name: {
 		Autoscaler: &CseWorkerPoolAutoscaler{
 			MaxSize: 2,
 			MinSize: 1,
@@ -172,7 +172,7 @@ func (vcd *TestVCD) Test_Cse(check *C) {
 	check.Assert(foundWorkerPool, Equals, true)
 
 	// Update worker pool from Autoscaling to static 2 nodes
-	err = cluster.UpdateWorkerPools(map[string]CseWorkerPoolUpdateInput{clusterSettings.WorkerPools[0].Name: {MachineCount: 2}}, true)
+	err = cluster.UpdateWorkerPools(ctx, map[string]CseWorkerPoolUpdateInput{clusterSettings.WorkerPools[0].Name: {MachineCount: 2}}, true)
 	check.Assert(err, IsNil)
 	foundWorkerPool = false
 	for _, nodePool := range cluster.WorkerPools {
@@ -185,7 +185,7 @@ func (vcd *TestVCD) Test_Cse(check *C) {
 	check.Assert(foundWorkerPool, Equals, true)
 
 	// Add two new worker pools, one with autoscaler
-	err = cluster.AddWorkerPools([]CseWorkerPoolSettings{{
+	err = cluster.AddWorkerPools(ctx, []CseWorkerPoolSettings{{
 		Name:         "new-pool-1",
 		MachineCount: 1,
 		DiskSizeGi:   20,
@@ -223,31 +223,31 @@ func (vcd *TestVCD) Test_Cse(check *C) {
 	check.Assert(foundWorkerPool2, Equals, true)
 
 	// Update control plane from 1 node to 3 (needs to be an odd number)
-	err = cluster.UpdateControlPlane(CseControlPlaneUpdateInput{MachineCount: 3}, true)
+	err = cluster.UpdateControlPlane(ctx, CseControlPlaneUpdateInput{MachineCount: 3}, true)
 	check.Assert(err, IsNil)
 	check.Assert(cluster.ControlPlane.MachineCount, Equals, 3)
 
 	// Turn off the node health check
-	err = cluster.SetNodeHealthCheck(false, true)
+	err = cluster.SetNodeHealthCheck(ctx, false, true)
 	check.Assert(err, IsNil)
 	check.Assert(cluster.NodeHealthCheck, Equals, false)
 
 	// Update the auto repair flag
 	check.Assert(err, IsNil)
-	err = cluster.SetAutoRepairOnErrors(false, true)
+	err = cluster.SetAutoRepairOnErrors(ctx, false, true)
 	check.Assert(err, IsNil) // It won't fail in CSE >4.1.0 as the flag is already false, so we update nothing.
 	check.Assert(cluster.AutoRepairOnErrors, Equals, false)
 
 	// Upgrade the cluster if possible
-	upgradeOvas, err := cluster.GetSupportedUpgrades(true)
+	upgradeOvas, err := cluster.GetSupportedUpgrades(ctx, true)
 	check.Assert(err, IsNil)
 	if len(upgradeOvas) > 0 {
-		err = cluster.UpgradeCluster(upgradeOvas[0].ID, true)
+		err = cluster.UpgradeCluster(ctx, upgradeOvas[0].ID, true)
 		check.Assert(err, IsNil)
 		check.Assert(cluster.KubernetesVersion, Not(Equals), clusterGet.KubernetesVersion)
 		check.Assert(cluster.TkgVersion, Not(Equals), clusterGet.TkgVersion)
 		check.Assert(cluster.KubernetesTemplateOvaId, Not(Equals), clusterGet.KubernetesTemplateOvaId)
-		upgradeOvas, err = cluster.GetSupportedUpgrades(true)
+		upgradeOvas, err = cluster.GetSupportedUpgrades(ctx, true)
 		check.Assert(err, IsNil)
 		check.Assert(len(upgradeOvas), Equals, 0)
 	} else {
@@ -255,7 +255,7 @@ func (vcd *TestVCD) Test_Cse(check *C) {
 	}
 
 	// Helps to delete the cluster faster, also tests generic update method
-	err = cluster.Update(CseClusterUpdateInput{
+	err = cluster.Update(ctx, CseClusterUpdateInput{
 		ControlPlane: &CseControlPlaneUpdateInput{MachineCount: 1},
 		WorkerPools: &map[string]CseWorkerPoolUpdateInput{
 			clusterSettings.WorkerPools[0].Name: {
@@ -289,42 +289,42 @@ func (vcd *TestVCD) Test_CseWithAutoscaler(check *C) {
 	requireCseConfig(check, vcd.config)
 
 	// Prerequisites: We need to read several items before creating the cluster.
-	org, err := vcd.client.GetOrgByName(vcd.config.Cse.TenantOrg)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.Cse.TenantOrg)
 	check.Assert(err, IsNil)
 
-	catalog, err := org.GetCatalogByName(vcd.config.Cse.OvaCatalog, false)
+	catalog, err := org.GetCatalogByName(ctx, vcd.config.Cse.OvaCatalog, false)
 	check.Assert(err, IsNil)
 
-	ova, err := catalog.GetVAppTemplateByName(vcd.config.Cse.OvaName)
+	ova, err := catalog.GetVAppTemplateByName(ctx, vcd.config.Cse.OvaName)
 	check.Assert(err, IsNil)
 
 	tkgBundle, err := getTkgVersionBundleFromVAppTemplate(ova.VAppTemplate)
 	check.Assert(err, IsNil)
 
-	vdc, err := org.GetVDCByName(vcd.config.Cse.TenantVdc, false)
+	vdc, err := org.GetVDCByName(ctx, vcd.config.Cse.TenantVdc, false)
 	check.Assert(err, IsNil)
 
-	net, err := vdc.GetOrgVdcNetworkByName(vcd.config.Cse.RoutedNetwork, false)
+	net, err := vdc.GetOrgVdcNetworkByName(ctx, vcd.config.Cse.RoutedNetwork, false)
 	check.Assert(err, IsNil)
 
-	sp, err := vdc.FindStorageProfileReference(vcd.config.Cse.StorageProfile)
+	sp, err := vdc.FindStorageProfileReference(ctx, vcd.config.Cse.StorageProfile)
 	check.Assert(err, IsNil)
 
-	policies, err := vcd.client.GetAllVdcComputePoliciesV2(url.Values{
+	policies, err := vcd.client.GetAllVdcComputePoliciesV2(ctx, url.Values{
 		"filter": []string{"name==TKG small"},
 	})
 	check.Assert(err, IsNil)
 	check.Assert(len(policies), Equals, 1)
 
-	token, err := vcd.client.CreateToken(vcd.config.Provider.SysOrg, check.TestName())
+	token, err := vcd.client.CreateToken(ctx, vcd.config.Provider.SysOrg, check.TestName())
 	check.Assert(err, IsNil)
 	defer func() {
-		err = token.Delete()
+		err = token.Delete(ctx)
 		check.Assert(err, IsNil)
 	}()
 	AddToCleanupListOpenApi(token.Token.Name, check.TestName(), types.OpenApiPathVersion1_0_0+types.OpenApiEndpointTokens+token.Token.ID)
 
-	apiToken, err := token.GetInitialApiToken()
+	apiToken, err := token.GetInitialApiToken(ctx)
 	check.Assert(err, IsNil)
 
 	cseVersion, err := semver.NewVersion(vcd.config.Cse.Version)
@@ -369,7 +369,7 @@ func (vcd *TestVCD) Test_CseWithAutoscaler(check *C) {
 		ServiceCidr:        "100.64.0.0/13",
 		AutoRepairOnErrors: true,
 	}
-	cluster, err := org.CseCreateKubernetesCluster(clusterSettings, 150*time.Minute)
+	cluster, err := org.CseCreateKubernetesCluster(ctx, clusterSettings, 150*time.Minute)
 
 	// We assure that the cluster gets always deleted, even if the creation failed.
 	// Deletion process only needs the cluster ID
@@ -377,36 +377,36 @@ func (vcd *TestVCD) Test_CseWithAutoscaler(check *C) {
 		check.Assert(cluster, NotNil)
 		check.Assert(cluster.client, NotNil)
 		check.Assert(cluster.ID, Not(Equals), "")
-		err = cluster.Delete(0)
+		err = cluster.Delete(ctx, 0)
 		check.Assert(err, IsNil)
 	}()
 
 	check.Assert(err, IsNil)
 	assertCseClusterCreation(check, cluster, clusterSettings, tkgBundle)
 
-	kubeconfig, err := cluster.GetKubeconfig(false)
+	kubeconfig, err := cluster.GetKubeconfig(ctx, false)
 	check.Assert(err, IsNil)
 	check.Assert(true, Equals, strings.Contains(kubeconfig, cluster.Name))
 	check.Assert(true, Equals, strings.Contains(kubeconfig, "client-certificate-data"))
 	check.Assert(true, Equals, strings.Contains(kubeconfig, "certificate-authority-data"))
 	check.Assert(true, Equals, strings.Contains(kubeconfig, "client-key-data"))
 
-	err = cluster.Refresh()
+	err = cluster.Refresh(ctx)
 	check.Assert(err, IsNil)
 
-	clusterGet, err := vcd.client.CseGetKubernetesClusterById(cluster.ID)
+	clusterGet, err := vcd.client.CseGetKubernetesClusterById(ctx, cluster.ID)
 	check.Assert(err, IsNil)
 	assertCseClusterEquals(check, clusterGet, cluster)
 	check.Assert(clusterGet.Etag, Not(Equals), "")
 
-	allClusters, err := org.CseGetKubernetesClustersByName(clusterGet.CseVersion, clusterGet.Name)
+	allClusters, err := org.CseGetKubernetesClustersByName(ctx, clusterGet.CseVersion, clusterGet.Name)
 	check.Assert(err, IsNil)
 	check.Assert(len(allClusters), Equals, 1)
 	assertCseClusterEquals(check, allClusters[0], clusterGet)
 	check.Assert(allClusters[0].Etag, Equals, "") // Can't recover ETag by name
 
 	// Update worker pool and deactivate autoscaler
-	err = cluster.UpdateWorkerPools(map[string]CseWorkerPoolUpdateInput{clusterSettings.WorkerPools[0].Name: {
+	err = cluster.UpdateWorkerPools(ctx, map[string]CseWorkerPoolUpdateInput{clusterSettings.WorkerPools[0].Name: {
 		Autoscaler: &CseWorkerPoolAutoscaler{
 			MaxSize: 10,
 			MinSize: 1,
@@ -430,39 +430,39 @@ func (vcd *TestVCD) Test_CseFailure(check *C) {
 	requireCseConfig(check, vcd.config)
 
 	// Prerequisites: We need to read several items before creating the cluster.
-	org, err := vcd.client.GetOrgByName(vcd.config.Cse.TenantOrg)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.Cse.TenantOrg)
 	check.Assert(err, IsNil)
 
-	catalog, err := org.GetCatalogByName(vcd.config.Cse.OvaCatalog, false)
+	catalog, err := org.GetCatalogByName(ctx, vcd.config.Cse.OvaCatalog, false)
 	check.Assert(err, IsNil)
 
-	ova, err := catalog.GetVAppTemplateByName(vcd.config.Cse.OvaName)
+	ova, err := catalog.GetVAppTemplateByName(ctx, vcd.config.Cse.OvaName)
 	check.Assert(err, IsNil)
 
-	vdc, err := org.GetVDCByName(vcd.config.Cse.TenantVdc, false)
+	vdc, err := org.GetVDCByName(ctx, vcd.config.Cse.TenantVdc, false)
 	check.Assert(err, IsNil)
 
-	net, err := vdc.GetOrgVdcNetworkByName(vcd.config.Cse.RoutedNetwork, false)
+	net, err := vdc.GetOrgVdcNetworkByName(ctx, vcd.config.Cse.RoutedNetwork, false)
 	check.Assert(err, IsNil)
 
-	sp, err := vdc.FindStorageProfileReference(vcd.config.Cse.StorageProfile)
+	sp, err := vdc.FindStorageProfileReference(ctx, vcd.config.Cse.StorageProfile)
 	check.Assert(err, IsNil)
 
-	policies, err := vcd.client.GetAllVdcComputePoliciesV2(url.Values{
+	policies, err := vcd.client.GetAllVdcComputePoliciesV2(ctx, url.Values{
 		"filter": []string{"name==TKG small"},
 	})
 	check.Assert(err, IsNil)
 	check.Assert(len(policies), Equals, 1)
 
-	token, err := vcd.client.CreateToken(vcd.config.Provider.SysOrg, check.TestName())
+	token, err := vcd.client.CreateToken(ctx, vcd.config.Provider.SysOrg, check.TestName())
 	check.Assert(err, IsNil)
 	defer func() {
-		err = token.Delete()
+		err = token.Delete(ctx)
 		check.Assert(err, IsNil)
 	}()
 	AddToCleanupListOpenApi(token.Token.Name, check.TestName(), types.OpenApiPathVersion1_0_0+types.OpenApiEndpointTokens+token.Token.ID)
 
-	apiToken, err := token.GetInitialApiToken()
+	apiToken, err := token.GetInitialApiToken(ctx)
 	check.Assert(err, IsNil)
 
 	cseVersion, err := semver.NewVersion(vcd.config.Cse.Version)
@@ -502,7 +502,7 @@ func (vcd *TestVCD) Test_CseFailure(check *C) {
 		ServiceCidr:        "1.1.1.1/24", // This should make the cluster fail
 		AutoRepairOnErrors: false,        // Must be false to avoid never-ending loops
 	}
-	cluster, err := org.CseCreateKubernetesCluster(clusterSettings, 150*time.Minute)
+	cluster, err := org.CseCreateKubernetesCluster(ctx, clusterSettings, 150*time.Minute)
 
 	// We assure that the cluster gets always deleted.
 	// Deletion process only needs the cluster ID
@@ -510,7 +510,7 @@ func (vcd *TestVCD) Test_CseFailure(check *C) {
 		check.Assert(cluster, NotNil)
 		check.Assert(cluster.client, NotNil)
 		check.Assert(cluster.ID, Not(Equals), "")
-		err = cluster.Delete(0)
+		err = cluster.Delete(ctx, 0)
 		check.Assert(err, IsNil)
 	}()
 
@@ -518,7 +518,7 @@ func (vcd *TestVCD) Test_CseFailure(check *C) {
 	check.Assert(cluster.client, NotNil)
 	check.Assert(cluster.ID, Not(Equals), "")
 
-	clusterGet, err := vcd.client.CseGetKubernetesClusterById(cluster.ID)
+	clusterGet, err := vcd.client.CseGetKubernetesClusterById(ctx, cluster.ID)
 	check.Assert(err, IsNil)
 	// We don't get an error when we retrieve a failed cluster, but some fields are missing
 	check.Assert(clusterGet.ID, Equals, cluster.ID)
@@ -526,40 +526,40 @@ func (vcd *TestVCD) Test_CseFailure(check *C) {
 	check.Assert(clusterGet.State, Equals, "error")
 	check.Assert(len(clusterGet.Events), Not(Equals), 0)
 
-	err = cluster.Refresh()
+	err = cluster.Refresh(ctx)
 	check.Assert(err, IsNil)
 	assertCseClusterEquals(check, cluster, clusterGet)
 
-	allClusters, err := org.CseGetKubernetesClustersByName(clusterGet.CseVersion, clusterGet.Name)
+	allClusters, err := org.CseGetKubernetesClustersByName(ctx, clusterGet.CseVersion, clusterGet.Name)
 	check.Assert(err, IsNil)
 	check.Assert(len(allClusters), Equals, 1)
 	assertCseClusterEquals(check, allClusters[0], clusterGet)
 	check.Assert(allClusters[0].Etag, Equals, "") // Can't recover ETag by name
 
-	_, err = cluster.GetKubeconfig(false)
+	_, err = cluster.GetKubeconfig(ctx, false)
 	check.Assert(err, NotNil)
 
 	// All updates should fail
-	err = cluster.UpdateWorkerPools(map[string]CseWorkerPoolUpdateInput{clusterSettings.WorkerPools[0].Name: {MachineCount: 1}}, true)
+	err = cluster.UpdateWorkerPools(ctx, map[string]CseWorkerPoolUpdateInput{clusterSettings.WorkerPools[0].Name: {MachineCount: 1}}, true)
 	check.Assert(err, NotNil)
-	err = cluster.AddWorkerPools([]CseWorkerPoolSettings{{
+	err = cluster.AddWorkerPools(ctx, []CseWorkerPoolSettings{{
 		Name:         "i-dont-care-i-will-fail",
 		MachineCount: 1,
 		DiskSizeGi:   20,
 	}}, true)
 	check.Assert(err, NotNil)
-	err = cluster.UpdateControlPlane(CseControlPlaneUpdateInput{MachineCount: 1}, true)
+	err = cluster.UpdateControlPlane(ctx, CseControlPlaneUpdateInput{MachineCount: 1}, true)
 	check.Assert(err, NotNil)
-	err = cluster.SetNodeHealthCheck(false, true)
+	err = cluster.SetNodeHealthCheck(ctx, false, true)
 	check.Assert(err, NotNil)
-	err = cluster.SetAutoRepairOnErrors(false, true)
+	err = cluster.SetAutoRepairOnErrors(ctx, false, true)
 	check.Assert(err, NotNil)
 
-	upgradeOvas, err := cluster.GetSupportedUpgrades(true)
+	upgradeOvas, err := cluster.GetSupportedUpgrades(ctx, true)
 	check.Assert(err, IsNil)
 	check.Assert(len(upgradeOvas), Equals, 0)
 
-	err = cluster.UpgradeCluster(clusterSettings.KubernetesTemplateOvaId, true)
+	err = cluster.UpgradeCluster(ctx, clusterSettings.KubernetesTemplateOvaId, true)
 	check.Assert(err, NotNil)
 }
 
@@ -567,7 +567,7 @@ func (vcd *TestVCD) Test_CseFailure(check *C) {
 func (vcd *TestVCD) Test_CseValidationErrors(check *C) {
 	requireCseConfig(check, vcd.config)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.Cse.TenantOrg)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.Cse.TenantOrg)
 	check.Assert(err, IsNil)
 
 	settings := CseClusterSettings{}
@@ -577,7 +577,7 @@ func (vcd *TestVCD) Test_CseValidationErrors(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(cseVersion, NotNil)
 	settings.CseVersion = *cseVersion
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == fmt.Sprintf("the Container Service Extension version '%s' is not supported", settings.CseVersion.String()), Equals, true)
 	cseVersion, err = semver.NewVersion(vcd.config.Cse.Version)
@@ -587,71 +587,71 @@ func (vcd *TestVCD) Test_CseValidationErrors(check *C) {
 
 	// Wrong name
 	settings.Name = "NotAValidName%%%1"
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == fmt.Sprintf("error creating the CSE Kubernetes cluster: the name '%s' must contain only lowercase alphanumeric characters or '-', start with an alphabetic character, end with an alphanumeric, and contain at most 31 characters", settings.Name), Equals, true)
 
 	settings.Name = "valid"
 
 	// Missing Organization ID
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == "error creating the CSE Kubernetes cluster: the Organization ID is required", Equals, true)
 
 	settings.OrganizationId = org.Org.ID
 
 	// Missing VDC ID
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == "error creating the CSE Kubernetes cluster: the VDC ID is required", Equals, true)
 
-	vdc, err := org.GetVDCByName(vcd.config.Cse.TenantVdc, false)
+	vdc, err := org.GetVDCByName(ctx, vcd.config.Cse.TenantVdc, false)
 	check.Assert(err, IsNil)
 	settings.VdcId = vdc.Vdc.ID
 
 	// Missing Network ID
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == "error creating the CSE Kubernetes cluster: the Network ID is required", Equals, true)
 
-	net, err := vdc.GetOrgVdcNetworkByName(vcd.config.Cse.RoutedNetwork, false)
+	net, err := vdc.GetOrgVdcNetworkByName(ctx, vcd.config.Cse.RoutedNetwork, false)
 	check.Assert(err, IsNil)
 	settings.NetworkId = net.OrgVDCNetwork.ID
 
 	// Missing Kubernetes OVA
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == "error creating the CSE Kubernetes cluster: the Kubernetes Template OVA ID is required", Equals, true)
 
-	catalog, err := org.GetCatalogByName(vcd.config.Cse.OvaCatalog, false)
+	catalog, err := org.GetCatalogByName(ctx, vcd.config.Cse.OvaCatalog, false)
 	check.Assert(err, IsNil)
-	ova, err := catalog.GetVAppTemplateByName(vcd.config.Cse.OvaName)
+	ova, err := catalog.GetVAppTemplateByName(ctx, vcd.config.Cse.OvaName)
 	check.Assert(err, IsNil)
 	settings.KubernetesTemplateOvaId = ova.VAppTemplate.ID
 
 	// No control plane nodes
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == "error creating the CSE Kubernetes cluster: number of Control Plane nodes must be odd and higher than 0, but it was '0'", Equals, true)
 
 	settings.ControlPlane.MachineCount = 2
 
 	// Wrong control plane nodes, it should not be even
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == "error creating the CSE Kubernetes cluster: number of Control Plane nodes must be odd and higher than 0, but it was '2'", Equals, true)
 
 	settings.ControlPlane.MachineCount = 1
 
 	// Wrong disk size for the control plane
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == "error creating the CSE Kubernetes cluster: disk size for the Control Plane in Gibibytes (Gi) must be at least 20, but it was '0'", Equals, true)
 
 	settings.ControlPlane.DiskSizeGi = 20
 
 	// No worker pool
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == "error creating the CSE Kubernetes cluster: there must be at least one Worker Pool", Equals, true)
 
@@ -661,14 +661,14 @@ func (vcd *TestVCD) Test_CseValidationErrors(check *C) {
 
 	// Wrong worker pool name
 	settings.WorkerPools[0].Name = "NotAValidName%%%1"
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == fmt.Sprintf("error creating the CSE Kubernetes cluster: the Worker Pool name '%s' must contain only lowercase alphanumeric characters or '-', start with an alphabetic character, end with an alphanumeric, and contain at most 31 characters", settings.WorkerPools[0].Name), Equals, true)
 
 	settings.WorkerPools[0].Name = "wp-1"
 
 	// No worker pool replicas
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == fmt.Sprintf("error creating the CSE Kubernetes cluster: number of Worker Pool '%s' nodes must higher than 0, but it was '0'", settings.WorkerPools[0].Name), Equals, true)
 
@@ -676,32 +676,32 @@ func (vcd *TestVCD) Test_CseValidationErrors(check *C) {
 
 	// Try to set the autoscaler and the static machine count at same time
 	settings.WorkerPools[0].Autoscaler = &CseWorkerPoolAutoscaler{MaxSize: 1, MinSize: 5}
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == fmt.Sprintf("error creating the CSE Kubernetes cluster: the Worker Pool '%s' is using Autoscaler (min=5,max=1), so can't set MachineCount to '1'", settings.WorkerPools[0].Name), Equals, true)
 
 	// The autoscaler is configured wrong (min > max)
 	settings.WorkerPools[0].MachineCount = 0
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == fmt.Sprintf("error creating the CSE Kubernetes cluster: the Autoscaler maximum size for Worker Pool '%s' cannot be less than the minimum", settings.WorkerPools[0].Name), Equals, true)
 
 	// The autoscaler is configured wrong (max < 0)
 	settings.WorkerPools[0].Autoscaler.MaxSize = -5
 	settings.WorkerPools[0].Autoscaler.MinSize = -10
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == fmt.Sprintf("error creating the CSE Kubernetes cluster: the Autoscaler maximum size for Worker Pool '%s' must be a positive number", settings.WorkerPools[0].Name), Equals, true)
 
 	// The autoscaler is configured wrong (min < 0)
 	settings.WorkerPools[0].Autoscaler.MaxSize = 5
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == fmt.Sprintf("error creating the CSE Kubernetes cluster: the Autoscaler minimum size for Worker Pool '%s' must be a positive number", settings.WorkerPools[0].Name), Equals, true)
 
 	// Wrong disk size for the worker pool
 	settings.WorkerPools[0].Autoscaler.MinSize = 1
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == fmt.Sprintf("error creating the CSE Kubernetes cluster: disk size for the Worker Pool '%s' in Gibibytes (Gi) must be at least 20, but it was '0'", settings.WorkerPools[0].Name), Equals, true)
 
@@ -709,43 +709,43 @@ func (vcd *TestVCD) Test_CseValidationErrors(check *C) {
 	settings.WorkerPools = append(settings.WorkerPools, CseWorkerPoolSettings{Name: "wp-1"})
 
 	// Repeated worker pool name
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == fmt.Sprintf("error creating the CSE Kubernetes cluster: the names of the Worker Pools must be unique, but '%s' is repeated", settings.WorkerPools[0].Name), Equals, true)
 
 	settings.WorkerPools[1] = CseWorkerPoolSettings{Name: "wp-2", MachineCount: 1, DiskSizeGi: 20}
 
 	// Missing API token
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == "error creating the CSE Kubernetes cluster: the API token is required", Equals, true)
 
-	token, err := vcd.client.CreateToken(vcd.config.Provider.SysOrg, check.TestName())
+	token, err := vcd.client.CreateToken(ctx, vcd.config.Provider.SysOrg, check.TestName())
 	check.Assert(err, IsNil)
 	defer func() {
-		err = token.Delete()
+		err = token.Delete(ctx)
 		check.Assert(err, IsNil)
 	}()
 	AddToCleanupListOpenApi(token.Token.Name, check.TestName(), types.OpenApiPathVersion1_0_0+types.OpenApiEndpointTokens+token.Token.ID)
 
-	apiToken, err := token.GetInitialApiToken()
+	apiToken, err := token.GetInitialApiToken(ctx)
 	check.Assert(err, IsNil)
 	settings.ApiToken = apiToken.RefreshToken
 
 	// Missing Pod CIDR
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == "error creating the CSE Kubernetes cluster: the Pod CIDR is required", Equals, true)
 
 	// Wrong Pod CIDR
 	settings.PodCidr = "256.700.1.278/800"
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(strings.Contains(err.Error(), "error creating the CSE Kubernetes cluster: the Pod CIDR is malformed"), Equals, true)
 
 	// Missing Service CIDR
 	settings.PodCidr = "192.168.1.0/20"
-	_, err = org.CseCreateKubernetesCluster(settings, 0)
+	_, err = org.CseCreateKubernetesCluster(ctx, settings, 0)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == "error creating the CSE Kubernetes cluster: the Service CIDR is required", Equals, true)
 
@@ -782,10 +782,10 @@ func (vcd *TestVCD) Test_CseValidationErrors(check *C) {
 	check.Assert(err, NotNil)
 	check.Assert(err.Error() == "error creating the CSE Kubernetes cluster: the Storage Profile ID for the Default Storage Class is required", Equals, true)
 
-	sp, err := vdc.FindStorageProfileReference(vcd.config.Cse.StorageProfile)
+	sp, err := vdc.FindStorageProfileReference(ctx, vcd.config.Cse.StorageProfile)
 	check.Assert(err, IsNil)
 
-	policies, err := vcd.client.GetAllVdcComputePoliciesV2(url.Values{
+	policies, err := vcd.client.GetAllVdcComputePoliciesV2(ctx, url.Values{
 		"filter": []string{"name==TKG small"},
 	})
 	check.Assert(err, IsNil)

@@ -158,7 +158,7 @@ func (org *Org) CreateCatalog(ctx context.Context, name, description string) (Ca
 		return Catalog{}, err
 	}
 	// Make sure that the creation task is finished
-	err = catalog.WaitForTasks()
+	err = catalog.WaitForTasks(ctx)
 	if err != nil {
 		return Catalog{}, err
 	}

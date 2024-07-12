@@ -14,22 +14,22 @@ func (vcd *TestVCD) Test_GetResourcePools(check *C) {
 	if !vcd.client.Client.IsSysAdmin {
 		check.Skip("this test requires system administrator privileges")
 	}
-	vcenters, err := vcd.client.GetAllVCenters(nil)
+	vcenters, err := vcd.client.GetAllVCenters(ctx, nil)
 	check.Assert(err, IsNil)
 
 	check.Assert(len(vcenters) > 0, Equals, true)
 
 	vc := vcenters[0]
 
-	allResourcePools, err := vc.GetAllResourcePools(nil)
+	allResourcePools, err := vc.GetAllResourcePools(ctx, nil)
 	check.Assert(err, IsNil)
 
 	for i, rp := range allResourcePools {
-		rpByID, err := vc.GetResourcePoolById(rp.ResourcePool.Moref)
+		rpByID, err := vc.GetResourcePoolById(ctx, rp.ResourcePool.Moref)
 		check.Assert(err, IsNil)
 		check.Assert(rpByID.ResourcePool.Moref, Equals, rp.ResourcePool.Moref)
 		check.Assert(rpByID.ResourcePool.Name, Equals, rp.ResourcePool.Name)
-		rpByName, err := vc.GetResourcePoolByName(rp.ResourcePool.Name)
+		rpByName, err := vc.GetResourcePoolByName(ctx, rp.ResourcePool.Name)
 		if err != nil && strings.Contains(err.Error(), "more than one") {
 			if testVerbose {
 				fmt.Printf("%s\n", err)
@@ -42,7 +42,7 @@ func (vcd *TestVCD) Test_GetResourcePools(check *C) {
 		if testVerbose {
 			fmt.Printf("%2d %# v\n", i, pretty.Formatter(rp.ResourcePool))
 		}
-		hw, err := rp.GetAvailableHardwareVersions()
+		hw, err := rp.GetAvailableHardwareVersions(ctx)
 		check.Assert(err, IsNil)
 		if testVerbose {
 			fmt.Printf("%s %#v\n", rp.ResourcePool.Name, hw)
