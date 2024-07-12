@@ -19,7 +19,7 @@ import (
 // to establish a Solution Add-On (measured to roughly 30mins)
 func (vcd *TestVCD) Test_Dse(check *C) {
 	vcd.skipIfNotSysAdmin(check)
-	if vcd.client.Client.APIVCDMaxVersionIs("< 37.1") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, "< 37.1") {
 		check.Skip("Solution Landing Zones are supported in VCD 10.4.1+")
 	}
 
@@ -34,20 +34,20 @@ func (vcd *TestVCD) Test_Dse(check *C) {
 
 	defer func() {
 		fmt.Println("# Cleaning up prerequisites")
-		_, err := addOnInstance.Publishing(nil, false)
+		_, err := addOnInstance.Publishing(ctx, nil, false)
 		check.Assert(err, IsNil)
 
 		deleteInputs := make(map[string]interface{})
 		deleteInputs["name"] = addOnInstance.SolutionAddOnInstance.AddonInstanceSolutionName
 		deleteInputs["input-force-delete"] = true
 
-		_, err = addOnInstance.Delete(deleteInputs)
+		_, err = addOnInstance.Delete(ctx, deleteInputs)
 		check.Assert(err, IsNil)
 
-		err = addOn.Delete()
+		err = addOn.Delete(ctx)
 		check.Assert(err, IsNil)
 
-		err = slz.Delete()
+		err = slz.Delete(ctx)
 		check.Assert(err, IsNil)
 	}()
 	// End of prerequisites
@@ -59,10 +59,10 @@ func (vcd *TestVCD) Test_Dse(check *C) {
 	userName := vcd.config.Provider.User
 	password := vcd.config.Provider.Password
 	vcdClient := NewVCDClient(vcd.client.Client.VCDHREF, true)
-	err := vcdClient.Authenticate(userName, password, orgName)
+	err := vcdClient.Authenticate(ctx, userName, password, orgName)
 	check.Assert(err, IsNil)
 
-	recipientOrg, err := vcdClient.GetOrgByName(vcd.config.Cse.TenantOrg)
+	recipientOrg, err := vcdClient.GetOrgByName(ctx, vcd.config.Cse.TenantOrg)
 	check.Assert(err, IsNil)
 
 	dsNames := make([]string, 0)
@@ -71,7 +71,7 @@ func (vcd *TestVCD) Test_Dse(check *C) {
 	}
 
 	// Lookup testing
-	allDataSolutions, err := vcdClient.GetAllDataSolutions(nil)
+	allDataSolutions, err := vcdClient.GetAllDataSolutions(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(allDataSolutions), Equals, len(dsNames)+1) // +1 because of default "VCD Data Solutions"
 
@@ -82,11 +82,11 @@ func (vcd *TestVCD) Test_Dse(check *C) {
 		}
 		check.Assert(strings.HasPrefix(ds.RdeId(), "urn:vcloud:entity:vmware:dsConfig:"), Equals, true)
 
-		byId, err := vcdClient.GetDataSolutionById(ds.RdeId())
+		byId, err := vcdClient.GetDataSolutionById(ctx, ds.RdeId())
 		check.Assert(err, IsNil)
 		check.Assert(byId.DataSolution, DeepEquals, ds.DataSolution)
 
-		byName, err := vcdClient.GetDataSolutionByName(ds.Name())
+		byName, err := vcdClient.GetDataSolutionByName(ctx, ds.Name())
 		check.Assert(err, IsNil)
 		check.Assert(byName.DataSolution, DeepEquals, ds.DataSolution)
 	}
@@ -95,7 +95,7 @@ func (vcd *TestVCD) Test_Dse(check *C) {
 	for dsName, dsConfig := range vcd.config.SolutionAddOn.DseSolutions {
 		printVerbose("# Configuring Data Solution '%s'\n", dsName)
 
-		byName, err := vcdClient.GetDataSolutionByName(dsName)
+		byName, err := vcdClient.GetDataSolutionByName(ctx, dsName)
 		check.Assert(err, IsNil)
 
 		cfg := byName.DataSolution
@@ -114,18 +114,18 @@ func (vcd *TestVCD) Test_Dse(check *C) {
 			cfg.Spec.Artifacts[0]["image"] = value
 		}
 
-		updatedDs, err := byName.Update(cfg)
+		updatedDs, err := byName.Update(ctx, cfg)
 		check.Assert(err, IsNil)
 
 		if updatedDs.DefinedEntity.State() != "RESOLVED" {
-			err = updatedDs.DefinedEntity.Resolve()
+			err = updatedDs.DefinedEntity.Resolve(ctx)
 			check.Assert(err, IsNil)
 		}
 	}
 
 	// Configure DSO
 	printVerbose("# Configuring Default Data Solution '%s'\n", defaultDsoName)
-	dsoByName, err := vcdClient.GetDataSolutionByName(defaultDsoName)
+	dsoByName, err := vcdClient.GetDataSolutionByName(ctx, defaultDsoName)
 	check.Assert(err, IsNil)
 
 	// Simulate using default values, but also configure registry
@@ -152,11 +152,11 @@ func (vcd *TestVCD) Test_Dse(check *C) {
 	auths[check.TestName()+"2"] = types.DseDockerAuth{Username: "user2", Password: "pass2", Description: "Test 2"}
 	cfg.Spec.DockerConfig = &types.DseDockerConfig{Auths: auths}
 
-	updatedDs, err := dsoByName.Update(cfg)
+	updatedDs, err := dsoByName.Update(ctx, cfg)
 	check.Assert(err, IsNil)
 
 	if updatedDs.DefinedEntity.State() != "RESOLVED" {
-		err = updatedDs.DefinedEntity.Resolve()
+		err = updatedDs.DefinedEntity.Resolve(ctx)
 		check.Assert(err, IsNil)
 	}
 
@@ -164,7 +164,7 @@ func (vcd *TestVCD) Test_Dse(check *C) {
 	for dsName := range vcd.config.SolutionAddOn.DseSolutions {
 		printVerbose("# Publishing Data Solution '%s' to tenant '%s'\n", dsName, recipientOrg.Org.Name)
 
-		ds, err := vcdClient.GetDataSolutionByName(dsName)
+		ds, err := vcdClient.GetDataSolutionByName(ctx, dsName)
 		check.Assert(err, IsNil)
 
 		dsAcl, dsoAcl, templateAcls, err := ds.Publish(ctx, recipientOrg.Org.ID)
@@ -175,17 +175,17 @@ func (vcd *TestVCD) Test_Dse(check *C) {
 		check.Assert(len(templateAcls) > 1, Equals, true)
 
 		printVerbose("# Unpublishing Data Solution '%s'\n", dsName)
-		err = ds.Unpublish(recipientOrg.Org.ID)
+		err = ds.Unpublish(ctx, recipientOrg.Org.ID)
 		check.Assert(err, IsNil)
 	}
 
 	for dsName := range vcd.config.SolutionAddOn.DseSolutions {
 		printVerbose("# Retrieve Data Solution '%s' Instance Templates\n", dsName)
 
-		ds, err := vcdClient.GetDataSolutionByName(dsName)
+		ds, err := vcdClient.GetDataSolutionByName(ctx, dsName)
 		check.Assert(err, IsNil)
 
-		allDst, err := ds.GetAllInstanceTemplates()
+		allDst, err := ds.GetAllInstanceTemplates(ctx)
 		check.Assert(err, IsNil)
 		for _, dst := range allDst {
 			printVerbose("## Got Template '%s' for Data Solution '%s'\n", dst.Name(), dsName)
@@ -193,11 +193,11 @@ func (vcd *TestVCD) Test_Dse(check *C) {
 
 			// Publishing / unpublishing to tenant
 			printVerbose("# Publishing Template '%s' for Data Solution '%s' to tenant '%s'\n", dst.Name(), dsName, recipientOrg.Org.Name)
-			createdAcl, err := dst.Publish(recipientOrg.Org.ID)
+			createdAcl, err := dst.Publish(ctx, recipientOrg.Org.ID)
 			check.Assert(err, IsNil)
 
 			// Checking that ACLs can be found
-			allAcls, err := dst.GetAllAccessControls(nil)
+			allAcls, err := dst.GetAllAccessControls(ctx, nil)
 			check.Assert(err, IsNil)
 
 			var foundAcl bool
@@ -209,7 +209,7 @@ func (vcd *TestVCD) Test_Dse(check *C) {
 			}
 			check.Assert(foundAcl, Equals, true)
 
-			allTenantAcls, err := dst.GetAllAccessControlsForTenant(recipientOrg.Org.ID)
+			allTenantAcls, err := dst.GetAllAccessControlsForTenant(ctx, recipientOrg.Org.ID)
 			check.Assert(err, IsNil)
 
 			foundAcl = false
@@ -222,11 +222,11 @@ func (vcd *TestVCD) Test_Dse(check *C) {
 			check.Assert(foundAcl, Equals, true)
 
 			printVerbose("# Unpublishing Template '%s' for Data Solution '%s' for tenant '%s'\n", dst.Name(), dsName, recipientOrg.Org.Name)
-			err = dst.Unpublish(recipientOrg.Org.ID)
+			err = dst.Unpublish(ctx, recipientOrg.Org.ID)
 			check.Assert(err, IsNil)
 
 			// Check that ACL is removed after unpublishing the template
-			tenantAclsAfterRemoval, err := dst.GetAllAccessControlsForTenant(recipientOrg.Org.ID)
+			tenantAclsAfterRemoval, err := dst.GetAllAccessControlsForTenant(ctx, recipientOrg.Org.ID)
 			check.Assert(err, IsNil)
 			check.Assert(len(tenantAclsAfterRemoval), Equals, 0)
 		}
@@ -242,13 +242,13 @@ func createDseAddonInstanceAndPublish(vcd *TestVCD, check *C) (*SolutionLandingZ
 	inputs["name"] = check.TestName()
 	inputs["input-delete-previous-uiplugin-versions"] = false
 
-	addOnInstance, _, err := addOn.CreateSolutionAddOnInstance(inputs)
+	addOnInstance, _, err := addOn.CreateSolutionAddOnInstance(ctx, inputs)
 	check.Assert(err, IsNil)
 
 	PrependToCleanupListOpenApi(addOnInstance.DefinedEntity.DefinedEntity.ID, check.TestName(), types.OpenApiPathVersion1_0_0+types.OpenApiEndpointRdeEntities+addOnInstance.DefinedEntity.DefinedEntity.ID)
 
 	scope := []string{vcd.config.Cse.TenantOrg}
-	_, err = addOnInstance.Publishing(scope, false)
+	_, err = addOnInstance.Publishing(ctx, scope, false)
 	check.Assert(err, IsNil)
 
 	return slz, addOn, addOnInstance
