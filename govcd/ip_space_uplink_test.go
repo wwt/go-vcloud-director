@@ -31,7 +31,7 @@ func (vcd *TestVCD) Test_IpSpaceUplink(check *C) {
 		IPSpaceRef:         &types.OpenApiReference{ID: ipSpace.IpSpace.ID},
 	}
 
-	createdIpSpaceUplink, err := vcd.client.CreateIpSpaceUplink(uplinkConfig)
+	createdIpSpaceUplink, err := vcd.client.CreateIpSpaceUplink(ctx, uplinkConfig)
 	check.Assert(err, IsNil)
 	check.Assert(createdIpSpaceUplink, NotNil)
 
@@ -43,22 +43,22 @@ func (vcd *TestVCD) Test_IpSpaceUplink(check *C) {
 	// as it might cause an error: busy completing an operation IP_SPACE_UPLINK_ROUTE_ADVERTISEMENT_SYNC
 	// Sleeping a few seconds because the task is not immediately seen sometimes.
 	time.Sleep(3 * time.Second)
-	err = vcd.client.Client.WaitForRouteAdvertisementTasks()
+	err = vcd.client.Client.WaitForRouteAdvertisementTasks(ctx)
 	check.Assert(err, IsNil)
 
 	// Get all IP Space Uplinks
-	allIpSpaceUplinks, err := vcd.client.GetAllIpSpaceUplinks(extNet.ExternalNetwork.ID, nil)
+	allIpSpaceUplinks, err := vcd.client.GetAllIpSpaceUplinks(ctx, extNet.ExternalNetwork.ID, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(allIpSpaceUplinks) > 0, Equals, true)
 
 	// Get by ID
-	byId, err := vcd.client.GetIpSpaceUplinkById(createdIpSpaceUplink.IpSpaceUplink.ID)
+	byId, err := vcd.client.GetIpSpaceUplinkById(ctx, createdIpSpaceUplink.IpSpaceUplink.ID)
 	check.Assert(err, IsNil)
 	check.Assert(byId, NotNil)
 	check.Assert(byId.IpSpaceUplink, DeepEquals, createdIpSpaceUplink.IpSpaceUplink)
 
 	// Get by Name
-	byName, err := vcd.client.GetIpSpaceUplinkByName(extNet.ExternalNetwork.ID, byId.IpSpaceUplink.Name)
+	byName, err := vcd.client.GetIpSpaceUplinkByName(ctx, extNet.ExternalNetwork.ID, byId.IpSpaceUplink.Name)
 	check.Assert(err, IsNil)
 	check.Assert(byName, NotNil)
 	check.Assert(byName.IpSpaceUplink, DeepEquals, byId.IpSpaceUplink)
@@ -66,7 +66,7 @@ func (vcd *TestVCD) Test_IpSpaceUplink(check *C) {
 	// Update
 	uplinkConfig.Name = check.TestName() + "updated"
 	uplinkConfig.Description = uplinkConfig.Description + "updated"
-	updatedUplinkConfig, err := createdIpSpaceUplink.Update(uplinkConfig)
+	updatedUplinkConfig, err := createdIpSpaceUplink.Update(ctx, uplinkConfig)
 	check.Assert(err, IsNil)
 	check.Assert(updatedUplinkConfig.IpSpaceUplink.ID, Equals, byId.IpSpaceUplink.ID)
 	check.Assert(updatedUplinkConfig.IpSpaceUplink.ID, Equals, createdIpSpaceUplink.IpSpaceUplink.ID)
@@ -80,20 +80,20 @@ func (vcd *TestVCD) Test_IpSpaceUplink(check *C) {
 	check.Assert(updatedUplinkConfig.IpSpaceUplink.Status, Equals, "REALIZED")
 
 	time.Sleep(3 * time.Second)
-	err = vcd.client.Client.WaitForRouteAdvertisementTasks()
+	err = vcd.client.Client.WaitForRouteAdvertisementTasks(ctx)
 	check.Assert(err, IsNil)
 
-	err = createdIpSpaceUplink.Delete()
+	err = createdIpSpaceUplink.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Check that IP Space Uplink was deleted
-	_, err = vcd.client.GetIpSpaceUplinkById(updatedUplinkConfig.IpSpaceUplink.ID)
+	_, err = vcd.client.GetIpSpaceUplinkById(ctx, updatedUplinkConfig.IpSpaceUplink.ID)
 	check.Assert(ContainsNotFound(err), Equals, true)
 
-	err = extNet.Delete()
+	err = extNet.Delete(ctx)
 	check.Assert(err, IsNil)
 
-	err = ipSpace.Delete()
+	err = ipSpace.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -141,7 +141,7 @@ func createIpSpace(vcd *TestVCD, check *C) *IpSpace {
 		},
 	}
 
-	createdIpSpace, err := vcd.client.CreateIpSpace(ipSpaceConfig)
+	createdIpSpace, err := vcd.client.CreateIpSpace(ctx, ipSpaceConfig)
 	check.Assert(err, IsNil)
 	check.Assert(createdIpSpace, NotNil)
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointIpSpaces + createdIpSpace.IpSpace.ID
@@ -152,7 +152,7 @@ func createIpSpace(vcd *TestVCD, check *C) *IpSpace {
 
 func createExternalNetwork(vcd *TestVCD, check *C) *ExternalNetworkV2 {
 	// NSX-T details
-	man, err := vcd.client.QueryNsxtManagerByName(vcd.config.VCD.Nsxt.Manager)
+	man, err := vcd.client.QueryNsxtManagerByName(ctx, vcd.config.VCD.Nsxt.Manager)
 	check.Assert(err, IsNil)
 	nsxtManagerId, err := BuildUrnWithUuid("urn:vcloud:nsxtmanager:", extractUuid(man[0].HREF))
 	check.Assert(err, IsNil)
@@ -174,7 +174,7 @@ func createExternalNetwork(vcd *TestVCD, check *C) *ExternalNetworkV2 {
 		UsingIpSpace: addrOf(true),
 	}
 
-	createdNet, err := CreateExternalNetworkV2(vcd.client, net)
+	createdNet, err := CreateExternalNetworkV2(ctx, vcd.client, net)
 	check.Assert(err, IsNil)
 	check.Assert(createdNet, NotNil)
 

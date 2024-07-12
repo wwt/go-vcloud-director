@@ -18,8 +18,6 @@ func (vcd *TestVCD) Test_FindAdminCatalogRecords(check *C) {
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
 
-	ctx := context.Background()
-
 	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
@@ -179,8 +177,6 @@ func (vcd *TestVCD) TestOrg_AdminOrg_QueryCatalogList(check *C) {
 	if vcd.config.VCD.Catalog.Name == "" {
 		check.Skip("no catalog name provided. test skipped")
 	}
-	ctx := context.Background()
-
 	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
@@ -251,8 +247,6 @@ func (vcd *TestVCD) Test_AdminOrgGetAllVDCs(check *C) {
 	if vcd.skipAdminTests {
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
-
-	ctx := context.Background()
 
 	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)

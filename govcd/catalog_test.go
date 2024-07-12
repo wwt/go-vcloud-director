@@ -29,7 +29,6 @@ func (vcd *TestVCD) Test_CatalogRefresh(check *C) {
 		check.Skip("Test_CatalogRefresh: Catalog name not given")
 		return
 	}
-	ctx := context.Background()
 
 	cat, err := vcd.org.GetCatalogByName(ctx, catalogName, false)
 	if err != nil {
@@ -60,8 +59,6 @@ func (vcd *TestVCD) Test_CatalogRefresh(check *C) {
 
 func (vcd *TestVCD) Test_FindCatalogItem(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
-	ctx := context.Background()
-
 	// Fetch Catalog
 	cat, err := vcd.org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	if err != nil {
@@ -139,7 +136,6 @@ func (vcd *TestVCD) Test_FindVAppTemplate(check *C) {
 // newly updated catalog. Then deletes the catalog
 func (vcd *TestVCD) Test_UpdateCatalog(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
-	ctx := context.Background()
 
 	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
@@ -169,7 +165,6 @@ func (vcd *TestVCD) Test_UpdateCatalog(check *C) {
 // the catalog still exists. If it does the assertion fails.
 func (vcd *TestVCD) Test_DeleteCatalog(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
-	ctx := context.Background()
 
 	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
@@ -300,7 +295,6 @@ func (vcd *TestVCD) Test_UploadOvf_chunked(check *C) {
 // checking UploadTask.GetUploadProgress returns values of progress.
 func (vcd *TestVCD) Test_UploadOvf_progress_works(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
-	ctx := context.Background()
 
 	skipWhenOvaPathMissing(vcd.config.OVA.OvaPath, check)
 	itemName := TestUploadOvf + "3"

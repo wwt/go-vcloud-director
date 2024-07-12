@@ -7,7 +7,6 @@
 package govcd
 
 import (
-	"context"
 	"fmt"
 	//"strings"
 	. "gopkg.in/check.v1"
@@ -16,8 +15,6 @@ import (
 )
 
 func (vcd *TestVCD) Test_GetVAppTemplate(check *C) {
-	ctx := context.Background()
-
 	fmt.Printf("Running: %s\n", check.TestName())
 	cat, err := vcd.org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	if err != nil {
@@ -48,7 +45,6 @@ func (vcd *TestVCD) Test_GetVAppTemplate(check *C) {
 func (vcd *TestVCD) Test_Delete(check *C) {
 	skipWhenOvaPathMissing(vcd.config.OVA.OvaPath, check)
 	AddToCleanupList(TestDeleteCatalogItem, "catalogItem", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.Name, "Test_Delete")
-	ctx := context.Background()
 
 	// Fetching organization
 	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
@@ -94,7 +90,6 @@ func (vcd *TestVCD) TestQueryCatalogItemAndVAppTemplateList(check *C) {
 	if vcd.config.VCD.Vdc == "" {
 		check.Skip("no VDC provided. Skipping test")
 	}
-	ctx := context.Background()
 	// Fetching organization and catalog
 	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)

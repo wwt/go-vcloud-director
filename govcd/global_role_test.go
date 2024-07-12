@@ -220,7 +220,7 @@ func testRightsContainerTenants(vcd *TestVCD, check *C, rpc rightsProviderCollec
 	tenants, err = rpc.GetTenants(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(tenants), Equals, 0)
-	err = newOrg.Delete(true, true)
+	err = newOrg.Delete(ctx, true, true)
 	check.Assert(err, IsNil)
 }
 

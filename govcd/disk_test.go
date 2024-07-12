@@ -7,7 +7,6 @@
 package govcd
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -39,7 +38,6 @@ func (vcd *TestVCD) Test_CreateDisk(check *C) {
 		Disk: diskCreateParamsDisk,
 	}
 
-	ctx := context.Background()
 	task, err := vcd.vdc.CreateDisk(ctx, diskCreateParams)
 	check.Assert(err, IsNil)
 
@@ -82,7 +80,6 @@ func (vcd *TestVCD) Test_UpdateDisk(check *C) {
 		Disk: diskCreateParamsDisk,
 	}
 
-	ctx := context.Background()
 	task, err := vcd.vdc.CreateDisk(ctx, diskCreateParams)
 	check.Assert(err, IsNil)
 
@@ -141,7 +138,6 @@ func (vcd *TestVCD) Test_DeleteDisk(check *C) {
 		Disk: diskCreateParamsDisk,
 	}
 
-	ctx := context.Background()
 	task, err := vcd.vdc.CreateDisk(ctx, diskCreateParams)
 	check.Assert(err, IsNil)
 
@@ -185,7 +181,6 @@ func (vcd *TestVCD) Test_RefreshDisk(check *C) {
 		Disk: diskCreateParamsDisk,
 	}
 
-	ctx := context.Background()
 	task, err := vcd.vdc.CreateDisk(ctx, diskCreateParams)
 	check.Assert(err, IsNil)
 
@@ -232,7 +227,6 @@ func (vcd *TestVCD) Test_AttachedVMDisk(check *C) {
 	if vcd.skipVappTests {
 		check.Skip("skipping test because vApp wasn't properly created")
 	}
-	ctx := context.Background()
 
 	// Find VM
 	vapp := vcd.findFirstVapp(ctx)
@@ -327,7 +321,6 @@ func (vcd *TestVCD) Test_VdcFindDiskByHREF(check *C) {
 	diskCreateParams := &types.DiskCreateParams{
 		Disk: diskCreateParamsDisk,
 	}
-	ctx := context.Background()
 
 	task, err := vcd.vdc.CreateDisk(ctx, diskCreateParams)
 	check.Assert(err, IsNil)
@@ -366,7 +359,6 @@ func (vcd *TestVCD) Test_FindDiskByHREF(check *C) {
 	diskCreateParams := &types.DiskCreateParams{
 		Disk: diskCreateParamsDisk,
 	}
-	ctx := context.Background()
 
 	task, err := vcd.vdc.CreateDisk(ctx, diskCreateParams)
 	check.Assert(err, IsNil)
@@ -402,7 +394,6 @@ func (vcd *TestVCD) Test_Disk(check *C) {
 	if vcd.skipVappTests {
 		check.Skip("skipping test because vApp wasn't properly created")
 	}
-	ctx := context.Background()
 
 	// Find VM
 	vapp := vcd.findFirstVapp(ctx)
@@ -520,7 +511,6 @@ func (vcd *TestVCD) Test_QueryDisk(check *C) {
 		Disk: diskCreateParamsDisk,
 	}
 
-	ctx := context.Background()
 	task, err := vcd.vdc.CreateDisk(ctx, diskCreateParams)
 	check.Assert(err, IsNil)
 
@@ -559,7 +549,6 @@ func (vcd *TestVCD) Test_QueryDisks(check *C) {
 	diskCreateParams := &types.DiskCreateParams{
 		Disk: diskCreateParamsDisk,
 	}
-	ctx := context.Background()
 
 	task, err := vcd.vdc.CreateDisk(ctx, diskCreateParams)
 	check.Assert(err, IsNil)
@@ -620,7 +609,6 @@ func (vcd *TestVCD) Test_GetDisks(check *C) {
 	diskCreateParams := &types.DiskCreateParams{
 		Disk: diskCreateParamsDisk,
 	}
-	ctx := context.Background()
 
 	task, err := vcd.vdc.CreateDisk(ctx, diskCreateParams)
 	check.Assert(err, IsNil)
@@ -697,7 +685,6 @@ func (vcd *TestVCD) Test_GetDiskByHref(check *C) {
 		Disk: diskCreateParamsDisk,
 	}
 
-	ctx := context.Background()
 	task, err := vcd.vdc.CreateDisk(ctx, diskCreateParams)
 	check.Assert(err, IsNil)
 

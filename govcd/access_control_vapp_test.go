@@ -7,7 +7,6 @@
 package govcd
 
 import (
-	"context"
 	"fmt"
 	. "gopkg.in/check.v1"
 	"os"
@@ -25,8 +24,6 @@ func (vapp VApp) GetId() string {
 }
 
 func (vcd *TestVCD) Test_VappAccessControl(check *C) {
-	ctx := context.Background()
-
 	if vcd.config.VCD.Org == "" {
 		check.Skip("Test_VappAccessControl: Org name not given.")
 		return

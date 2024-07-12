@@ -9,7 +9,6 @@ package govcd
 // This file tests out NSX-T related Org VDC capabilities
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
@@ -22,8 +21,6 @@ func (vcd *TestVCD) Test_CreateNsxtOrgVdc(check *C) {
 	}
 
 	skipNoNsxtConfiguration(vcd, check)
-
-	ctx := context.Background()
 
 	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)

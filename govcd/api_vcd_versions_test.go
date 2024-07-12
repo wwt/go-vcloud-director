@@ -7,7 +7,6 @@
 package govcd
 
 import (
-	"context"
 	"fmt"
 	"regexp"
 	"strings"
@@ -43,8 +42,6 @@ func (vcd *TestVCD) Test_APIClientVersionIs_Unauthenticated(check *C) {
 
 // Test_APIVCDMaxVersionIs uses already authenticated vcdClient (in SetupSuite)
 func (vcd *TestVCD) Test_APIVCDMaxVersionIs(check *C) {
-	ctx := context.Background()
-
 	// Minimum supported vCD 8.20 introduced API version 27.0
 	versionCheck := vcd.client.Client.APIVCDMaxVersionIs(ctx, ">= 27.0")
 	check.Assert(versionCheck, Equals, true)
@@ -113,7 +110,7 @@ func (vcd *TestVCD) Test_validateAPIVersion(check *C) {
 
 	vcdClient, err := GetTestVCDFromYaml(config, WithAPIVersion(unsupportedVersion))
 	check.Assert(err, IsNil)
-	err = vcdClient.Client.validateAPIVersion(context.Background())
+	err = vcdClient.Client.validateAPIVersion(ctx)
 	check.Assert(err, ErrorMatches, "API version .* is not supported: version = .* is not supported")
 }
 
@@ -133,8 +130,6 @@ func getMockVcdWithAPIVersion(version string) *VCDClient {
 }
 
 func (vcd *TestVCD) Test_GetVcdVersion(check *C) {
-	ctx := context.Background()
-
 	version, versionTime, err := vcd.client.Client.GetVcdVersion(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(version, Not(Equals), "")

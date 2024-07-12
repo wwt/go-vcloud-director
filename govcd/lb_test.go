@@ -7,7 +7,6 @@
 package govcd
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -28,12 +27,10 @@ import (
 // being server in 2 VMs
 // 7. Tears down
 func (vcd *TestVCD) Test_LB(check *C) {
-	ctx := context.Background()
-
 	// Validate prerequisites
-	validateTestLbPrerequisites(ctx, vcd, check)
+	validateTestLbPrerequisites(vcd, check)
 
-	vdc, edge, vappTemplate, vapp, desiredNetConfig, err := vcd.createAndGetResourcesForVmCreation(ctx, check, TestLb)
+	vdc, edge, vappTemplate, vapp, desiredNetConfig, err := vcd.createAndGetResourcesForVmCreation(check, TestLb)
 	check.Assert(err, IsNil)
 
 	// The script below creates a file /tmp/node/server with single value `name` being set in it.
@@ -44,9 +41,9 @@ func (vcd *TestVCD) Test_LB(check *C) {
 	vm2CustomizationScript := "mkdir /tmp/node && cd /tmp/node && echo -n 'SecondNode' > server && " +
 		"/bin/systemctl stop iptables && /usr/bin/python3 -m http.server 8000 &"
 
-	vm1, err := spawnVM(ctx, "FirstNode", 512, *vdc, *vapp, desiredNetConfig, vappTemplate, check, vm1CustomizationScript, true)
+	vm1, err := spawnVM("FirstNode", 512, *vdc, *vapp, desiredNetConfig, vappTemplate, check, vm1CustomizationScript, true)
 	check.Assert(err, IsNil)
-	vm2, err := spawnVM(ctx, "SecondNode", 512, *vdc, *vapp, desiredNetConfig, vappTemplate, check, vm2CustomizationScript, true)
+	vm2, err := spawnVM("SecondNode", 512, *vdc, *vapp, desiredNetConfig, vappTemplate, check, vm2CustomizationScript, true)
 	check.Assert(err, IsNil)
 
 	// Get IPs allocated to the VMs
@@ -59,14 +56,14 @@ func (vcd *TestVCD) Test_LB(check *C) {
 	fmt.Printf("# Setting up load balancer for VMs: '%s' (%s), '%s' (%s)\n", vm1.VM.Name, ip1, vm2.VM.Name, ip2)
 
 	fmt.Printf("# Creating firewall rule for load balancer virtual server access. ")
-	ruleDescription := addFirewallRule(ctx, *vdc, vcd, check)
+	ruleDescription := addFirewallRule(*vdc, vcd, check)
 	fmt.Printf("Done\n")
 
 	// Build load balancer
-	buildLb(ctx, *edge, ip1, ip2, vcd, check)
+	buildLb(*edge, ip1, ip2, vcd, check)
 
 	// Cache current load balancer settings for change validation in the end
-	beforeLb, beforeLbXml := testCacheLoadBalancer(ctx, *edge, check)
+	beforeLb, beforeLbXml := testCacheLoadBalancer(*edge, check)
 
 	// Enable load balancer globally
 	fmt.Printf("# Enabling load balancer with acceleration: ")
@@ -81,7 +78,7 @@ func (vcd *TestVCD) Test_LB(check *C) {
 
 	// Remove firewall rule
 	fmt.Printf("# Deleting firewall rule used for load balancer virtual server access. ")
-	deleteFirewallRule(ctx, ruleDescription, *vdc, vcd, check)
+	deleteFirewallRule(ruleDescription, *vdc, vcd, check)
 	fmt.Printf("Done\n")
 
 	// Restore global load balancer configuration
@@ -93,7 +90,7 @@ func (vcd *TestVCD) Test_LB(check *C) {
 
 	// Validate load balancer configuration against initially cached version
 	fmt.Printf("# Validating load balancer XML structure: ")
-	testCheckLoadBalancerConfig(ctx, beforeLb, beforeLbXml, *edge, check)
+	testCheckLoadBalancerConfig(beforeLb, beforeLbXml, *edge, check)
 	fmt.Printf("Done\n")
 
 	// Finally after some cleanups - check if querying succeeded
@@ -105,7 +102,7 @@ func (vcd *TestVCD) Test_LB(check *C) {
 // * ExternalIp is set in config (will be edge gateway external IP)
 // * PhotonOsOvaPath is set (will be used for spawning VMs)
 // * Edge Gateway can be found and it has advanced networking enabled (a must for load balancers)
-func validateTestLbPrerequisites(ctx context.Context, vcd *TestVCD, check *C) {
+func validateTestLbPrerequisites(vcd *TestVCD, check *C) {
 	if vcd.config.VCD.EdgeGateway == "" {
 		check.Skip("Skipping test because no edge gateway given")
 	}
@@ -125,7 +122,7 @@ func validateTestLbPrerequisites(ctx context.Context, vcd *TestVCD, check *C) {
 }
 
 // buildLB establishes an HTTP load balancer for 2 IPs specified as arguments
-func buildLb(ctx context.Context, edge EdgeGateway, node1Ip, node2Ip string, vcd *TestVCD, check *C) {
+func buildLb(edge EdgeGateway, node1Ip, node2Ip string, vcd *TestVCD, check *C) {
 
 	_, serverPoolId, appProfileId, _ := buildTestLBVirtualServerPrereqs(node1Ip, node2Ip, TestLb,
 		check, vcd, edge)
@@ -228,7 +225,7 @@ func checkLb(queryUrl string, expectedResponses []string, maxRetryTimeout int) e
 }
 
 // addFirewallRule adds a firewall rule needed to access virtual server port on edge gateway
-func addFirewallRule(ctx context.Context, vdc Vdc, vcd *TestVCD, check *C) string {
+func addFirewallRule(vdc Vdc, vcd *TestVCD, check *C) string {
 	description := "Created by: " + TestLb
 
 	edge, err := vdc.GetEdgeGatewayByName(ctx, vcd.config.VCD.EdgeGateway, false)
@@ -254,7 +251,7 @@ func addFirewallRule(ctx context.Context, vdc Vdc, vcd *TestVCD, check *C) strin
 }
 
 // deleteFirewallRule removes firewall rule which was used for testing load balancer
-func deleteFirewallRule(ctx context.Context, ruleDescription string, vdc Vdc, vcd *TestVCD, check *C) {
+func deleteFirewallRule(ruleDescription string, vdc Vdc, vcd *TestVCD, check *C) {
 	edge, err := vdc.GetEdgeGatewayByName(ctx, vcd.config.VCD.EdgeGateway, false)
 	check.Assert(err, IsNil)
 	rules := edge.EdgeGateway.Configuration.EdgeGatewayServiceConfiguration.FirewallService.FirewallRule

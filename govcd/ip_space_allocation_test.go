@@ -45,22 +45,22 @@ func (vcd *TestVCD) Test_IpSpaceIpAllocation(check *C) {
 	performIpAllocationChecks(vcd, check, ipSpace.IpSpace.ID, edgeGw.EdgeGateway.ID, prefixAllocationRequest)
 
 	// Cleanup
-	err := edgeGw.Delete()
+	err := edgeGw.Delete(ctx)
 	check.Assert(err, IsNil)
 
-	err = ipSpaceUplink.Delete()
+	err = ipSpaceUplink.Delete(ctx)
 	check.Assert(err, IsNil)
 
-	err = extNet.Delete()
+	err = extNet.Delete(ctx)
 	check.Assert(err, IsNil)
 
-	err = ipSpace.Delete()
+	err = ipSpace.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
 func performIpAllocationChecks(vcd *TestVCD, check *C, ipSpaceId, edgeGatewayId string, ipSpaceAllocationRequest *types.IpSpaceIpAllocationRequest) {
 	// resulting slice must have 1 IP as the requested quantity is 1
-	ipAllocationResult, err := vcd.org.IpSpaceAllocateIp(ipSpaceId, ipSpaceAllocationRequest)
+	ipAllocationResult, err := vcd.org.IpSpaceAllocateIp(ctx, ipSpaceId, ipSpaceAllocationRequest)
 	check.Assert(err, IsNil)
 	check.Assert(len(ipAllocationResult), Equals, 1)
 
@@ -71,13 +71,13 @@ func performIpAllocationChecks(vcd *TestVCD, check *C, ipSpaceId, edgeGatewayId 
 	performIpSuggestionChecks(vcd, check, ipSpaceId, edgeGatewayId, ipSpaceAllocationRequest)
 
 	// Get IP Allocation
-	ipAllocation, err := vcd.org.GetIpSpaceAllocationByTypeAndValue(ipSpaceId, ipSpaceAllocationRequest.Type, ipAllocationResult[0].Value, nil)
+	ipAllocation, err := vcd.org.GetIpSpaceAllocationByTypeAndValue(ctx, ipSpaceId, ipSpaceAllocationRequest.Type, ipAllocationResult[0].Value, nil)
 	check.Assert(err, IsNil)
 	check.Assert(ipAllocation, NotNil)
 	check.Assert(ipAllocation.IpSpaceIpAllocation.UsageState, Equals, types.IpSpaceIpAllocationUnused)
 
 	// Get IP Allocation by ID
-	ipAllocationById, err := vcd.org.GetIpSpaceAllocationById(ipSpaceId, ipAllocation.IpSpaceIpAllocation.ID)
+	ipAllocationById, err := vcd.org.GetIpSpaceAllocationById(ctx, ipSpaceId, ipAllocation.IpSpaceIpAllocation.ID)
 	check.Assert(err, IsNil)
 	check.Assert(ipAllocationById, NotNil)
 	check.Assert(ipAllocationById.IpSpaceIpAllocation, DeepEquals, ipAllocation.IpSpaceIpAllocation)
@@ -85,7 +85,7 @@ func performIpAllocationChecks(vcd *TestVCD, check *C, ipSpaceId, edgeGatewayId 
 	// Set the IP for manual usage
 	ipAllocation.IpSpaceIpAllocation.UsageState = types.IpSpaceIpAllocationUsedManual
 	ipAllocation.IpSpaceIpAllocation.Description = "Manual usage description"
-	updatedIpAllocationManual, err := ipAllocation.Update(ipAllocation.IpSpaceIpAllocation)
+	updatedIpAllocationManual, err := ipAllocation.Update(ctx, ipAllocation.IpSpaceIpAllocation)
 	check.Assert(err, IsNil)
 	check.Assert(updatedIpAllocationManual.IpSpaceIpAllocation.ID, Equals, ipAllocation.IpSpaceIpAllocation.ID)
 	check.Assert(updatedIpAllocationManual.IpSpaceIpAllocation.UsageState, Equals, types.IpSpaceIpAllocationUsedManual)
@@ -93,41 +93,41 @@ func performIpAllocationChecks(vcd *TestVCD, check *C, ipSpaceId, edgeGatewayId 
 	// Removal manual allocation
 	ipAllocation.IpSpaceIpAllocation.UsageState = types.IpSpaceIpAllocationUnused
 	ipAllocation.IpSpaceIpAllocation.Description = ""
-	releasedIpAllocation, err := updatedIpAllocationManual.Update(ipAllocation.IpSpaceIpAllocation)
+	releasedIpAllocation, err := updatedIpAllocationManual.Update(ctx, ipAllocation.IpSpaceIpAllocation)
 	check.Assert(err, IsNil)
 	check.Assert(releasedIpAllocation, NotNil)
 	check.Assert(releasedIpAllocation.IpSpaceIpAllocation.UsageState, Equals, types.IpSpaceIpAllocationUnused)
 
-	err = updatedIpAllocationManual.Delete()
+	err = updatedIpAllocationManual.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Get IP Space by ID
-	ipSpace, err := vcd.client.GetIpSpaceById(ipSpaceId)
+	ipSpace, err := vcd.client.GetIpSpaceById(ctx, ipSpaceId)
 	check.Assert(err, IsNil)
 
 	// Attempt to search for allocations when none exist
-	allAllocations, err := ipSpace.GetAllIpSpaceAllocations(ipSpaceAllocationRequest.Type, nil)
+	allAllocations, err := ipSpace.GetAllIpSpaceAllocations(ctx, ipSpaceAllocationRequest.Type, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(allAllocations), Equals, 0)
 
 	// allocate IP
-	allocationByIpSpaceResult, err := ipSpace.AllocateIp(vcd.org.Org.ID, vcd.org.Org.Name, ipSpaceAllocationRequest)
+	allocationByIpSpaceResult, err := ipSpace.AllocateIp(ctx, vcd.org.Org.ID, vcd.org.Org.Name, ipSpaceAllocationRequest)
 	check.Assert(err, IsNil)
 	check.Assert(len(allocationByIpSpaceResult), Equals, 1)
 
 	// Remove
-	ipAllocationByIpSpaceResult, err := vcd.org.GetIpSpaceAllocationByTypeAndValue(ipSpaceId, ipSpaceAllocationRequest.Type, allocationByIpSpaceResult[0].Value, nil)
+	ipAllocationByIpSpaceResult, err := vcd.org.GetIpSpaceAllocationByTypeAndValue(ctx, ipSpaceId, ipSpaceAllocationRequest.Type, allocationByIpSpaceResult[0].Value, nil)
 	check.Assert(err, IsNil)
 	check.Assert(ipAllocation, NotNil)
 
-	err = ipAllocationByIpSpaceResult.Delete()
+	err = ipAllocationByIpSpaceResult.Delete(ctx)
 	check.Assert(err, IsNil)
 
 }
 
 func performIpSuggestionChecks(vcd *TestVCD, check *C, ipSpaceId, edgeGatewayId string, ipSpaceAllocationRequest *types.IpSpaceIpAllocationRequest) {
 	// Get IP suggestions without additional filters
-	floatingIpSuggestions, err := vcd.client.GetAllIpSpaceFloatingIpSuggestions(edgeGatewayId, nil)
+	floatingIpSuggestions, err := vcd.client.GetAllIpSpaceFloatingIpSuggestions(ctx, edgeGatewayId, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(floatingIpSuggestions) > 0, Equals, true)
 	if ipSpaceAllocationRequest.Type == "FLOATING_IP" {
@@ -137,7 +137,7 @@ func performIpSuggestionChecks(vcd *TestVCD, check *C, ipSpaceId, edgeGatewayId 
 	// Get IP suggestions only for IPv4
 	queryParams := url.Values{}
 	queryParams.Set("filter", "ipType==IPV4")
-	floatingIpSuggestionsWithFilterIpv4, err := vcd.client.GetAllIpSpaceFloatingIpSuggestions(edgeGatewayId, queryParams)
+	floatingIpSuggestionsWithFilterIpv4, err := vcd.client.GetAllIpSpaceFloatingIpSuggestions(ctx, edgeGatewayId, queryParams)
 	check.Assert(err, IsNil)
 	check.Assert(len(floatingIpSuggestionsWithFilterIpv4) > 0, Equals, true)
 	if ipSpaceAllocationRequest.Type == "FLOATING_IP" {
@@ -146,18 +146,18 @@ func performIpSuggestionChecks(vcd *TestVCD, check *C, ipSpaceId, edgeGatewayId 
 
 	// Get IP suggestions only for IPv6
 	queryParams.Set("filter", "ipType==IPV6")
-	floatingIpSuggestionsWithFilterIpv6, err := vcd.client.GetAllIpSpaceFloatingIpSuggestions(edgeGatewayId, queryParams)
+	floatingIpSuggestionsWithFilterIpv6, err := vcd.client.GetAllIpSpaceFloatingIpSuggestions(ctx, edgeGatewayId, queryParams)
 	check.Assert(err, IsNil)
 	check.Assert(len(floatingIpSuggestionsWithFilterIpv6) > 0, Equals, false)
 
 	// check IP suggestions with invalid Edge Gateway - it returns ACCESS_TO_RESOURCE_IS_FORBIDDEN
 	// queryParams.Set("filter", fmt.Sprintf("gatewayId==%s", "urn:vcloud:gateway:00000000-0000-0000-0000-000000000000"))
-	floatingIpSuggestions2, err := vcd.client.GetAllIpSpaceFloatingIpSuggestions("urn:vcloud:gateway:00000000-0000-0000-0000-000000000000", nil)
+	floatingIpSuggestions2, err := vcd.client.GetAllIpSpaceFloatingIpSuggestions(ctx, "urn:vcloud:gateway:00000000-0000-0000-0000-000000000000", nil)
 	check.Assert(strings.Contains(err.Error(), "ACCESS_TO_RESOURCE_IS_FORBIDDEN"), Equals, true)
 	check.Assert(floatingIpSuggestions2, IsNil)
 
 	// check with empty filter - it cannot be used this way (edge gateway is mandatory)
-	floatingIpSuggestions3, err := vcd.client.GetAllIpSpaceFloatingIpSuggestions("", nil)
+	floatingIpSuggestions3, err := vcd.client.GetAllIpSpaceFloatingIpSuggestions(ctx, "", nil)
 	check.Assert(strings.Contains(err.Error(), "edge gateway ID is mandatory"), Equals, true)
 	check.Assert(floatingIpSuggestions3, IsNil)
 }
@@ -171,7 +171,7 @@ func createIpSpaceUplink(vcd *TestVCD, check *C, extNetId, ipSpaceId string) *Ip
 		IPSpaceRef:         &types.OpenApiReference{ID: ipSpaceId},
 	}
 
-	createdIpSpaceUplink, err := vcd.client.CreateIpSpaceUplink(uplinkConfig)
+	createdIpSpaceUplink, err := vcd.client.CreateIpSpaceUplink(ctx, uplinkConfig)
 	check.Assert(err, IsNil)
 	check.Assert(createdIpSpaceUplink, NotNil)
 
@@ -179,7 +179,7 @@ func createIpSpaceUplink(vcd *TestVCD, check *C, extNetId, ipSpaceId string) *Ip
 	AddToCleanupListOpenApi(createdIpSpaceUplink.IpSpaceUplink.Name, check.TestName(), openApiEndpoint)
 
 	time.Sleep(3 * time.Second)
-	err = vcd.client.Client.WaitForRouteAdvertisementTasks()
+	err = vcd.client.Client.WaitForRouteAdvertisementTasks(ctx)
 	check.Assert(err, IsNil)
 
 	return createdIpSpaceUplink
@@ -199,11 +199,11 @@ func createNsxtEdgeGateway(vcd *TestVCD, check *C, extNetId string) *NsxtEdgeGat
 		},
 	}
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
-	createdEdge, err := adminOrg.CreateNsxtEdgeGateway(egwDefinition)
+	createdEdge, err := adminOrg.CreateNsxtEdgeGateway(ctx, egwDefinition)
 	check.Assert(err, IsNil)
 	check.Assert(createdEdge.EdgeGateway.Name, Equals, egwDefinition.Name)
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeGateways + createdEdge.EdgeGateway.ID

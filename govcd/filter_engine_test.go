@@ -347,8 +347,8 @@ func (vcd *TestVCD) Test_SearchOrgVdc(check *C) {
 			printVerbose("( I) %2d %-10s %-20s %s\n\n", i, item.GetType(), item.GetParentName(), item.GetName())
 		}
 	}
-	task, err := anotherVdc.Delete(true, true)
+	task, err := anotherVdc.Delete(ctx, true, true)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion(context.Background())
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 }

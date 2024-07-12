@@ -7,7 +7,6 @@
 package govcd
 
 import (
-	"context"
 	"fmt"
 	"math"
 
@@ -34,7 +33,6 @@ func (vcd *TestVCD) Test_CreateOrgVdcWithFlex(check *C) {
 	if vcd.config.VCD.ProviderVdc.NetworkPool == "" {
 		check.Skip("No Network Pool given for VDC tests")
 	}
-	ctx := context.Background()
 
 	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
@@ -280,7 +278,7 @@ func (vcd *TestVCD) Test_UpdateVdcFlex(check *C) {
 	check.Assert(err, IsNil)
 	task, err := vdc.Delete(ctx, true, true)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion(context.Background())
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -332,6 +330,6 @@ func (vcd *TestVCD) Test_VdcUpdateStorageProfile(check *C) {
 	check.Assert(updatedStorageProfile.Units, Equals, "MB")
 	task, err := vdc.Delete(ctx, true, true)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion(context.Background())
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 }

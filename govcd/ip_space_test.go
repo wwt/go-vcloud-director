@@ -168,7 +168,7 @@ func (vcd *TestVCD) Test_IpSpacePrivate(check *C) {
 }
 
 func ipSpaceChecks(vcd *TestVCD, check *C, ipSpaceConfig *types.IpSpace) {
-	createdIpSpace, err := vcd.client.CreateIpSpace(ipSpaceConfig)
+	createdIpSpace, err := vcd.client.CreateIpSpace(ctx, ipSpaceConfig)
 	check.Assert(err, IsNil)
 	check.Assert(createdIpSpace, NotNil)
 
@@ -176,17 +176,17 @@ func ipSpaceChecks(vcd *TestVCD, check *C, ipSpaceConfig *types.IpSpace) {
 	AddToCleanupListOpenApi(createdIpSpace.IpSpace.Name, check.TestName(), openApiEndpoint)
 
 	// Get by ID
-	byId, err := vcd.client.GetIpSpaceById(createdIpSpace.IpSpace.ID)
+	byId, err := vcd.client.GetIpSpaceById(ctx, createdIpSpace.IpSpace.ID)
 	check.Assert(err, IsNil)
 	check.Assert(byId.IpSpace, DeepEquals, createdIpSpace.IpSpace)
 
 	// Get by Name
-	byName, err := vcd.client.GetIpSpaceByName(createdIpSpace.IpSpace.Name)
+	byName, err := vcd.client.GetIpSpaceByName(ctx, createdIpSpace.IpSpace.Name)
 	check.Assert(err, IsNil)
 	check.Assert(byName.IpSpace, DeepEquals, createdIpSpace.IpSpace)
 
 	// Get all and make sure it is found
-	allIpSpaces, err := vcd.client.GetAllIpSpaceSummaries(nil)
+	allIpSpaces, err := vcd.client.GetAllIpSpaceSummaries(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(allIpSpaces) > 0, Equals, true)
 	var found bool
@@ -200,7 +200,7 @@ func ipSpaceChecks(vcd *TestVCD, check *C, ipSpaceConfig *types.IpSpace) {
 
 	// If an Org is assigned - attempt to lookup by name and Org ID
 	if byId.IpSpace.OrgRef != nil && byId.IpSpace.OrgRef.ID != "" {
-		byNameAndOrgId, err := vcd.client.GetIpSpaceByNameAndOrgId(byId.IpSpace.Name, byId.IpSpace.OrgRef.ID)
+		byNameAndOrgId, err := vcd.client.GetIpSpaceByNameAndOrgId(ctx, byId.IpSpace.Name, byId.IpSpace.OrgRef.ID)
 		check.Assert(err, IsNil)
 		check.Assert(byNameAndOrgId, NotNil)
 		check.Assert(byNameAndOrgId.IpSpace, DeepEquals, createdIpSpace.IpSpace)
@@ -211,12 +211,12 @@ func ipSpaceChecks(vcd *TestVCD, check *C, ipSpaceConfig *types.IpSpace) {
 	ipSpaceConfig.RouteAdvertisementEnabled = true
 	ipSpaceConfig.IPSpaceInternalScope = append(ipSpaceConfig.IPSpaceInternalScope, "32.0.0.0/24")
 
-	updatedIpSpace, err := createdIpSpace.Update(ipSpaceConfig)
+	updatedIpSpace, err := createdIpSpace.Update(ctx, ipSpaceConfig)
 	check.Assert(err, IsNil)
 	check.Assert(updatedIpSpace, NotNil)
 	check.Assert(len(ipSpaceConfig.IPSpaceInternalScope), Equals, len(updatedIpSpace.IpSpace.IPSpaceInternalScope))
 
-	if vcd.client.Client.APIVCDMaxVersionIs(">= 38.0") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, ">= 38.0") {
 		fmt.Println("# Testing NAT and Firewall rule autocreation flags for VCD 10.5.0+")
 		ipSpaceConfig.Name = check.TestName() + "-GatewayServiceConfig"
 		ipSpaceConfig.DefaultGatewayServiceConfig = &types.IpSpaceDefaultGatewayServiceConfig{
@@ -225,16 +225,16 @@ func ipSpaceChecks(vcd *TestVCD, check *C, ipSpaceConfig *types.IpSpace) {
 			EnableDefaultSnatRuleCreation:     true,
 		}
 
-		updatedIpSpace, err = updatedIpSpace.Update(ipSpaceConfig)
+		updatedIpSpace, err = updatedIpSpace.Update(ctx, ipSpaceConfig)
 		check.Assert(err, IsNil)
 		check.Assert(updatedIpSpace.IpSpace.DefaultGatewayServiceConfig, DeepEquals, ipSpaceConfig.DefaultGatewayServiceConfig)
 	}
 
-	err = createdIpSpace.Delete()
+	err = createdIpSpace.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Check that the entity is not found
-	notFoundById, err := vcd.client.GetIpSpaceById(byId.IpSpace.ID)
+	notFoundById, err := vcd.client.GetIpSpaceById(ctx, byId.IpSpace.ID)
 	check.Assert(ContainsNotFound(err), Equals, true)
 	check.Assert(notFoundById, IsNil)
 }

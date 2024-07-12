@@ -7,7 +7,6 @@
 package govcd
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
@@ -19,8 +18,6 @@ func (vcd *TestVCD) Test_LDAP_Configuration(check *C) {
 	if vcd.skipAdminTests {
 		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
 	}
-
-	ctx := context.Background()
 
 	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)

@@ -34,7 +34,7 @@ func (vcd *TestVCD) Test_ExternalNetworkGetByName(check *C) {
 func (vcd *TestVCD) Test_ExternalNetworkDelete(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
 
-	skippingReason, externalNetwork, task, err := vcd.testCreateExternalNetwork(ctx, check.TestName(), TestDeleteExternalNetwork, "")
+	skippingReason, externalNetwork, task, err := vcd.testCreateExternalNetwork(check.TestName(), TestDeleteExternalNetwork, "")
 	if skippingReason != "" {
 		check.Skip(skippingReason)
 	}
@@ -81,7 +81,7 @@ func (vcd *TestVCD) Test_CreateExternalNetwork(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
 
 	dnsSuffix := "some.net"
-	skippingReason, externalNetwork, task, err := vcd.testCreateExternalNetwork(ctx, check.TestName(), TestCreateExternalNetwork, dnsSuffix)
+	skippingReason, externalNetwork, task, err := vcd.testCreateExternalNetwork(check.TestName(), TestCreateExternalNetwork, dnsSuffix)
 	if skippingReason != "" {
 		check.Skip(skippingReason)
 	}

@@ -37,9 +37,9 @@ func (vcd *TestVCD) Test_DeleteMedia(check *C) {
 	check.Assert(catalog, NotNil)
 
 	itemName := "TestDeleteMedia"
-	uploadTask, err := catalog.UploadMediaImage(itemName, "upload from test", vcd.config.Media.MediaPath, 1024)
+	uploadTask, err := catalog.UploadMediaImage(ctx, itemName, "upload from test", vcd.config.Media.MediaPath, 1024)
 	check.Assert(err, IsNil)
-	err = uploadTask.WaitTaskCompletion(context.Background())
+	err = uploadTask.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
 	AddToCleanupList(itemName, "mediaCatalogImage", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.Name, check.TestName())
@@ -49,12 +49,12 @@ func (vcd *TestVCD) Test_DeleteMedia(check *C) {
 	check.Assert(media, NotNil)
 	check.Assert(media.Media.Name, Equals, itemName)
 
-	task, err := media.Delete()
+	task, err := media.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion(context.Background())
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
-	_, err = catalog.GetMediaByName(itemName, true)
+	_, err = catalog.GetMediaByName(ctx, itemName, true)
 	check.Assert(err, NotNil)
 	check.Assert(IsNotFound(err), Equals, true)
 }
@@ -84,15 +84,15 @@ func (vcd *TestVCD) Test_UploadAnyMediaFile(check *C) {
 	itemPath := sourceFile
 
 	// Upload the source file of the current test as a media item
-	uploadTask, err := catalog.UploadMediaFile(itemName, "Text file uploaded from test", itemPath, 1024, false)
+	uploadTask, err := catalog.UploadMediaFile(ctx, itemName, "Text file uploaded from test", itemPath, 1024, false)
 	check.Assert(err, IsNil)
-	err = uploadTask.WaitTaskCompletion(context.Background())
+	err = uploadTask.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
 	AddToCleanupList(itemName, "mediaCatalogImage", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.Name, check.TestName())
 
 	// Retrieve the media item
-	media, err := catalog.GetMediaByName(itemName, true)
+	media, err := catalog.GetMediaByName(ctx, itemName, true)
 	check.Assert(err, IsNil)
 	check.Assert(media, NotNil)
 	check.Assert(media.Media.Name, Equals, itemName)
@@ -116,12 +116,12 @@ func (vcd *TestVCD) Test_UploadAnyMediaFile(check *C) {
 		check.Assert(fromFile, DeepEquals, contents)
 	}
 
-	task, err := media.Delete()
+	task, err := media.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion(context.Background())
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
-	_, err = catalog.GetMediaByName(itemName, true)
+	_, err = catalog.GetMediaByName(ctx, itemName, true)
 	check.Assert(err, NotNil)
 	check.Assert(IsNotFound(err), Equals, true)
 }

@@ -27,25 +27,25 @@ func (vcd *TestVCD) Test_AddAndDeleteMetadataForVdc(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
 
 	// Add metadata
-	vdc, err := vcd.vdc.AddMetadata("key", "value")
+	vdc, err := vcd.vdc.AddMetadata(ctx, "key", "value")
 	check.Assert(err, IsNil)
 	check.Assert(vdc, Not(Equals), Vdc{})
 
 	AddToCleanupList("key", "vdcMetaData", vcd.org.Org.Name+"|"+vcd.config.VCD.Vdc, check.TestName())
 
 	// Check if metadata was added correctly
-	metadata, err := vcd.vdc.GetMetadata()
+	metadata, err := vcd.vdc.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(len(metadata.MetadataEntry), Equals, 1)
 	check.Assert(metadata.MetadataEntry[0].Key, Equals, "key")
 	check.Assert(metadata.MetadataEntry[0].TypedValue.Value, Equals, "value")
 
 	// Remove metadata
-	vdc, err = vcd.vdc.DeleteMetadata("key")
+	vdc, err = vcd.vdc.DeleteMetadata(ctx, "key")
 	check.Assert(err, IsNil)
 	check.Assert(vdc, Not(Equals), Vdc{})
 
-	metadata, err = vcd.vdc.GetMetadata()
+	metadata, err = vcd.vdc.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(len(metadata.MetadataEntry), Equals, 0)
 }
@@ -57,27 +57,27 @@ func (vcd *TestVCD) Test_AddAndDeleteMetadataOnVapp(check *C) {
 		check.Skip("Skipping test because vApp was not successfully created at setup")
 	}
 	// Add metadata
-	task, err := vcd.vapp.AddMetadata("key", "value")
+	task, err := vcd.vapp.AddMetadata(ctx, "key", "value")
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion(context.Background())
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
 	// Check if metadata was added correctly
-	metadata, err := vcd.vapp.GetMetadata()
+	metadata, err := vcd.vapp.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(len(metadata.MetadataEntry), Equals, 1)
 	check.Assert(metadata.MetadataEntry[0].Key, Equals, "key")
 	check.Assert(metadata.MetadataEntry[0].TypedValue.Value, Equals, "value")
 
 	// Remove metadata
-	task, err = vcd.vapp.DeleteMetadata("key")
+	task, err = vcd.vapp.DeleteMetadata(ctx, "key")
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion(context.Background())
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
-	metadata, err = vcd.vapp.GetMetadata()
+	metadata, err = vcd.vapp.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(len(metadata.MetadataEntry), Equals, 0)
 }
@@ -94,7 +94,7 @@ func (vcd *TestVCD) Test_AddAndDeleteMetadataOnVm(check *C) {
 		check.Skip("skipping test because no vApp is found")
 	}
 
-	vapp := vcd.findFirstVapp()
+	vapp := vcd.findFirstVapp(ctx)
 	vmType, vmName := vcd.findFirstVm(vapp)
 	if vmName == "" {
 		check.Skip("skipping test because no VM is found")
@@ -103,18 +103,18 @@ func (vcd *TestVCD) Test_AddAndDeleteMetadataOnVm(check *C) {
 	vm := NewVM(&vcd.client.Client)
 	vm.VM = &vmType
 
-	existingMetadata, err := vm.GetMetadata()
+	existingMetadata, err := vm.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 
 	// Add metadata
-	task, err := vm.AddMetadata("key", "value")
+	task, err := vm.AddMetadata(ctx, "key", "value")
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion(context.Background())
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
 	// Check if metadata was added correctly
-	metadata, err := vm.GetMetadata()
+	metadata, err := vm.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(len(metadata.MetadataEntry), Equals, len(existingMetadata.MetadataEntry)+1)
 	found := false
@@ -126,19 +126,19 @@ func (vcd *TestVCD) Test_AddAndDeleteMetadataOnVm(check *C) {
 	check.Assert(found, Equals, true)
 
 	// Remove metadata
-	task, err = vm.DeleteMetadata("key")
+	task, err = vm.DeleteMetadata(ctx, "key")
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion(context.Background())
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
-	metadata, err = vm.GetMetadata()
+	metadata, err = vm.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(len(metadata.MetadataEntry), Equals, len(existingMetadata.MetadataEntry))
 }
 
 func (vcd *TestVCD) Test_AddAndDeleteMetadataOnVAppTemplate(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
-	cat, err := vcd.org.GetCatalogByName(vcd.config.VCD.Catalog.Name, false)
+	cat, err := vcd.org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	if err != nil {
 		check.Skip("Test_DeleteMetadataOnCatalogItem: Catalog not found. Test can't proceed")
 		return
@@ -148,28 +148,28 @@ func (vcd *TestVCD) Test_AddAndDeleteMetadataOnVAppTemplate(check *C) {
 		check.Skip("Test_DeleteMetadataOnCatalogItem: Catalog Item not given. Test can't proceed")
 	}
 
-	catItem, err := cat.GetCatalogItemByName(vcd.config.VCD.Catalog.CatalogItem, false)
+	catItem, err := cat.GetCatalogItemByName(ctx, vcd.config.VCD.Catalog.CatalogItem, false)
 	check.Assert(err, IsNil)
 	check.Assert(catItem, NotNil)
 	check.Assert(catItem.CatalogItem.Name, Equals, vcd.config.VCD.Catalog.CatalogItem)
 
-	vAppTemplate, err := catItem.GetVAppTemplate()
+	vAppTemplate, err := catItem.GetVAppTemplate(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplate, NotNil)
 	check.Assert(vAppTemplate.VAppTemplate.Name, Equals, vcd.config.VCD.Catalog.CatalogItem)
 
 	// Check how much metaData exist
-	metadata, err := vAppTemplate.GetMetadata()
+	metadata, err := vAppTemplate.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(metadata, NotNil)
 	existingMetaDataCount := len(metadata.MetadataEntry)
 
 	// Add metadata
-	_, err = vAppTemplate.AddMetadata("key", "value")
+	_, err = vAppTemplate.AddMetadata(ctx, "key", "value")
 	check.Assert(err, IsNil)
 
 	// Check if metadata was added correctly
-	metadata, err = vAppTemplate.GetMetadata()
+	metadata, err = vAppTemplate.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(metadata, NotNil)
 	check.Assert(len(metadata.MetadataEntry), Equals, existingMetaDataCount+1)
@@ -184,9 +184,9 @@ func (vcd *TestVCD) Test_AddAndDeleteMetadataOnVAppTemplate(check *C) {
 	check.Assert(foundEntry.TypedValue.Value, Equals, "value")
 
 	// Remove metadata
-	err = vAppTemplate.DeleteMetadata("key")
+	err = vAppTemplate.DeleteMetadata(ctx, "key")
 	check.Assert(err, IsNil)
-	metadata, err = vAppTemplate.GetMetadata()
+	metadata, err = vAppTemplate.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(len(metadata.MetadataEntry), Equals, 0)
 }
@@ -198,37 +198,37 @@ func (vcd *TestVCD) Test_AddAndDeleteMetadataOnMediaRecord(check *C) {
 	skipWhenMediaPathMissing(vcd, check)
 	itemName := "TestAddMediaMetaDataEntry"
 
-	org, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	catalog, err := org.GetCatalogByName(vcd.config.VCD.Catalog.Name, false)
+	catalog, err := org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	check.Assert(err, IsNil)
 	check.Assert(catalog, NotNil)
 	check.Assert(catalog.Catalog.Name, Equals, vcd.config.VCD.Catalog.Name)
 
-	uploadTask, err := catalog.UploadMediaImage(itemName, "upload from test", vcd.config.Media.MediaPath, 1024)
+	uploadTask, err := catalog.UploadMediaImage(ctx, itemName, "upload from test", vcd.config.Media.MediaPath, 1024)
 	check.Assert(err, IsNil)
 	check.Assert(uploadTask, NotNil)
-	err = uploadTask.WaitTaskCompletion(context.Background())
+	err = uploadTask.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
 	AddToCleanupList(itemName, "mediaCatalogImage", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.Name, check.TestName())
 
-	err = vcd.org.Refresh()
+	err = vcd.org.Refresh(ctx)
 	check.Assert(err, IsNil)
 
-	mediaRecord, err := catalog.QueryMedia(itemName)
+	mediaRecord, err := catalog.QueryMedia(ctx, itemName)
 	check.Assert(err, IsNil)
 	check.Assert(mediaRecord, NotNil)
 	check.Assert(mediaRecord.MediaRecord.Name, Equals, itemName)
 
 	// Add metadata
-	_, err = mediaRecord.AddMetadata("key", "value")
+	_, err = mediaRecord.AddMetadata(ctx, "key", "value")
 	check.Assert(err, IsNil)
 
 	// Check if metadata was added correctly
-	metadata, err := mediaRecord.GetMetadata()
+	metadata, err := mediaRecord.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(metadata, NotNil)
 	check.Assert(len(metadata.MetadataEntry), Equals, 1)
@@ -236,16 +236,16 @@ func (vcd *TestVCD) Test_AddAndDeleteMetadataOnMediaRecord(check *C) {
 	check.Assert(metadata.MetadataEntry[0].TypedValue.Value, Equals, "value")
 
 	// Remove metadata
-	err = mediaRecord.DeleteMetadata("key")
+	err = mediaRecord.DeleteMetadata(ctx, "key")
 	check.Assert(err, IsNil)
-	metadata, err = mediaRecord.GetMetadata()
+	metadata, err = mediaRecord.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(len(metadata.MetadataEntry), Equals, 0)
 
 	// Remove catalog item so far other tests don't fail
-	task, err := mediaRecord.Delete()
+	task, err := mediaRecord.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion(context.Background())
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -254,21 +254,21 @@ func (vcd *TestVCD) Test_MetadataOnAdminCatalogCRUD(check *C) {
 
 	var catalogName string = check.TestName()
 
-	org, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	catalog, err := vcd.org.CreateCatalog(catalogName, catalogName)
+	catalog, err := vcd.org.CreateCatalog(ctx, catalogName, catalogName)
 	check.Assert(err, IsNil)
 	check.Assert(catalog, NotNil)
 	AddToCleanupList(catalogName, "catalog", org.AdminOrg.Name, catalogName)
 
-	adminCatalog, err := org.GetAdminCatalogByName(catalogName, true)
+	adminCatalog, err := org.GetAdminCatalogByName(ctx, catalogName, true)
 	check.Assert(err, IsNil)
 	check.Assert(adminCatalog, NotNil)
 
 	testMetadataCRUDActionsDeprecated(adminCatalog, check, func() {
-		metadata, err := catalog.GetMetadata()
+		metadata, err := catalog.GetMetadata(ctx)
 		check.Assert(err, IsNil)
 		check.Assert(metadata, NotNil)
 		check.Assert(len(metadata.MetadataEntry), Equals, 1)
@@ -282,7 +282,7 @@ func (vcd *TestVCD) Test_MetadataOnAdminCatalogCRUD(check *C) {
 		check.Assert(foundEntry.Key, Equals, "key")
 		check.Assert(foundEntry.TypedValue.Value, Equals, "value")
 	})
-	err = catalog.Delete(true, true)
+	err = catalog.Delete(ctx, true, true)
 	check.Assert(err, IsNil)
 }
 
@@ -318,7 +318,7 @@ func (vcd *TestVCD) Test_MetadataEntryOnVmCRUD(check *C) {
 		check.Skip("skipping test because no vApp is found")
 	}
 
-	vapp := vcd.findFirstVapp()
+	vapp := vcd.findFirstVapp(ctx)
 	vmType, vmName := vcd.findFirstVm(vapp)
 	if vmName == "" {
 		check.Skip("skipping test because no VM is found")
@@ -332,7 +332,7 @@ func (vcd *TestVCD) Test_MetadataEntryOnVmCRUD(check *C) {
 
 func (vcd *TestVCD) Test_MetadataEntryOnVAppTemplateCRUD(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
-	cat, err := vcd.org.GetCatalogByName(vcd.config.VCD.Catalog.Name, false)
+	cat, err := vcd.org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	if err != nil {
 		check.Skip("Test_DeleteMetadataOnCatalogItem: Catalog not found. Test can't proceed")
 		return
@@ -342,12 +342,12 @@ func (vcd *TestVCD) Test_MetadataEntryOnVAppTemplateCRUD(check *C) {
 		check.Skip("Test_DeleteMetadataOnCatalogItem: Catalog Item not given. Test can't proceed")
 	}
 
-	catItem, err := cat.GetCatalogItemByName(vcd.config.VCD.Catalog.CatalogItem, false)
+	catItem, err := cat.GetCatalogItemByName(ctx, vcd.config.VCD.Catalog.CatalogItem, false)
 	check.Assert(err, IsNil)
 	check.Assert(catItem, NotNil)
 	check.Assert(catItem.CatalogItem.Name, Equals, vcd.config.VCD.Catalog.CatalogItem)
 
-	vAppTemplate, err := catItem.GetVAppTemplate()
+	vAppTemplate, err := catItem.GetVAppTemplate(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(vAppTemplate, NotNil)
 	check.Assert(vAppTemplate.VAppTemplate.Name, Equals, vcd.config.VCD.Catalog.CatalogItem)
@@ -362,33 +362,33 @@ func (vcd *TestVCD) Test_MetadataEntryOnMediaRecordCRUD(check *C) {
 	skipWhenMediaPathMissing(vcd, check)
 	itemName := "TestAddMediaMetaData"
 
-	org, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	catalog, err := org.GetCatalogByName(vcd.config.VCD.Catalog.Name, false)
+	catalog, err := org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	check.Assert(err, IsNil)
 	check.Assert(catalog, NotNil)
 	check.Assert(catalog.Catalog.Name, Equals, vcd.config.VCD.Catalog.Name)
 
-	uploadTask, err := catalog.UploadMediaImage(itemName, "upload from test", vcd.config.Media.MediaPath, 1024)
+	uploadTask, err := catalog.UploadMediaImage(ctx, itemName, "upload from test", vcd.config.Media.MediaPath, 1024)
 	check.Assert(err, IsNil)
 	check.Assert(uploadTask, NotNil)
-	err = uploadTask.WaitTaskCompletion(context.Background())
+	err = uploadTask.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
 	AddToCleanupList(itemName, "mediaCatalogImage", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.Name, check.TestName())
 
-	err = vcd.org.Refresh()
+	err = vcd.org.Refresh(ctx)
 	check.Assert(err, IsNil)
 
-	mediaRecord, err := catalog.QueryMedia(itemName)
+	mediaRecord, err := catalog.QueryMedia(ctx, itemName)
 	check.Assert(err, IsNil)
 	check.Assert(mediaRecord, NotNil)
 	check.Assert(mediaRecord.MediaRecord.Name, Equals, itemName)
 
 	testMetadataCRUDActionsDeprecated(mediaRecord, check, nil)
-	task, err := mediaRecord.Delete()
+	task, err := mediaRecord.Delete(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
@@ -396,19 +396,19 @@ func (vcd *TestVCD) Test_MetadataEntryOnMediaRecordCRUD(check *C) {
 
 func (vcd *TestVCD) Test_MetadataOnAdminOrgCRUD(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
-	adminOrg, err := vcd.client.GetAdminOrgById(vcd.org.Org.ID)
+	adminOrg, err := vcd.client.GetAdminOrgById(ctx, vcd.org.Org.ID)
 	if err != nil {
 		check.Skip("Test_AddMetadataOnAdminOrg: Organization (admin) not found. Test can't proceed")
 		return
 	}
-	org, err := vcd.client.GetOrgById(vcd.org.Org.ID)
+	org, err := vcd.client.GetOrgById(ctx, vcd.org.Org.ID)
 	if err != nil {
 		check.Skip("Test_AddMetadataOnAdminOrg: Organization not found. Test can't proceed")
 		return
 	}
 
 	testMetadataCRUDActionsDeprecated(adminOrg, check, func() {
-		metadata, err := org.GetMetadata()
+		metadata, err := org.GetMetadata(ctx)
 		check.Assert(err, IsNil)
 		check.Assert(metadata, NotNil)
 		check.Assert(len(metadata.MetadataEntry), Equals, 1)
@@ -438,7 +438,7 @@ func (vcd *TestVCD) Test_MetadataOnIndependentDiskCRUD(check *C) {
 		Disk: diskCreateParamsDisk,
 	}
 
-	task, err := vcd.vdc.CreateDisk(diskCreateParams)
+	task, err := vcd.vdc.CreateDisk(ctx, diskCreateParams)
 	check.Assert(err, IsNil)
 
 	diskHREF := task.Task.Owner.HREF
@@ -447,12 +447,12 @@ func (vcd *TestVCD) Test_MetadataOnIndependentDiskCRUD(check *C) {
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
-	disk, err := vcd.vdc.GetDiskByHref(diskHREF)
+	disk, err := vcd.vdc.GetDiskByHref(ctx, diskHREF)
 	check.Assert(err, IsNil)
 
 	testMetadataCRUDActionsDeprecated(disk, check, nil)
 
-	task, err = disk.Delete()
+	task, err = disk.Delete(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
@@ -460,7 +460,7 @@ func (vcd *TestVCD) Test_MetadataOnIndependentDiskCRUD(check *C) {
 
 func (vcd *TestVCD) Test_MetadataOnVdcNetworkCRUD(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
-	net, err := vcd.vdc.GetOrgVdcNetworkByName(vcd.config.VCD.Network.Net1, false)
+	net, err := vcd.vdc.GetOrgVdcNetworkByName(ctx, vcd.config.VCD.Network.Net1, false)
 	if err != nil {
 		check.Skip(fmt.Sprintf("%s: Network %s not found. Test can't proceed", check.TestName(), vcd.config.VCD.Network.Net1))
 		return
@@ -471,13 +471,13 @@ func (vcd *TestVCD) Test_MetadataOnVdcNetworkCRUD(check *C) {
 
 func (vcd *TestVCD) Test_MetadataOnCatalogItemCRUD(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
-	catalog, err := vcd.org.GetCatalogByName(vcd.config.VCD.Catalog.Name, false)
+	catalog, err := vcd.org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	if err != nil {
 		check.Skip(fmt.Sprintf("%s: Catalog %s not found. Test can't proceed", check.TestName(), vcd.config.VCD.Catalog.Name))
 		return
 	}
 
-	catalogItem, err := catalog.GetCatalogItemByName(vcd.config.VCD.Catalog.CatalogItem, false)
+	catalogItem, err := catalog.GetCatalogItemByName(ctx, vcd.config.VCD.Catalog.CatalogItem, false)
 	if err != nil {
 		check.Skip(fmt.Sprintf("%s: Catalog item %s not found. Test can't proceed", check.TestName(), vcd.config.VCD.Catalog.CatalogItem))
 		return
@@ -489,7 +489,7 @@ func (vcd *TestVCD) Test_MetadataOnCatalogItemCRUD(check *C) {
 func (vcd *TestVCD) Test_MetadataOnProviderVdcCRUD(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
 	vcd.skipIfNotSysAdmin(check)
-	providerVdc, err := vcd.client.GetProviderVdcByName(vcd.config.VCD.NsxtProviderVdc.Name)
+	providerVdc, err := vcd.client.GetProviderVdcByName(ctx, vcd.config.VCD.NsxtProviderVdc.Name)
 	if err != nil {
 		check.Skip(fmt.Sprintf("%s: Provider VDC %s not found. Test can't proceed", check.TestName(), vcd.config.VCD.NsxtProviderVdc.Name))
 		return
@@ -500,7 +500,7 @@ func (vcd *TestVCD) Test_MetadataOnProviderVdcCRUD(check *C) {
 
 func (vcd *TestVCD) Test_MetadataOnOpenApiOrgVdcNetworkCRUD(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
-	net, err := vcd.vdc.GetOpenApiOrgVdcNetworkByName(vcd.config.VCD.Network.Net1)
+	net, err := vcd.vdc.GetOpenApiOrgVdcNetworkByName(ctx, vcd.config.VCD.Network.Net1)
 	if err != nil {
 		check.Skip(fmt.Sprintf("%s: Network %s not found. Test can't proceed", check.TestName(), vcd.config.VCD.Network.Net1))
 		return
@@ -512,7 +512,7 @@ func (vcd *TestVCD) Test_MetadataOnOpenApiOrgVdcNetworkCRUD(check *C) {
 func (vcd *TestVCD) Test_MetadataByHrefCRUD(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
 	vcd.skipIfNotSysAdmin(check)
-	storageProfileRef, err := vcd.vdc.FindStorageProfileReference(vcd.config.VCD.StorageProfile.SP1)
+	storageProfileRef, err := vcd.vdc.FindStorageProfileReference(ctx, vcd.config.VCD.StorageProfile.SP1)
 	if err != nil {
 		check.Skip(fmt.Sprintf("%s: Storage Profile %s not found. Test can't proceed", check.TestName(), vcd.config.VCD.StorageProfile.SP1))
 		return
@@ -521,17 +521,17 @@ func (vcd *TestVCD) Test_MetadataByHrefCRUD(check *C) {
 	storageProfileAdminHref := strings.ReplaceAll(storageProfileRef.HREF, "api", "api/admin")
 
 	// Check how much metadata exists
-	metadata, err := vcd.client.GetMetadataByHref(storageProfileAdminHref)
+	metadata, err := vcd.client.GetMetadataByHref(ctx, storageProfileAdminHref)
 	check.Assert(err, IsNil)
 	check.Assert(metadata, NotNil)
 	existingMetaDataCount := len(metadata.MetadataEntry)
 
 	// Add metadata
-	err = vcd.client.AddMetadataEntryByHref(storageProfileAdminHref, types.MetadataStringValue, "key", "value")
+	err = vcd.client.AddMetadataEntryByHref(ctx, storageProfileAdminHref, types.MetadataStringValue, "key", "value")
 	check.Assert(err, IsNil)
 
 	// Check if metadata was added correctly
-	metadata, err = vcd.client.GetMetadataByHref(storageProfileAdminHref)
+	metadata, err = vcd.client.GetMetadataByHref(ctx, storageProfileAdminHref)
 	check.Assert(err, IsNil)
 	check.Assert(metadata, NotNil)
 	check.Assert(len(metadata.MetadataEntry), Equals, existingMetaDataCount+1)
@@ -546,7 +546,7 @@ func (vcd *TestVCD) Test_MetadataByHrefCRUD(check *C) {
 	check.Assert(foundEntry.TypedValue.Value, Equals, "value")
 
 	// Check the same without admin privileges
-	metadata, err = vcd.client.GetMetadataByHref(storageProfileRef.HREF)
+	metadata, err = vcd.client.GetMetadataByHref(ctx, storageProfileRef.HREF)
 	check.Assert(err, IsNil)
 	check.Assert(metadata, NotNil)
 	check.Assert(len(metadata.MetadataEntry), Equals, existingMetaDataCount+1)
@@ -560,14 +560,14 @@ func (vcd *TestVCD) Test_MetadataByHrefCRUD(check *C) {
 	check.Assert(foundEntry.TypedValue.Value, Equals, "value")
 
 	// Merge updated metadata with a new entry
-	err = vcd.client.MergeMetadataByHref(storageProfileAdminHref, types.MetadataStringValue, map[string]interface{}{
+	err = vcd.client.MergeMetadataByHref(ctx, storageProfileAdminHref, types.MetadataStringValue, map[string]interface{}{
 		"key":  "valueUpdated",
 		"key2": "value2",
 	})
 	check.Assert(err, IsNil)
 
 	// Check that the first key was updated and the second, created
-	metadata, err = vcd.client.GetMetadataByHref(storageProfileRef.HREF)
+	metadata, err = vcd.client.GetMetadataByHref(ctx, storageProfileRef.HREF)
 	check.Assert(err, IsNil)
 	check.Assert(metadata, NotNil)
 	check.Assert(len(metadata.MetadataEntry), Equals, existingMetaDataCount+2)
@@ -581,37 +581,37 @@ func (vcd *TestVCD) Test_MetadataByHrefCRUD(check *C) {
 	}
 
 	// Delete the metadata
-	err = vcd.client.DeleteMetadataEntryByHref(storageProfileAdminHref, "key")
+	err = vcd.client.DeleteMetadataEntryByHref(ctx, storageProfileAdminHref, "key")
 	check.Assert(err, IsNil)
-	err = vcd.client.DeleteMetadataEntryByHref(storageProfileAdminHref, "key2")
+	err = vcd.client.DeleteMetadataEntryByHref(ctx, storageProfileAdminHref, "key2")
 	check.Assert(err, IsNil)
 	// Check if metadata was deleted correctly
-	metadata, err = vcd.client.GetMetadataByHref(storageProfileAdminHref)
+	metadata, err = vcd.client.GetMetadataByHref(ctx, storageProfileAdminHref)
 	check.Assert(err, IsNil)
 	check.Assert(metadata, NotNil)
 	check.Assert(len(metadata.MetadataEntry), Equals, 0)
 }
 
 type metadataCompatibleDeprecated interface {
-	GetMetadata() (*types.Metadata, error)
-	AddMetadataEntry(typedValue, key, value string) error
-	MergeMetadata(typedValue string, metadata map[string]interface{}) error
-	DeleteMetadataEntry(key string) error
+	GetMetadata(ctx context.Context) (*types.Metadata, error)
+	AddMetadataEntry(ctx context.Context, typedValue, key, value string) error
+	MergeMetadata(ctx context.Context, typedValue string, metadata map[string]interface{}) error
+	DeleteMetadataEntry(ctx context.Context, key string) error
 }
 
 func testMetadataCRUDActionsDeprecated(resource metadataCompatibleDeprecated, check *C, extraCheck func()) {
 	// Check how much metadata exists
-	metadata, err := resource.GetMetadata()
+	metadata, err := resource.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(metadata, NotNil)
 	existingMetaDataCount := len(metadata.MetadataEntry)
 
 	// Add metadata
-	err = resource.AddMetadataEntry(types.MetadataStringValue, "key", "value")
+	err = resource.AddMetadataEntry(ctx, types.MetadataStringValue, "key", "value")
 	check.Assert(err, IsNil)
 
 	// Check if metadata was added correctly
-	metadata, err = resource.GetMetadata()
+	metadata, err = resource.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(metadata, NotNil)
 	check.Assert(len(metadata.MetadataEntry), Equals, existingMetaDataCount+1)
@@ -630,14 +630,14 @@ func testMetadataCRUDActionsDeprecated(resource metadataCompatibleDeprecated, ch
 	}
 
 	// Merge updated metadata with a new entry
-	err = resource.MergeMetadata(types.MetadataStringValue, map[string]interface{}{
+	err = resource.MergeMetadata(ctx, types.MetadataStringValue, map[string]interface{}{
 		"key":  "valueUpdated",
 		"key2": "value2",
 	})
 	check.Assert(err, IsNil)
 
 	// Check that the first key was updated and the second, created
-	metadata, err = resource.GetMetadata()
+	metadata, err = resource.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(metadata, NotNil)
 	check.Assert(len(metadata.MetadataEntry), Equals, existingMetaDataCount+2)
@@ -650,12 +650,12 @@ func testMetadataCRUDActionsDeprecated(resource metadataCompatibleDeprecated, ch
 		}
 	}
 
-	err = resource.DeleteMetadataEntry("key")
+	err = resource.DeleteMetadataEntry(ctx, "key")
 	check.Assert(err, IsNil)
-	err = resource.DeleteMetadataEntry("key2")
+	err = resource.DeleteMetadataEntry(ctx, "key2")
 	check.Assert(err, IsNil)
 	// Check if metadata was deleted correctly
-	metadata, err = resource.GetMetadata()
+	metadata, err = resource.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(metadata, NotNil)
 	check.Assert(len(metadata.MetadataEntry), Equals, existingMetaDataCount)

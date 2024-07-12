@@ -7,7 +7,6 @@
 package govcd
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
@@ -88,7 +87,7 @@ func (vcd *TestVCD) Test_VMGetDhcpAddress(check *C) {
 	// err = vm.PowerOnAndForceCustomization()
 	task, err := vapp.PowerOn(ctx)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion(context.Background())
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
 	if testVerbose {
@@ -166,7 +165,7 @@ func (vcd *TestVCD) Test_VMGetDhcpAddress(check *C) {
 	check.Assert(err, IsNil)
 	task, err = network.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion(context.Background())
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -227,7 +226,7 @@ func makeOrgVdcNetworkWithDhcp(vcd *TestVCD, check *C, edgeGateway *EdgeGateway)
 	dhcpPoolConfig[0] = dhcpPool
 	task, err := edgeGateway.AddDhcpPool(ctx, network.OrgVDCNetwork, dhcpPoolConfig)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion(context.Background())
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
 	return network

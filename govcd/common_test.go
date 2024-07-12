@@ -7,7 +7,6 @@
 package govcd
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -77,7 +76,7 @@ func (vcd *TestVCD) createAndGetResourcesForVmCreation(check *C, vmName string) 
 	check.Assert(err, IsNil)
 	task, err := vapp.AddRAWNetworkConfig(ctx, []*types.OrgVDCNetwork{net.OrgVDCNetwork})
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion(context.Background())
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 	fmt.Printf(". Done\n")
 	// Spawn 2 VMs with python servers in the newly created vApp
@@ -99,7 +98,7 @@ func spawnVM(name string, memorySize int, vdc Vdc, vapp VApp, net types.NetworkC
 	fmt.Printf("# Spawning VM '%s'", name)
 	task, err := vapp.AddNewVM(ctx, name, vAppTemplate, &net, true)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion(context.Background())
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 	vm, err := vapp.GetVMByName(ctx, name, true)
 	check.Assert(err, IsNil)
@@ -117,7 +116,7 @@ func spawnVM(name string, memorySize int, vdc Vdc, vapp VApp, net types.NetworkC
 		fmt.Printf("# Applying customization script for VM '%s'", name)
 		task, err = vm.RunCustomizationScript(ctx, name, customizationScript)
 		check.Assert(err, IsNil)
-		err = task.WaitTaskCompletion(context.Background())
+		err = task.WaitTaskCompletion(ctx)
 		check.Assert(err, IsNil)
 		fmt.Printf(". Done\n")
 	}
@@ -126,7 +125,7 @@ func spawnVM(name string, memorySize int, vdc Vdc, vapp VApp, net types.NetworkC
 		fmt.Printf("# Powering on VM '%s'", name)
 		task, err = vm.PowerOn(ctx)
 		check.Assert(err, IsNil)
-		err = task.WaitTaskCompletion(context.Background())
+		err = task.WaitTaskCompletion(ctx)
 		check.Assert(err, IsNil)
 		fmt.Printf(". Done\n")
 	}

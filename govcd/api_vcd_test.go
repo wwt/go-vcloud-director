@@ -618,7 +618,6 @@ func (vcd *TestVCD) SetUpSuite(check *C) {
 	if token == "" {
 		token = config.Provider.Token
 	}
-	ctx := context.Background()
 
 	apiToken := os.Getenv("VCD_API_TOKEN")
 	if apiToken == "" {
@@ -1017,7 +1016,7 @@ func (vcd *TestVCD) removeLeftoverEntities(ctx context.Context, entity CleanupEn
 			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
 			return
 		}
-		err = task.WaitTaskCompletion(context.Background())
+		err = task.WaitTaskCompletion()
 		if err != nil {
 			vcd.infoCleanup(notDeletedMsg, entity.EntityType, entity.Name, err)
 			return

@@ -24,7 +24,7 @@ func (vcd *TestVCD) Test_IpSpaceOrgAssignment(check *C) {
 
 	// Check if any Org assignments are found before Edge Gateway creation - there should be none as
 	// Org assignments are implicitly created during Edge Gateway creation
-	allOrgAssignments, err := ipSpace.GetAllOrgAssignments(nil)
+	allOrgAssignments, err := ipSpace.GetAllOrgAssignments(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(allOrgAssignments), Equals, 0)
 
@@ -32,21 +32,21 @@ func (vcd *TestVCD) Test_IpSpaceOrgAssignment(check *C) {
 	edgeGw := createNsxtEdgeGateway(vcd, check, extNet.ExternalNetwork.ID)
 
 	// After the Edge Gateway is created - one can find an implicitly created IP Space Org Assignment
-	orgAssignmentByOrgName, err := ipSpace.GetOrgAssignmentByOrgName(vcd.org.Org.Name)
+	orgAssignmentByOrgName, err := ipSpace.GetOrgAssignmentByOrgName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(orgAssignmentByOrgName, NotNil)
 
-	orgAssignmentByOrgId, err := ipSpace.GetOrgAssignmentByOrgId(vcd.org.Org.ID)
+	orgAssignmentByOrgId, err := ipSpace.GetOrgAssignmentByOrgId(ctx, vcd.org.Org.ID)
 	check.Assert(err, IsNil)
 	check.Assert(orgAssignmentByOrgId, NotNil)
 
 	// Get Org Assignment by ID
-	orgAssignmentById, err := ipSpace.GetOrgAssignmentById(orgAssignmentByOrgId.IpSpaceOrgAssignment.ID)
+	orgAssignmentById, err := ipSpace.GetOrgAssignmentById(ctx, orgAssignmentByOrgId.IpSpaceOrgAssignment.ID)
 	check.Assert(err, IsNil)
 	check.Assert(orgAssignmentById.IpSpaceOrgAssignment, DeepEquals, orgAssignmentByOrgId.IpSpaceOrgAssignment)
 
 	// Get All org Assignments and check that there is exactly one - matching other lookup methods
-	allOrgAssignments, err = ipSpace.GetAllOrgAssignments(nil)
+	allOrgAssignments, err = ipSpace.GetAllOrgAssignments(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(allOrgAssignments), Equals, 1)
 	check.Assert(allOrgAssignments[0].IpSpaceOrgAssignment, DeepEquals, orgAssignmentByOrgId.IpSpaceOrgAssignment)
@@ -67,21 +67,21 @@ func (vcd *TestVCD) Test_IpSpaceOrgAssignment(check *C) {
 		},
 	}
 
-	updatedOrgAssignmentCustomQuota, err := orgAssignmentById.Update(orgAssignmentById.IpSpaceOrgAssignment)
+	updatedOrgAssignmentCustomQuota, err := orgAssignmentById.Update(ctx, orgAssignmentById.IpSpaceOrgAssignment)
 	check.Assert(err, IsNil)
 	check.Assert(updatedOrgAssignmentCustomQuota.IpSpaceOrgAssignment.CustomQuotas.FloatingIPQuota, DeepEquals, orgAssignmentById.IpSpaceOrgAssignment.CustomQuotas.FloatingIPQuota)
 	check.Assert(len(updatedOrgAssignmentCustomQuota.IpSpaceOrgAssignment.CustomQuotas.IPPrefixQuotas), DeepEquals, len(orgAssignmentById.IpSpaceOrgAssignment.CustomQuotas.IPPrefixQuotas))
 
 	// Cleanup
-	err = edgeGw.Delete()
+	err = edgeGw.Delete(ctx)
 	check.Assert(err, IsNil)
 
-	err = ipSpaceUplink.Delete()
+	err = ipSpaceUplink.Delete(ctx)
 	check.Assert(err, IsNil)
 
-	err = extNet.Delete()
+	err = extNet.Delete(ctx)
 	check.Assert(err, IsNil)
 
-	err = ipSpace.Delete()
+	err = ipSpace.Delete(ctx)
 	check.Assert(err, IsNil)
 }
