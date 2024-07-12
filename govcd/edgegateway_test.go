@@ -566,7 +566,7 @@ func (vcd *TestVCD) TestEdgeGateway_UpdateLBGeneralParams(check *C) {
 	}
 
 	// Cache current load balancer settings for change validation in the end
-	beforeLb, beforeLbXml := testCacheLoadBalancer(ctx, *edge, check)
+	beforeLb, beforeLbXml := testCacheLoadBalancer(*edge, check)
 
 	_, err = edge.UpdateLBGeneralParams(ctx, true, true, true, "critical")
 	check.Assert(err, IsNil)
@@ -584,7 +584,7 @@ func (vcd *TestVCD) TestEdgeGateway_UpdateLBGeneralParams(check *C) {
 	check.Assert(err, IsNil)
 
 	// Validate load balancer configuration against initially cached version
-	testCheckLoadBalancerConfig(ctx, beforeLb, beforeLbXml, *edge, check)
+	testCheckLoadBalancerConfig(beforeLb, beforeLbXml, *edge, check)
 }
 
 // TestEdgeGateway_UpdateFwGeneralParams main point is to test that no firewall configuration
@@ -670,7 +670,7 @@ func (vcd *TestVCD) TestEdgeGateway_GetVdcNetworks(check *C) {
 func testCacheFirewall(edge EdgeGateway, check *C) (*types.FirewallConfigWithXml, string) {
 	beforeFw, err := edge.GetFirewallConfig(ctx)
 	check.Assert(err, IsNil)
-	beforeFwbXml := testGetEdgeEndpointXML(ctx, types.EdgeFirewallPath, edge, check)
+	beforeFwbXml := testGetEdgeEndpointXML(types.EdgeFirewallPath, edge, check)
 	return beforeFw, beforeFwbXml
 }
 
@@ -680,7 +680,7 @@ func testCheckFirewallConfig(beforeFw *types.FirewallConfigWithXml, beforeFwXml 
 	afterFw, err := edge.GetFirewallConfig(ctx)
 	check.Assert(err, IsNil)
 
-	afterFwXml := testGetEdgeEndpointXML(ctx, types.EdgeFirewallPath, edge, check)
+	afterFwXml := testGetEdgeEndpointXML(types.EdgeFirewallPath, edge, check)
 
 	// remove `<version></version>` tag from both XML represntation and struct for deep comparison
 	// because this version changes with each update and will never be the same after a few
