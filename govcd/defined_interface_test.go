@@ -136,7 +136,7 @@ func (vcd *TestVCD) Test_DefinedInterfaceBehavior(check *C) {
 
 	// Create a new Defined Interface with dummy values, so we can test behaviors on it
 	sanizitedTestName := strings.NewReplacer("_", "", ".", "").Replace(check.TestName())
-	di, err := vcd.client.CreateDefinedInterface(&types.DefinedInterface{
+	di, err := vcd.client.CreateDefinedInterface(ctx, &types.DefinedInterface{
 		Name:    sanizitedTestName,
 		Nss:     "nss",
 		Version: "1.0.0",
@@ -145,7 +145,7 @@ func (vcd *TestVCD) Test_DefinedInterfaceBehavior(check *C) {
 	check.Assert(err, IsNil)
 	AddToCleanupListOpenApi(di.DefinedInterface.ID, check.TestName(), types.OpenApiPathVersion1_0_0+types.OpenApiEndpointRdeInterfaces+di.DefinedInterface.ID)
 	defer func() {
-		err := di.Delete()
+		err := di.Delete(ctx)
 		check.Assert(err, IsNil)
 	}()
 
@@ -158,7 +158,7 @@ func (vcd *TestVCD) Test_DefinedInterfaceBehavior(check *C) {
 			"type": "Activity",
 		},
 	}
-	behavior, err := di.AddBehavior(behaviorPayload)
+	behavior, err := di.AddBehavior(ctx, behaviorPayload)
 	check.Assert(err, IsNil)
 	check.Assert(behavior.Name, Equals, behaviorPayload.Name)
 	check.Assert(behavior.Description, Equals, behaviorPayload.Description)
@@ -166,34 +166,34 @@ func (vcd *TestVCD) Test_DefinedInterfaceBehavior(check *C) {
 	check.Assert(behavior.ID, Equals, behavior.Ref)
 
 	// Try to add the same behavior again.
-	_, err = di.AddBehavior(behaviorPayload)
+	_, err = di.AddBehavior(ctx, behaviorPayload)
 	check.Assert(err, NotNil)
 	check.Assert(strings.Contains(err.Error(), "RDE_BEHAVIOR_ALREADY_EXISTS"), Equals, true)
 
 	// We check that the Behaviors can be retrieved
-	allBehaviors, err := di.GetAllBehaviors(nil)
+	allBehaviors, err := di.GetAllBehaviors(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(1, Equals, len(allBehaviors))
 	check.Assert(allBehaviors[0], DeepEquals, behavior)
 
 	// Error getting non-existing Behaviors
-	_, err = di.GetBehaviorById("urn:vcloud:behavior-interface:notexist:notexist:notexist:9.9.9")
+	_, err = di.GetBehaviorById(ctx, "urn:vcloud:behavior-interface:notexist:notexist:notexist:9.9.9")
 	check.Assert(err, NotNil)
 	check.Assert(strings.Contains(err.Error(), ErrorEntityNotFound.Error()), Equals, true)
 
-	_, err = di.GetBehaviorByName("DoesNotExist")
+	_, err = di.GetBehaviorByName(ctx, "DoesNotExist")
 	check.Assert(err, NotNil)
 	check.Assert(strings.Contains(err.Error(), ErrorEntityNotFound.Error()), Equals, true)
 
 	// Getting behaviors correctly
-	retrievedBehavior, err := di.GetBehaviorById(behavior.ID)
+	retrievedBehavior, err := di.GetBehaviorById(ctx, behavior.ID)
 	check.Assert(err, IsNil)
 	check.Assert(retrievedBehavior, NotNil)
 	check.Assert(retrievedBehavior.Name, Equals, behavior.Name)
 	check.Assert(retrievedBehavior.Description, Equals, behavior.Description)
 	check.Assert(retrievedBehavior.Execution, DeepEquals, behavior.Execution)
 
-	retrievedBehavior2, err := di.GetBehaviorByName(behavior.Name)
+	retrievedBehavior2, err := di.GetBehaviorByName(ctx, behavior.Name)
 	check.Assert(err, IsNil)
 	check.Assert(retrievedBehavior, NotNil)
 	check.Assert(retrievedBehavior, DeepEquals, retrievedBehavior2)
@@ -207,12 +207,12 @@ func (vcd *TestVCD) Test_DefinedInterfaceBehavior(check *C) {
 		Ref:  "notGoingToUpdate1",
 		Name: "notGoingToUpdate2",
 	}
-	_, err = di.UpdateBehavior(updatePayload)
+	_, err = di.UpdateBehavior(ctx, updatePayload)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error(), Equals, "ID of the Behavior to update is empty")
 
 	updatePayload.ID = retrievedBehavior.ID
-	updatedBehavior, err := di.UpdateBehavior(updatePayload)
+	updatedBehavior, err := di.UpdateBehavior(ctx, updatePayload)
 	check.Assert(err, IsNil)
 	check.Assert(updatedBehavior.ID, Equals, retrievedBehavior.ID)
 	check.Assert(updatedBehavior.Ref, Equals, retrievedBehavior.Ref)   // This cannot be updated
@@ -220,6 +220,6 @@ func (vcd *TestVCD) Test_DefinedInterfaceBehavior(check *C) {
 	check.Assert(updatedBehavior.Execution, DeepEquals, updatePayload.Execution)
 	check.Assert(updatedBehavior.Description, Equals, updatePayload.Description)
 
-	err = di.DeleteBehavior(behavior.ID)
+	err = di.DeleteBehavior(ctx, behavior.ID)
 	check.Assert(err, IsNil)
 }
