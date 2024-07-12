@@ -15,15 +15,15 @@ func (vcd *TestVCD) Test_NsxtEdgeGatewayDns(check *C) {
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointEdgeGatewayDns)
 	skipNoNsxtConfiguration(vcd, check)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
-	nsxtVdc, err := org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 	AddToCleanupList(vcd.config.VCD.Nsxt.EdgeGateway, "nsxtEdgeGatewayDns", vcd.config.VCD.Org, check.TestName())
 
-	disabledDns, err := edge.GetDnsConfig()
+	disabledDns, err := edge.GetDnsConfig(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(disabledDns.NsxtEdgeGatewayDns.Enabled, Equals, false)
 
@@ -52,7 +52,7 @@ func (vcd *TestVCD) Test_NsxtEdgeGatewayDns(check *C) {
 		},
 	}
 
-	enabledDns, err := disabledDns.Update(enabledDnsConfig)
+	enabledDns, err := disabledDns.Update(ctx, enabledDnsConfig)
 	check.Assert(err, IsNil)
 	dnsConfig := enabledDns.NsxtEdgeGatewayDns
 	check.Assert(dnsConfig.Enabled, Equals, true)
@@ -96,7 +96,7 @@ func (vcd *TestVCD) Test_NsxtEdgeGatewayDns(check *C) {
 			},
 		},
 	}
-	updatedDns, err := enabledDns.Update(updatedDnsConfig)
+	updatedDns, err := enabledDns.Update(ctx, updatedDnsConfig)
 	updatedDnsConfig = updatedDns.NsxtEdgeGatewayDns
 	check.Assert(err, IsNil)
 	check.Assert(updatedDnsConfig.Enabled, Equals, true)
@@ -117,10 +117,10 @@ func (vcd *TestVCD) Test_NsxtEdgeGatewayDns(check *C) {
 		check.Assert(len(conditionalZones[0].DnsDomainNames), Equals, 1)
 	}
 
-	err = enabledDns.Delete()
+	err = enabledDns.Delete(ctx)
 	check.Assert(err, IsNil)
 
-	deletedDns, err := edge.GetDnsConfig()
+	deletedDns, err := edge.GetDnsConfig(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(deletedDns.NsxtEdgeGatewayDns.Enabled, Equals, false)
 }

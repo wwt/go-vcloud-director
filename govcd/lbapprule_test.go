@@ -33,7 +33,7 @@ func (vcd *TestVCD) Test_LBAppRule(check *C) {
 		Script: "acl vmware_page url_beg / vmware redirect location https://www.vmware.com/ ifvmware_page",
 	}
 
-	err = deleteLbAppRuleIfExists(ctx, *edge, lbAppRuleConfig.Name)
+	err = deleteLbAppRuleIfExists(*edge, lbAppRuleConfig.Name)
 	check.Assert(err, IsNil)
 	createdLbAppRule, err := edge.CreateLbAppRule(ctx, lbAppRuleConfig)
 	check.Assert(err, IsNil)

@@ -3,6 +3,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 	. "gopkg.in/check.v1"
@@ -196,7 +197,7 @@ func (vcd *TestVCD) Test_ProviderVdcCRUD(check *C) {
 	}
 	providerVdcName := check.TestName()
 	providerVdcDescription := check.TestName()
-	storageProfileList, err := vcd.client.Client.QueryAllProviderVdcStorageProfiles()
+	storageProfileList, err := vcd.client.Client.QueryAllProviderVdcStorageProfiles(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(len(storageProfileList) > 0, Equals, true)
 	var storageProfile types.QueryResultProviderVdcStorageProfileRecordType
@@ -207,25 +208,25 @@ func (vcd *TestVCD) Test_ProviderVdcCRUD(check *C) {
 	}
 	check.Assert(storageProfile.HREF, Not(Equals), "")
 
-	vcenter, err := vcd.client.GetVCenterByName(vcd.config.VCD.VimServer)
+	vcenter, err := vcd.client.GetVCenterByName(ctx, vcd.config.VCD.VimServer)
 	check.Assert(err, IsNil)
 	check.Assert(vcenter, NotNil)
 
-	resourcePool, err := vcenter.GetResourcePoolByName(vcd.config.Vsphere.ResourcePoolForVcd1)
+	resourcePool, err := vcenter.GetResourcePoolByName(ctx, vcd.config.Vsphere.ResourcePoolForVcd1)
 	check.Assert(err, IsNil)
 	check.Assert(resourcePool, NotNil)
 
-	nsxtManagers, err := vcd.client.QueryNsxtManagerByName(vcd.config.VCD.Nsxt.Manager)
+	nsxtManagers, err := vcd.client.QueryNsxtManagerByName(ctx, vcd.config.VCD.Nsxt.Manager)
 	check.Assert(err, IsNil)
 	check.Assert(len(nsxtManagers), Equals, 1)
 
-	hwVersion, err := resourcePool.GetDefaultHardwareVersion()
+	hwVersion, err := resourcePool.GetDefaultHardwareVersion(ctx)
 	check.Assert(err, IsNil)
 
 	vcenterUrl, err := vcenter.GetVimServerUrl()
 	check.Assert(err, IsNil)
 
-	networkPool, err := vcd.client.GetNetworkPoolByName(vcd.config.VCD.NsxtProviderVdc.NetworkPool)
+	networkPool, err := vcd.client.GetNetworkPoolByName(ctx, vcd.config.VCD.NsxtProviderVdc.NetworkPool)
 	check.Assert(err, IsNil)
 	networkPoolHref, err := networkPool.GetOpenApiUrl()
 	check.Assert(err, IsNil)
@@ -337,21 +338,21 @@ func testProviderVdcCreation(client *VCDClient, check *C, creationElements provi
 
 	printVerbose("  creating provider VDC '%s' using resource pool '%s' and storage profile '%s'\n",
 		providerVdcName, resourcePoolName, storageProfileName)
-	providerVdcJson, err := client.CreateProviderVdc(creationElements.params)
+	providerVdcJson, err := client.CreateProviderVdc(ctx, creationElements.params)
 	check.Assert(err, IsNil)
 	check.Assert(providerVdcJson, NotNil)
 	check.Assert(providerVdcJson.VMWProviderVdc.Name, Equals, providerVdcName)
 
 	AddToCleanupList(providerVdcName, "provider_vdc", "", check.TestName())
-	retrievedPvdc, err := client.GetProviderVdcExtendedByName(providerVdcName)
+	retrievedPvdc, err := client.GetProviderVdcExtendedByName(ctx, providerVdcName)
 	check.Assert(err, IsNil)
 
-	err = retrievedPvdc.Disable()
+	err = retrievedPvdc.Disable(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(retrievedPvdc.VMWProviderVdc.IsEnabled, NotNil)
 	check.Assert(*retrievedPvdc.VMWProviderVdc.IsEnabled, Equals, false)
 
-	err = retrievedPvdc.Enable()
+	err = retrievedPvdc.Enable(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(retrievedPvdc.VMWProviderVdc.IsEnabled, NotNil)
 	check.Assert(*retrievedPvdc.VMWProviderVdc.IsEnabled, Equals, true)
@@ -359,13 +360,13 @@ func testProviderVdcCreation(client *VCDClient, check *C, creationElements provi
 	newProviderVdcName := "TestNewName"
 	newProviderVdcDescription := "Test New provider VDC description"
 	printVerbose("  renaming provider VDC to '%s'\n", newProviderVdcName)
-	err = retrievedPvdc.Rename(newProviderVdcName, newProviderVdcDescription)
+	err = retrievedPvdc.Rename(ctx, newProviderVdcName, newProviderVdcDescription)
 	check.Assert(err, IsNil)
 	check.Assert(retrievedPvdc.VMWProviderVdc.Name, Equals, newProviderVdcName)
 	check.Assert(retrievedPvdc.VMWProviderVdc.Description, Equals, newProviderVdcDescription)
 
 	printVerbose("  renaming back provider VDC to '%s'\n", providerVdcName)
-	err = retrievedPvdc.Rename(providerVdcName, providerVdcDescription)
+	err = retrievedPvdc.Rename(ctx, providerVdcName, providerVdcDescription)
 	check.Assert(err, IsNil)
 	check.Assert(retrievedPvdc.VMWProviderVdc.Name, Equals, providerVdcName)
 	check.Assert(retrievedPvdc.VMWProviderVdc.Description, Equals, providerVdcDescription)
@@ -373,19 +374,19 @@ func testProviderVdcCreation(client *VCDClient, check *C, creationElements provi
 	secondResourcePoolName := creationElements.config.Vsphere.ResourcePoolForVcd2
 	if secondResourcePoolName != "" {
 		printVerbose("  adding resource pool '%s' to provider VDC\n", secondResourcePoolName)
-		secondResourcePool, err := creationElements.vcenter.GetResourcePoolByName(secondResourcePoolName)
+		secondResourcePool, err := creationElements.vcenter.GetResourcePoolByName(ctx, secondResourcePoolName)
 		check.Assert(err, IsNil)
 		check.Assert(secondResourcePool, NotNil)
-		err = retrievedPvdc.AddResourcePools([]*ResourcePool{secondResourcePool})
+		err = retrievedPvdc.AddResourcePools(ctx, []*ResourcePool{secondResourcePool})
 		check.Assert(err, IsNil)
-		err = retrievedPvdc.Refresh()
+		err = retrievedPvdc.Refresh(ctx)
 		check.Assert(err, IsNil)
 		check.Assert(len(retrievedPvdc.VMWProviderVdc.ResourcePoolRefs.VimObjectRef), Equals, 2)
 
 		printVerbose("  removing resource pool '%s' from provider VDC\n", secondResourcePoolName)
-		err = retrievedPvdc.DeleteResourcePools([]*ResourcePool{secondResourcePool})
+		err = retrievedPvdc.DeleteResourcePools(ctx, []*ResourcePool{secondResourcePool})
 		check.Assert(err, IsNil)
-		err = retrievedPvdc.Refresh()
+		err = retrievedPvdc.Refresh(ctx)
 		check.Assert(err, IsNil)
 		check.Assert(len(retrievedPvdc.VMWProviderVdc.ResourcePoolRefs.VimObjectRef), Equals, 1)
 	}
@@ -394,30 +395,30 @@ func testProviderVdcCreation(client *VCDClient, check *C, creationElements provi
 	if secondStorageProfile != "" {
 		printVerbose("  adding storage profile '%s' to provider VDC\n", secondStorageProfile)
 		// Adds a storage profile
-		err = retrievedPvdc.AddStorageProfiles([]string{secondStorageProfile})
+		err = retrievedPvdc.AddStorageProfiles(ctx, []string{secondStorageProfile})
 		check.Assert(err, IsNil)
 		check.Assert(len(retrievedPvdc.VMWProviderVdc.StorageProfiles.ProviderVdcStorageProfile), Equals, 2)
 
 		printVerbose("  removing storage profile '%s' from provider VDC\n", secondStorageProfile)
 		// Remove a storage profile
-		err = retrievedPvdc.DeleteStorageProfiles([]string{secondStorageProfile})
+		err = retrievedPvdc.DeleteStorageProfiles(ctx, []string{secondStorageProfile})
 		check.Assert(err, IsNil)
 		check.Assert(len(retrievedPvdc.VMWProviderVdc.StorageProfiles.ProviderVdcStorageProfile), Equals, 1)
 	}
 
 	// Deleting while the Provider VDC is still enabled will fail
-	task, err := retrievedPvdc.Delete()
+	task, err := retrievedPvdc.Delete(ctx)
 	check.Assert(err, NotNil)
 
 	// Properly deleting provider VDC: first disabling, then removing
 	printVerbose("  disabling provider VDC '%s'\n", providerVdcName)
-	err = retrievedPvdc.Disable()
+	err = retrievedPvdc.Disable(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(retrievedPvdc.VMWProviderVdc.IsEnabled, NotNil)
 	check.Assert(*retrievedPvdc.VMWProviderVdc.IsEnabled, Equals, false)
 
 	printVerbose("  removing provider VDC '%s'\n", providerVdcName)
-	task, err = retrievedPvdc.Delete()
+	task, err = retrievedPvdc.Delete(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)

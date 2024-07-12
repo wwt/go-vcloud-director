@@ -40,7 +40,7 @@ func (vcd *TestVCD) Test_LBServiceMonitor(check *C) {
 		Type:       "http",
 	}
 
-	err = deleteLbServiceMonitorIfExists(ctx, *edge, lbMon.Name)
+	err = deleteLbServiceMonitorIfExists(*edge, lbMon.Name)
 	check.Assert(err, IsNil)
 	lbMonitor, err := edge.CreateLbServiceMonitor(ctx, lbMon)
 	check.Assert(err, IsNil)

@@ -16,25 +16,25 @@ func (vcd *TestVCD) Test_NsxtEdgeCreate(check *C) {
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointEdgeGateways)
 	vcd.skipIfNotSysAdmin(check)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	nsxvVdc, err := adminOrg.GetVDCByName(vcd.config.VCD.Vdc, false)
+	nsxvVdc, err := adminOrg.GetVDCByName(ctx, vcd.config.VCD.Vdc, false)
 	check.Assert(err, IsNil)
 	check.Assert(nsxvVdc, NotNil)
-	nsxtVdc, err := adminOrg.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	nsxtVdc, err := adminOrg.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	if ContainsNotFound(err) {
 		check.Skip(fmt.Sprintf("No NSX-T VDC (%s) found - skipping test", vcd.config.VCD.Nsxt.Vdc))
 	}
 	check.Assert(err, IsNil)
 	check.Assert(nsxtVdc, NotNil)
 
-	nsxtExternalNetwork, err := GetExternalNetworkV2ByName(vcd.client, vcd.config.VCD.Nsxt.ExternalNetwork)
+	nsxtExternalNetwork, err := GetExternalNetworkV2ByName(ctx, vcd.client, vcd.config.VCD.Nsxt.ExternalNetwork)
 	check.Assert(err, IsNil)
 	check.Assert(nsxtExternalNetwork, NotNil)
 
@@ -56,13 +56,13 @@ func (vcd *TestVCD) Test_NsxtEdgeCreate(check *C) {
 		}},
 	}
 
-	createdEdge, err := adminOrg.CreateNsxtEdgeGateway(egwDefinition)
+	createdEdge, err := adminOrg.CreateNsxtEdgeGateway(ctx, egwDefinition)
 	check.Assert(err, IsNil)
 	check.Assert(createdEdge.EdgeGateway.Name, Equals, egwDefinition.Name)
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeGateways + createdEdge.EdgeGateway.ID
 	AddToCleanupListOpenApi(createdEdge.EdgeGateway.Name, check.TestName(), openApiEndpoint)
 
-	edgeCluster, err := nsxtVdc.GetNsxtEdgeClusterByName(vcd.config.VCD.Nsxt.NsxtEdgeCluster)
+	edgeCluster, err := nsxtVdc.GetNsxtEdgeClusterByName(ctx, vcd.config.VCD.Nsxt.NsxtEdgeCluster)
 	check.Assert(err, IsNil)
 	check.Assert(edgeCluster, NotNil)
 
@@ -72,7 +72,7 @@ func (vcd *TestVCD) Test_NsxtEdgeCreate(check *C) {
 		},
 	}
 	createdEdge.EdgeGateway.Name = "renamed-edge"
-	updatedEdge, err := createdEdge.Update(createdEdge.EdgeGateway)
+	updatedEdge, err := createdEdge.Update(ctx, createdEdge.EdgeGateway)
 	check.Assert(err, IsNil)
 	check.Assert(updatedEdge.EdgeGateway.Name, Equals, "renamed-edge")
 
@@ -80,35 +80,35 @@ func (vcd *TestVCD) Test_NsxtEdgeCreate(check *C) {
 	queryParams := url.Values{}
 	queryParams.Add("filter", "name==renamed-edge")
 	//
-	egws, err := adminOrg.GetAllNsxtEdgeGateways(queryParams)
+	egws, err := adminOrg.GetAllNsxtEdgeGateways(ctx, queryParams)
 	check.Assert(err, IsNil)
 	check.Assert(len(egws) >= 1, Equals, true)
 
 	// Lookup using different available methods
-	e1, err := adminOrg.GetNsxtEdgeGatewayByName(updatedEdge.EdgeGateway.Name)
+	e1, err := adminOrg.GetNsxtEdgeGatewayByName(ctx, updatedEdge.EdgeGateway.Name)
 	check.Assert(err, IsNil)
 	check.Assert(e1, NotNil)
-	e2, err := org.GetNsxtEdgeGatewayByName(updatedEdge.EdgeGateway.Name)
+	e2, err := org.GetNsxtEdgeGatewayByName(ctx, updatedEdge.EdgeGateway.Name)
 	check.Assert(err, IsNil)
 	check.Assert(e2, NotNil)
-	e3, err := nsxtVdc.GetNsxtEdgeGatewayByName(updatedEdge.EdgeGateway.Name)
+	e3, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, updatedEdge.EdgeGateway.Name)
 	check.Assert(err, IsNil)
 	check.Assert(e3, NotNil)
-	e4, err := adminOrg.GetNsxtEdgeGatewayById(updatedEdge.EdgeGateway.ID)
+	e4, err := adminOrg.GetNsxtEdgeGatewayById(ctx, updatedEdge.EdgeGateway.ID)
 	check.Assert(err, IsNil)
 	check.Assert(e4, NotNil)
-	e5, err := org.GetNsxtEdgeGatewayById(updatedEdge.EdgeGateway.ID)
+	e5, err := org.GetNsxtEdgeGatewayById(ctx, updatedEdge.EdgeGateway.ID)
 	check.Assert(err, IsNil)
 	check.Assert(e5, NotNil)
-	e6, err := nsxtVdc.GetNsxtEdgeGatewayById(updatedEdge.EdgeGateway.ID)
+	e6, err := nsxtVdc.GetNsxtEdgeGatewayById(ctx, updatedEdge.EdgeGateway.ID)
 	check.Assert(err, IsNil)
 	check.Assert(e6, NotNil)
 
 	// Try to search for NSX-T edge gateway in NSX-V VDC and expect it to be not found
-	expectNil, err := nsxvVdc.GetNsxtEdgeGatewayByName(updatedEdge.EdgeGateway.Name)
+	expectNil, err := nsxvVdc.GetNsxtEdgeGatewayByName(ctx, updatedEdge.EdgeGateway.Name)
 	check.Assert(ContainsNotFound(err), Equals, true)
 	check.Assert(expectNil, IsNil)
-	expectNil, err = nsxvVdc.GetNsxtEdgeGatewayById(updatedEdge.EdgeGateway.ID)
+	expectNil, err = nsxvVdc.GetNsxtEdgeGatewayById(ctx, updatedEdge.EdgeGateway.ID)
 	check.Assert(ContainsNotFound(err), Equals, true)
 	check.Assert(expectNil, IsNil)
 
@@ -120,22 +120,22 @@ func (vcd *TestVCD) Test_NsxtEdgeCreate(check *C) {
 	check.Assert(e1.EdgeGateway.ID, Equals, e6.EdgeGateway.ID)
 
 	// Try out GetUsedIpAddresses function
-	usedIPs, err := updatedEdge.GetUsedIpAddresses(nil)
+	usedIPs, err := updatedEdge.GetUsedIpAddresses(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(usedIPs, NotNil)
 
-	ipAddr, err := updatedEdge.GetUnusedExternalIPAddresses(1, netip.Prefix{}, false)
+	ipAddr, err := updatedEdge.GetUnusedExternalIPAddresses(ctx, 1, netip.Prefix{}, false)
 	// Expect an error as no ranges were assigned
 	check.Assert(err, NotNil)
 	check.Assert(ipAddr, DeepEquals, []netip.Addr(nil))
 
 	// Try a refresh operation
-	err = updatedEdge.Refresh()
+	err = updatedEdge.Refresh(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(updatedEdge.EdgeGateway.ID, Equals, e1.EdgeGateway.ID)
 
 	// Cleanup
-	err = updatedEdge.Delete()
+	err = updatedEdge.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -144,15 +144,15 @@ func (vcd *TestVCD) Test_NsxtEdgeVdcGroup(check *C) {
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointEdgeGateways)
 	vcd.skipIfNotSysAdmin(check)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	nsxtExternalNetwork, err := GetExternalNetworkV2ByName(vcd.client, vcd.config.VCD.Nsxt.ExternalNetwork)
+	nsxtExternalNetwork, err := GetExternalNetworkV2ByName(ctx, vcd.client, vcd.config.VCD.Nsxt.ExternalNetwork)
 	check.Assert(err, IsNil)
 	check.Assert(nsxtExternalNetwork, NotNil)
 
@@ -177,7 +177,7 @@ func (vcd *TestVCD) Test_NsxtEdgeVdcGroup(check *C) {
 	}
 
 	// Create Edge Gateway in VDC
-	createdEdge, err := adminOrg.CreateNsxtEdgeGateway(egwDefinition)
+	createdEdge, err := adminOrg.CreateNsxtEdgeGateway(ctx, egwDefinition)
 	check.Assert(err, IsNil)
 	check.Assert(createdEdge.EdgeGateway.OwnerRef.ID, Matches, `^urn:vcloud:vdc:.*`)
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeGateways + createdEdge.EdgeGateway.ID
@@ -187,17 +187,17 @@ func (vcd *TestVCD) Test_NsxtEdgeVdcGroup(check *C) {
 	check.Assert(createdEdge.EdgeGateway.OwnerRef.ID, Equals, egwDefinition.OwnerRef.ID)
 
 	// Move Edge Gateway to VDC Group
-	movedGateway, err := createdEdge.MoveToVdcOrVdcGroup(vdcGroup.VdcGroup.Id)
+	movedGateway, err := createdEdge.MoveToVdcOrVdcGroup(ctx, vdcGroup.VdcGroup.Id)
 	check.Assert(err, IsNil)
 	check.Assert(movedGateway.EdgeGateway.OwnerRef.ID, Equals, vdcGroup.VdcGroup.Id)
 	check.Assert(movedGateway.EdgeGateway.OwnerRef.ID, Matches, `^urn:vcloud:vdcGroup:.*`)
 
 	// Get by name and owner ID
-	edgeByNameAndOwnerId, err := org.GetNsxtEdgeGatewayByNameAndOwnerId(createdEdge.EdgeGateway.Name, vdcGroup.VdcGroup.Id)
+	edgeByNameAndOwnerId, err := org.GetNsxtEdgeGatewayByNameAndOwnerId(ctx, createdEdge.EdgeGateway.Name, vdcGroup.VdcGroup.Id)
 	check.Assert(err, IsNil)
 
 	// Check lookup of Edge Gateways in VDC Groups
-	edgeInVdcGroup, err := vdcGroup.GetNsxtEdgeGatewayByName(createdEdge.EdgeGateway.Name)
+	edgeInVdcGroup, err := vdcGroup.GetNsxtEdgeGatewayByName(ctx, createdEdge.EdgeGateway.Name)
 	check.Assert(err, IsNil)
 
 	// Ensure both methods for retrieval get the same object
@@ -211,7 +211,7 @@ func (vcd *TestVCD) Test_NsxtEdgeVdcGroup(check *C) {
 	egwDefinition.OwnerRef.ID = vdc.Vdc.ID
 	egwDefinition.ID = movedGateway.EdgeGateway.ID
 
-	movedBackToVdcEdge, err := movedGateway.Update(egwDefinition)
+	movedBackToVdcEdge, err := movedGateway.Update(ctx, egwDefinition)
 	check.Assert(err, IsNil)
 	check.Assert(movedBackToVdcEdge.EdgeGateway.OwnerRef.ID, Matches, `^urn:vcloud:vdc:.*`)
 
@@ -224,15 +224,15 @@ func (vcd *TestVCD) Test_NsxtEdgeVdcGroup(check *C) {
 	check.Assert(movedBackToVdcEdge.EdgeGateway, DeepEquals, createdEdge.EdgeGateway)
 
 	// Remove Edge Gateway
-	err = movedBackToVdcEdge.Delete()
+	err = movedBackToVdcEdge.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Remove VDC Group
-	err = vdcGroup.Delete()
+	err = vdcGroup.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Remove VDC
-	err = vdc.DeleteWait(true, true)
+	err = vdc.DeleteWait(ctx, true, true)
 	check.Assert(err, IsNil)
 }
 
@@ -241,18 +241,18 @@ func (vcd *TestVCD) Test_NsxtEdgeGatewayUsedAndUnusedIPs(check *C) {
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointEdgeGateways)
 	vcd.skipIfNotSysAdmin(check)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	nsxvVdc, err := adminOrg.GetVDCByName(vcd.config.VCD.Vdc, false)
+	nsxvVdc, err := adminOrg.GetVDCByName(ctx, vcd.config.VCD.Vdc, false)
 	check.Assert(err, IsNil)
 	check.Assert(nsxvVdc, NotNil)
-	nsxtVdc, err := adminOrg.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	nsxtVdc, err := adminOrg.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	if ContainsNotFound(err) {
 		check.Skip(fmt.Sprintf("No NSX-T VDC (%s) found - skipping test", vcd.config.VCD.Nsxt.Vdc))
 	}
@@ -260,12 +260,12 @@ func (vcd *TestVCD) Test_NsxtEdgeGatewayUsedAndUnusedIPs(check *C) {
 	check.Assert(nsxtVdc, NotNil)
 
 	// NSX-T details
-	man, err := vcd.client.QueryNsxtManagerByName(vcd.config.VCD.Nsxt.Manager)
+	man, err := vcd.client.QueryNsxtManagerByName(ctx, vcd.config.VCD.Nsxt.Manager)
 	check.Assert(err, IsNil)
 	nsxtManagerId, err := BuildUrnWithUuid("urn:vcloud:nsxtmanager:", extractUuid(man[0].HREF))
 	check.Assert(err, IsNil)
 
-	tier0RouterVrf, err := vcd.client.GetImportableNsxtTier0RouterByName(vcd.config.VCD.Nsxt.Tier0router, nsxtManagerId)
+	tier0RouterVrf, err := vcd.client.GetImportableNsxtTier0RouterByName(ctx, vcd.config.VCD.Nsxt.Tier0router, nsxtManagerId)
 	check.Assert(err, IsNil)
 	backingId := tier0RouterVrf.NsxtTier0Router.ID
 
@@ -294,7 +294,7 @@ func (vcd *TestVCD) Test_NsxtEdgeGatewayUsedAndUnusedIPs(check *C) {
 			},
 		}},
 	}
-	createdNet, err := CreateExternalNetworkV2(vcd.client, netNsxt)
+	createdNet, err := CreateExternalNetworkV2(ctx, vcd.client, netNsxt)
 	check.Assert(err, IsNil)
 
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointExternalNetworks + createdNet.ExternalNetwork.ID
@@ -325,14 +325,14 @@ func (vcd *TestVCD) Test_NsxtEdgeGatewayUsedAndUnusedIPs(check *C) {
 		}},
 	}
 
-	createdEdge, err := adminOrg.CreateNsxtEdgeGateway(egwDefinition)
+	createdEdge, err := adminOrg.CreateNsxtEdgeGateway(ctx, egwDefinition)
 	check.Assert(err, IsNil)
 	check.Assert(createdEdge.EdgeGateway.Name, Equals, egwDefinition.Name)
 	openApiEndpoint = types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeGateways + createdEdge.EdgeGateway.ID
 	PrependToCleanupListOpenApi(createdEdge.EdgeGateway.Name, check.TestName(), openApiEndpoint)
 
 	// Try out GetUsedIpAddresses function
-	usedIPs, err := createdEdge.GetUsedIpAddresses(nil)
+	usedIPs, err := createdEdge.GetUsedIpAddresses(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(usedIPs, NotNil)
 
@@ -341,13 +341,13 @@ func (vcd *TestVCD) Test_NsxtEdgeGatewayUsedAndUnusedIPs(check *C) {
 	check.Assert(usedIPs[0].Category, Equals, "PRIMARY_IP")
 
 	// Attempt to get 1 unallocated IP
-	ipAddr, err := createdEdge.GetUnusedExternalIPAddresses(1, netip.Prefix{}, false)
+	ipAddr, err := createdEdge.GetUnusedExternalIPAddresses(ctx, 1, netip.Prefix{}, false)
 	check.Assert(err, IsNil)
 	ipsCompared := compareEachIpElementAndOrder(ipAddr, []netip.Addr{netip.MustParseAddr("1.1.1.4")})
 	check.Assert(ipsCompared, Equals, true)
 
 	// Attempt to get 10 unallocated IPs
-	ipAddr, err = createdEdge.GetUnusedExternalIPAddresses(10, netip.Prefix{}, true)
+	ipAddr, err = createdEdge.GetUnusedExternalIPAddresses(ctx, 10, netip.Prefix{}, true)
 	check.Assert(err, IsNil)
 	ipsCompared = compareEachIpElementAndOrder(ipAddr, []netip.Addr{
 		netip.MustParseAddr("1.1.1.4"),
@@ -364,13 +364,13 @@ func (vcd *TestVCD) Test_NsxtEdgeGatewayUsedAndUnusedIPs(check *C) {
 	check.Assert(ipsCompared, Equals, true)
 
 	// Attempt to get IP but filter it off by prefix
-	ipAddr, err = createdEdge.GetUnusedExternalIPAddresses(1, netip.MustParsePrefix("192.168.1.1/24"), false)
+	ipAddr, err = createdEdge.GetUnusedExternalIPAddresses(ctx, 1, netip.MustParsePrefix("192.168.1.1/24"), false)
 	// Expect an error because Edge Gateway does not have IPs from required subnet 192.168.1.1/24
 	check.Assert(err, NotNil)
 	check.Assert(ipAddr, IsNil)
 
 	// Attempt to get all unused IPs
-	allIps, err := createdEdge.GetAllUnusedExternalIPAddresses(true)
+	allIps, err := createdEdge.GetAllUnusedExternalIPAddresses(ctx, true)
 	check.Assert(err, IsNil)
 	ipsCompared = compareEachIpElementAndOrder(allIps, []netip.Addr{
 		netip.MustParseAddr("1.1.1.4"),
@@ -400,48 +400,48 @@ func (vcd *TestVCD) Test_NsxtEdgeGatewayUsedAndUnusedIPs(check *C) {
 	check.Assert(len(allIps), Equals, 22)
 
 	// Get used and unused IP counts
-	usedIpCount, unusedIpCount, err := createdEdge.GetUsedAndUnusedExternalIPAddressCountWithLimit(false, 5)
+	usedIpCount, unusedIpCount, err := createdEdge.GetUsedAndUnusedExternalIPAddressCountWithLimit(ctx, false, 5)
 	check.Assert(err, IsNil)
 	check.Assert(unusedIpCount, Equals, int64(4))
 	check.Assert(usedIpCount, Equals, int64(1))
 
 	// Verify that GetAllocatedIpCount returns correct number of allocated IPs
-	totalAllocationIpCount, err := createdEdge.GetAllocatedIpCount(true)
+	totalAllocationIpCount, err := createdEdge.GetAllocatedIpCount(ctx, true)
 	check.Assert(err, IsNil)
 	check.Assert(totalAllocationIpCount, NotNil)
 	check.Assert(totalAllocationIpCount, Equals, 23) // 22 unused IPs + 1 primary
 
 	// Try to deallocate more IPs than allocated
-	failedDeallocationIpCount, err := createdEdge.QuickDeallocateIpCount(24)
+	failedDeallocationIpCount, err := createdEdge.QuickDeallocateIpCount(ctx, 24)
 	check.Assert(err, NotNil)
 	check.Assert(failedDeallocationIpCount, IsNil)
 
 	// Check that failed deallocation did not change the number of allocated IPs
-	allocatedIpCountAfterFailedDeallocation, err := createdEdge.GetAllocatedIpCount(true)
+	allocatedIpCountAfterFailedDeallocation, err := createdEdge.GetAllocatedIpCount(ctx, true)
 	check.Assert(err, IsNil)
 	check.Assert(allocatedIpCountAfterFailedDeallocation, NotNil)
 	check.Assert(allocatedIpCountAfterFailedDeallocation, Equals, 23) // 22 unused IPs + 1 primary
 
 	// Try to deallocate all IPs including primary. Expect a failure as an Edge Gateway must always
 	// have a primary IP
-	failedDeallocationIpCount, err = createdEdge.QuickDeallocateIpCount(23)
+	failedDeallocationIpCount, err = createdEdge.QuickDeallocateIpCount(ctx, 23)
 	check.Assert(err, NotNil)
 	check.Assert(failedDeallocationIpCount, IsNil)
 
 	// Deallocate 22 IP addresses
-	deallocatedEdge, err := createdEdge.QuickDeallocateIpCount(22)
+	deallocatedEdge, err := createdEdge.QuickDeallocateIpCount(ctx, 22)
 	check.Assert(err, IsNil)
 
-	allocatedIpCountAfterDeallocation, err := deallocatedEdge.GetAllocatedIpCount(true)
+	allocatedIpCountAfterDeallocation, err := deallocatedEdge.GetAllocatedIpCount(ctx, true)
 	check.Assert(err, IsNil)
 	check.Assert(allocatedIpCountAfterDeallocation, NotNil)
 	check.Assert(allocatedIpCountAfterDeallocation, Equals, 1) // 1 primary
 
 	// Cleanup
-	err = createdEdge.Delete()
+	err = createdEdge.Delete(ctx)
 	check.Assert(err, IsNil)
 
-	err = createdNet.Delete()
+	err = createdNet.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -473,7 +473,7 @@ func (vcd *TestVCD) Test_NsxtEdgeQoS(check *C) {
 	}
 
 	// Get QoS profile to use
-	nsxtManagers, err := vcd.client.QueryNsxtManagerByName(vcd.config.VCD.Nsxt.Manager)
+	nsxtManagers, err := vcd.client.QueryNsxtManagerByName(ctx, vcd.config.VCD.Nsxt.Manager)
 	check.Assert(err, IsNil)
 	check.Assert(len(nsxtManagers), Equals, 1)
 
@@ -482,19 +482,19 @@ func (vcd *TestVCD) Test_NsxtEdgeQoS(check *C) {
 	urn, err := BuildUrnWithUuid("urn:vcloud:nsxtmanager:", uuid)
 	check.Assert(err, IsNil)
 
-	qosProfile, err := vcd.client.GetNsxtEdgeGatewayQosProfileByDisplayName(urn, vcd.config.VCD.Nsxt.GatewayQosProfile)
+	qosProfile, err := vcd.client.GetNsxtEdgeGatewayQosProfileByDisplayName(ctx, urn, vcd.config.VCD.Nsxt.GatewayQosProfile)
 	check.Assert(err, IsNil)
 	check.Assert(qosProfile, NotNil)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
-	nsxtVdc, err := org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	// Fetch current QoS config
-	qosConfig, err := edge.GetQoS()
+	qosConfig, err := edge.GetQoS(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(qosConfig, NotNil)
 	check.Assert(qosConfig.EgressProfile, IsNil)
@@ -507,7 +507,7 @@ func (vcd *TestVCD) Test_NsxtEdgeQoS(check *C) {
 	}
 
 	// Update QoS config
-	updatedEdgeQosConfig, err := edge.UpdateQoS(newQosConfig)
+	updatedEdgeQosConfig, err := edge.UpdateQoS(ctx, newQosConfig)
 	check.Assert(err, IsNil)
 	check.Assert(updatedEdgeQosConfig, NotNil)
 
@@ -516,7 +516,7 @@ func (vcd *TestVCD) Test_NsxtEdgeQoS(check *C) {
 	check.Assert(updatedEdgeQosConfig.IngressProfile.ID, Equals, newQosConfig.IngressProfile.ID)
 
 	// Remove QoS config
-	updatedEdgeQosConfig, err = edge.UpdateQoS(&types.NsxtEdgeGatewayQos{})
+	updatedEdgeQosConfig, err = edge.UpdateQoS(ctx, &types.NsxtEdgeGatewayQos{})
 	check.Assert(err, IsNil)
 	check.Assert(updatedEdgeQosConfig, NotNil)
 }
@@ -528,16 +528,16 @@ func (vcd *TestVCD) Test_NsxtEdgeDhcpForwarder(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointEdgeGatewayDhcpForwarder)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
-	nsxtVdc, err := org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 	AddToCleanupList(vcd.config.VCD.Nsxt.EdgeGateway, "nsxtDhcpForwarder", vcd.config.VCD.Org, check.TestName())
 
 	// Fetch current DHCP forwarder config
-	dhcpForwarderConfig, err := edge.GetDhcpForwarder()
+	dhcpForwarderConfig, err := edge.GetDhcpForwarder(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(dhcpForwarderConfig.Enabled, Equals, false)
 	check.Assert(dhcpForwarderConfig.DhcpServers, DeepEquals, []string(nil))
@@ -555,7 +555,7 @@ func (vcd *TestVCD) Test_NsxtEdgeDhcpForwarder(check *C) {
 	}
 
 	// Update DHCP forwarder config
-	updatedEdgeDhcpForwarderConfig, err := edge.UpdateDhcpForwarder(newDhcpForwarderConfig)
+	updatedEdgeDhcpForwarderConfig, err := edge.UpdateDhcpForwarder(ctx, newDhcpForwarderConfig)
 	check.Assert(err, IsNil)
 	check.Assert(updatedEdgeDhcpForwarderConfig, NotNil)
 
@@ -567,7 +567,7 @@ func (vcd *TestVCD) Test_NsxtEdgeDhcpForwarder(check *C) {
 	testDhcpServers = testDhcpServers[0:2]
 	newDhcpForwarderConfig.DhcpServers = testDhcpServers
 
-	updatedEdgeDhcpForwarderConfig, err = edge.UpdateDhcpForwarder(newDhcpForwarderConfig)
+	updatedEdgeDhcpForwarderConfig, err = edge.UpdateDhcpForwarder(ctx, newDhcpForwarderConfig)
 	check.Assert(err, IsNil)
 	check.Assert(updatedEdgeDhcpForwarderConfig, NotNil)
 
@@ -579,7 +579,7 @@ func (vcd *TestVCD) Test_NsxtEdgeDhcpForwarder(check *C) {
 	testDhcpServers = append(testDhcpServers, "192.254.0.2")
 	newDhcpForwarderConfig.DhcpServers = testDhcpServers
 
-	updatedEdgeDhcpForwarderConfig, err = edge.UpdateDhcpForwarder(newDhcpForwarderConfig)
+	updatedEdgeDhcpForwarderConfig, err = edge.UpdateDhcpForwarder(ctx, newDhcpForwarderConfig)
 	check.Assert(err, IsNil)
 	check.Assert(updatedEdgeDhcpForwarderConfig, NotNil)
 
@@ -591,7 +591,7 @@ func (vcd *TestVCD) Test_NsxtEdgeDhcpForwarder(check *C) {
 	newDhcpForwarderConfig.Enabled = false
 
 	// Update DHCP forwarder config
-	updatedEdgeDhcpForwarderConfig, err = edge.UpdateDhcpForwarder(newDhcpForwarderConfig)
+	updatedEdgeDhcpForwarderConfig, err = edge.UpdateDhcpForwarder(ctx, newDhcpForwarderConfig)
 	check.Assert(err, IsNil)
 	check.Assert(updatedEdgeDhcpForwarderConfig, NotNil)
 
@@ -599,7 +599,7 @@ func (vcd *TestVCD) Test_NsxtEdgeDhcpForwarder(check *C) {
 	check.Assert(updatedEdgeDhcpForwarderConfig.Enabled, Equals, false)
 	check.Assert(updatedEdgeDhcpForwarderConfig.DhcpServers, DeepEquals, testDhcpServers)
 
-	_, err = edge.UpdateDhcpForwarder(&types.NsxtEdgeGatewayDhcpForwarder{})
+	_, err = edge.UpdateDhcpForwarder(ctx, &types.NsxtEdgeGatewayDhcpForwarder{})
 	check.Assert(err, IsNil)
 }
 
@@ -611,12 +611,12 @@ func (vcd *TestVCD) Test_NsxtEdgeSlaacProfile(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointEdgeGatewaySlaacProfile)
 
-	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := vcd.nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 	AddToCleanupList(vcd.config.VCD.Nsxt.EdgeGateway, "slaacProfile", vcd.config.VCD.Org, check.TestName())
 
 	// Fetch current SLAAC Profile
-	slaacProfile, err := edge.GetSlaacProfile()
+	slaacProfile, err := edge.GetSlaacProfile(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(slaacProfile, NotNil)
 	check.Assert(slaacProfile.Enabled, Equals, false)
@@ -632,7 +632,7 @@ func (vcd *TestVCD) Test_NsxtEdgeSlaacProfile(check *C) {
 	}
 
 	// Update SLAAC profile
-	updatedSlaacProfile, err := edge.UpdateSlaacProfile(newSlaacProfile)
+	updatedSlaacProfile, err := edge.UpdateSlaacProfile(ctx, newSlaacProfile)
 	check.Assert(err, IsNil)
 	check.Assert(updatedSlaacProfile, NotNil)
 	check.Assert(updatedSlaacProfile, DeepEquals, newSlaacProfile)
@@ -648,13 +648,13 @@ func (vcd *TestVCD) Test_NsxtEdgeSlaacProfile(check *C) {
 	}
 
 	// Update SLAAC profile
-	updatedSlaacProfileDhcpv6, err := edge.UpdateSlaacProfile(newSlaacProfileDhcpv6)
+	updatedSlaacProfileDhcpv6, err := edge.UpdateSlaacProfile(ctx, newSlaacProfileDhcpv6)
 	check.Assert(err, IsNil)
 	check.Assert(updatedSlaacProfileDhcpv6, NotNil)
 	check.Assert(updatedSlaacProfileDhcpv6, DeepEquals, newSlaacProfileDhcpv6)
 
 	// Cleanup
-	updatedSlaacProfile, err = edge.UpdateSlaacProfile(&types.NsxtEdgeGatewaySlaacProfile{Enabled: false, Mode: "DISABLED"})
+	updatedSlaacProfile, err = edge.UpdateSlaacProfile(ctx, &types.NsxtEdgeGatewaySlaacProfile{Enabled: false, Mode: "DISABLED"})
 	check.Assert(err, IsNil)
 	check.Assert(updatedSlaacProfile, NotNil)
 }
@@ -672,7 +672,7 @@ func (vcd *TestVCD) Test_NsxtEdgeCreateWithT0VrfAndExternalNetworks(check *C) {
 }
 
 func test_NsxtEdgeCreateWithExternalNetworks(vcd *TestVCD, check *C, backingRouter, backingRouterType string) {
-	if vcd.client.Client.APIVCDMaxVersionIs("< 37.1") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, "< 37.1") {
 		check.Skip("Segment Backed External Network uplinks are supported in VCD 10.4.1+")
 	}
 
@@ -684,11 +684,11 @@ func test_NsxtEdgeCreateWithExternalNetworks(vcd *TestVCD, check *C, backingRout
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointEdgeGateways)
 	vcd.skipIfNotSysAdmin(check)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
-	nsxtVdc, err := adminOrg.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	nsxtVdc, err := adminOrg.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	if ContainsNotFound(err) {
 		check.Skip(fmt.Sprintf("No NSX-T VDC (%s) found - skipping test", vcd.config.VCD.Nsxt.Vdc))
 	}
@@ -696,7 +696,7 @@ func test_NsxtEdgeCreateWithExternalNetworks(vcd *TestVCD, check *C, backingRout
 	check.Assert(nsxtVdc, NotNil)
 
 	// Setup 2 NSX-T Segment backed External Networks and 1 T0 or T0 VRF backed networks
-	nsxtManager, err := vcd.client.QueryNsxtManagerByName(vcd.config.VCD.Nsxt.Manager)
+	nsxtManager, err := vcd.client.QueryNsxtManagerByName(ctx, vcd.config.VCD.Nsxt.Manager)
 	check.Assert(err, IsNil)
 	nsxtManagerId, err := BuildUrnWithUuid("urn:vcloud:nsxtmanager:", extractUuid(nsxtManager[0].HREF))
 	check.Assert(err, IsNil)
@@ -704,7 +704,7 @@ func test_NsxtEdgeCreateWithExternalNetworks(vcd *TestVCD, check *C, backingRout
 	//	T0 backed external network
 	backingExtNet := getBackingIdByNameAndType(check, backingRouter, backingRouterType, vcd, nsxtManagerId)
 	nsxtExternalNetworkCfg := t0vrfBackedExternalNetworkConfig(vcd, check.TestName()+"-t0", "89.1.1", backingRouterType, backingExtNet, nsxtManagerId)
-	nsxtExternalNetwork, err := CreateExternalNetworkV2(vcd.client, nsxtExternalNetworkCfg)
+	nsxtExternalNetwork, err := CreateExternalNetworkV2(ctx, vcd.client, nsxtExternalNetworkCfg)
 	check.Assert(err, IsNil)
 	check.Assert(nsxtExternalNetwork, NotNil)
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointExternalNetworks + nsxtExternalNetwork.ExternalNetwork.ID
@@ -713,7 +713,7 @@ func test_NsxtEdgeCreateWithExternalNetworks(vcd *TestVCD, check *C, backingRout
 	// First NSX-T Segment backed network
 	backingId1 := getBackingIdByNameAndType(check, vcd.config.VCD.Nsxt.NsxtImportSegment, types.ExternalNetworkBackingTypeNsxtSegment, vcd, nsxtManagerId)
 	segmentBackedNet1Cfg := t0vrfBackedExternalNetworkConfig(vcd, check.TestName()+"-1", "1.1.1", types.ExternalNetworkBackingTypeNsxtSegment, backingId1, nsxtManagerId)
-	segmentBackedNet1, err := CreateExternalNetworkV2(vcd.client, segmentBackedNet1Cfg)
+	segmentBackedNet1, err := CreateExternalNetworkV2(ctx, vcd.client, segmentBackedNet1Cfg)
 	check.Assert(err, IsNil)
 	check.Assert(segmentBackedNet1, NotNil)
 	openApiEndpoint = types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointExternalNetworks + segmentBackedNet1.ExternalNetwork.ID
@@ -722,7 +722,7 @@ func test_NsxtEdgeCreateWithExternalNetworks(vcd *TestVCD, check *C, backingRout
 	// Second NSX-T Segment backed network
 	backingId2 := getBackingIdByNameAndType(check, vcd.config.VCD.Nsxt.NsxtImportSegment2, types.ExternalNetworkBackingTypeNsxtSegment, vcd, nsxtManagerId)
 	segmentBackedNet2Cfg := t0vrfBackedExternalNetworkConfig(vcd, check.TestName()+"-2", "4.4.4", types.ExternalNetworkBackingTypeNsxtSegment, backingId2, nsxtManagerId)
-	segmentBackedNet2, err := CreateExternalNetworkV2(vcd.client, segmentBackedNet2Cfg)
+	segmentBackedNet2, err := CreateExternalNetworkV2(ctx, vcd.client, segmentBackedNet2Cfg)
 	check.Assert(err, IsNil)
 	check.Assert(segmentBackedNet2, NotNil)
 	openApiEndpoint = types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointExternalNetworks + segmentBackedNet2.ExternalNetwork.ID
@@ -774,67 +774,67 @@ func test_NsxtEdgeCreateWithExternalNetworks(vcd *TestVCD, check *C, backingRout
 		},
 	}
 
-	createdEdge, err := adminOrg.CreateNsxtEdgeGateway(egwDefinition)
+	createdEdge, err := adminOrg.CreateNsxtEdgeGateway(ctx, egwDefinition)
 	check.Assert(err, IsNil)
 	check.Assert(createdEdge.EdgeGateway.Name, Equals, egwDefinition.Name)
 	openApiEndpoint = types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointEdgeGateways + createdEdge.EdgeGateway.ID
 	PrependToCleanupListOpenApi(createdEdge.EdgeGateway.Name, check.TestName(), openApiEndpoint)
 
 	// Retrieve edge gateway
-	retrievedEdge, err := adminOrg.GetNsxtEdgeGatewayById(createdEdge.EdgeGateway.ID)
+	retrievedEdge, err := adminOrg.GetNsxtEdgeGatewayById(ctx, createdEdge.EdgeGateway.ID)
 	check.Assert(err, IsNil)
 	check.Assert(retrievedEdge, NotNil)
 
 	// Check IP allocation in NSX-T Segment backed networks
-	totalAllocatedIpCountSegmentBacked, err := retrievedEdge.GetAllocatedIpCountByUplinkType(false, types.ExternalNetworkBackingTypeNsxtSegment)
+	totalAllocatedIpCountSegmentBacked, err := retrievedEdge.GetAllocatedIpCountByUplinkType(ctx, false, types.ExternalNetworkBackingTypeNsxtSegment)
 	check.Assert(err, IsNil)
 	check.Assert(totalAllocatedIpCountSegmentBacked, Equals, (4 + 7))
 
 	// Check IP allocation in NSX-T T0 backed networks
-	totalAllocatedIpCountT0backed, err := retrievedEdge.GetAllocatedIpCountByUplinkType(false, backingRouterType)
+	totalAllocatedIpCountT0backed, err := retrievedEdge.GetAllocatedIpCountByUplinkType(ctx, false, backingRouterType)
 	check.Assert(err, IsNil)
 	check.Assert(totalAllocatedIpCountT0backed, Equals, 1)
 
-	totalAllocatedIpCountForPrimaryUplink, err := retrievedEdge.GetPrimaryNetworkAllocatedIpCount(false)
+	totalAllocatedIpCountForPrimaryUplink, err := retrievedEdge.GetPrimaryNetworkAllocatedIpCount(ctx, false)
 	check.Assert(err, IsNil)
 	check.Assert(totalAllocatedIpCountForPrimaryUplink, Equals, 1)
 
 	// Check IP allocation for all subnets
-	totalAllocatedIpCount, err := retrievedEdge.GetAllocatedIpCount(false)
+	totalAllocatedIpCount, err := retrievedEdge.GetAllocatedIpCount(ctx, false)
 	check.Assert(err, IsNil)
 	check.Assert(totalAllocatedIpCount, Equals, (1 + 4 + 7))
 
 	createdEdge.EdgeGateway.Name = check.TestName() + "-renamed-edge"
-	updatedEdge, err := createdEdge.Update(createdEdge.EdgeGateway)
+	updatedEdge, err := createdEdge.Update(ctx, createdEdge.EdgeGateway)
 	check.Assert(err, IsNil)
 	check.Assert(updatedEdge.EdgeGateway.Name, Equals, createdEdge.EdgeGateway.Name)
 
 	// Check IP allocation in NSX-T Segment backed networks
-	totalAllocatedIpCountSegmentBacked, err = updatedEdge.GetAllocatedIpCountByUplinkType(false, types.ExternalNetworkBackingTypeNsxtSegment)
+	totalAllocatedIpCountSegmentBacked, err = updatedEdge.GetAllocatedIpCountByUplinkType(ctx, false, types.ExternalNetworkBackingTypeNsxtSegment)
 	check.Assert(err, IsNil)
 	check.Assert(totalAllocatedIpCountSegmentBacked, Equals, (4 + 7))
 
 	// Check IP allocation in NSX-T T0 backed networks
-	totalAllocatedIpCountT0backed, err = updatedEdge.GetAllocatedIpCountByUplinkType(false, backingRouterType)
+	totalAllocatedIpCountT0backed, err = updatedEdge.GetAllocatedIpCountByUplinkType(ctx, false, backingRouterType)
 	check.Assert(err, IsNil)
 	check.Assert(totalAllocatedIpCountT0backed, Equals, 1)
 
 	// Check IP allocation for all subnets
-	totalAllocatedIpCount, err = updatedEdge.GetAllocatedIpCount(false)
+	totalAllocatedIpCount, err = updatedEdge.GetAllocatedIpCount(ctx, false)
 	check.Assert(err, IsNil)
 	check.Assert(totalAllocatedIpCount, Equals, (1 + 4 + 7))
 
 	// Cleanup
-	err = updatedEdge.Delete()
+	err = updatedEdge.Delete(ctx)
 	check.Assert(err, IsNil)
 
-	err = segmentBackedNet2.Delete()
+	err = segmentBackedNet2.Delete(ctx)
 	check.Assert(err, IsNil)
 
-	err = segmentBackedNet1.Delete()
+	err = segmentBackedNet1.Delete(ctx)
 	check.Assert(err, IsNil)
 
-	err = nsxtExternalNetwork.Delete()
+	err = nsxtExternalNetwork.Delete(ctx)
 	check.Assert(err, IsNil)
 
 }

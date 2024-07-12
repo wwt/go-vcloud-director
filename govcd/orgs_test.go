@@ -17,13 +17,13 @@ func (vcd *TestVCD) Test_GetOrgs(check *C) {
 	if !vcd.client.Client.APIClientVersionIs(">= 37.0") {
 		check.Skip(fmt.Sprintf("Minimum API version required for this test is 37.0. Found: %s", vcd.client.Client.APIVersion))
 	}
-	orgs, err := vcd.client.GetAllOrgs(nil, true)
+	orgs, err := vcd.client.GetAllOrgs(ctx, nil, true)
 	check.Assert(err, IsNil)
 	for i, org := range orgs {
 		fmt.Printf("%d %# v\n", i, pretty.Formatter(org.Org))
 	}
 	fmt.Println()
-	orgs2, err := vcd.client.GetAllOrgs(nil, false)
+	orgs2, err := vcd.client.GetAllOrgs(ctx, nil, false)
 	check.Assert(err, IsNil)
 	for i, org := range orgs2 {
 		fmt.Printf("%d %# v\n", i, pretty.Formatter(org.Org))

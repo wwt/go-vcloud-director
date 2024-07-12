@@ -7,6 +7,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"github.com/kr/pretty"
 	"regexp"
@@ -27,10 +28,10 @@ func (vcd *TestVCD) TestGetParentVDC(check *C) {
 	if vcd.skipVappTests {
 		check.Skip("Skipping test because vApp was not successfully created at setup")
 	}
-	vapp, err := vcd.vdc.GetVAppByName(vcd.vapp.VApp.Name, false)
+	vapp, err := vcd.vdc.GetVAppByName(ctx, vcd.vapp.VApp.Name, false)
 	check.Assert(err, IsNil)
 
-	vdc, err := vapp.GetParentVDC()
+	vdc, err := vapp.GetParentVDC(ctx)
 
 	check.Assert(err, IsNil)
 	check.Assert(vdc.Vdc.Name, Equals, vcd.vdc.Vdc.Name)
@@ -40,17 +41,17 @@ func (vcd *TestVCD) TestGetVappByHref(check *C) {
 	if vcd.skipVappTests {
 		check.Skip("Skipping test because vApp was not successfully created at setup")
 	}
-	vapp, err := vcd.vdc.GetVAppByName(vcd.vapp.VApp.Name, false)
+	vapp, err := vcd.vdc.GetVAppByName(ctx, vcd.vapp.VApp.Name, false)
 	check.Assert(err, IsNil)
 
-	vdc, err := vapp.GetParentVDC()
+	vdc, err := vapp.GetParentVDC(ctx)
 	check.Assert(err, IsNil)
 
-	orgVappByHref, err := vcd.org.GetVAppByHref(vapp.VApp.HREF)
+	orgVappByHref, err := vcd.org.GetVAppByHref(ctx, vapp.VApp.HREF)
 	check.Assert(err, IsNil)
 	check.Assert(orgVappByHref.VApp, DeepEquals, vapp.VApp)
 
-	vdcVappByHref, err := vdc.GetVAppByHref(vapp.VApp.HREF)
+	vdcVappByHref, err := vdc.GetVAppByHref(ctx, vapp.VApp.HREF)
 	check.Assert(err, IsNil)
 	check.Assert(vdcVappByHref.VApp, DeepEquals, vapp.VApp)
 }
@@ -61,7 +62,7 @@ func (vcd *TestVCD) Test_PowerOn(check *C) {
 	if vcd.skipVappTests {
 		check.Skip("Skipping test because vApp was not successfully created at setup")
 	}
-	task, err := vcd.vapp.PowerOn()
+	task, err := vcd.vapp.PowerOn(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
@@ -74,11 +75,11 @@ func (vcd *TestVCD) Test_Reboot(check *C) {
 	if vcd.skipVappTests {
 		check.Skip("Skipping test because vApp was not successfully created at setup")
 	}
-	task, err := vcd.vapp.PowerOn()
+	task, err := vcd.vapp.PowerOn(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
-	task, err = vcd.vapp.Reboot()
+	task, err = vcd.vapp.Reboot(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
@@ -91,17 +92,17 @@ func (vcd *TestVCD) Test_BlockWhileStatus(check *C) {
 		check.Skip("Skipping test because vApp was not successfully created at setup")
 	}
 
-	initialVappStatus, err := vcd.vapp.GetStatus()
+	initialVappStatus, err := vcd.vapp.GetStatus(ctx)
 	check.Assert(err, IsNil)
 
 	// This must timeout as the timeout is zero and we are not changing vApp
-	errMustTimeout := vcd.vapp.BlockWhileStatus(initialVappStatus, 0)
+	errMustTimeout := vcd.vapp.BlockWhileStatus(ctx, initialVappStatus, 0)
 	check.Assert(errMustTimeout, ErrorMatches, "timed out waiting for vApp to exit state .* after .* seconds")
 
-	task, err := vcd.vapp.PowerOn()
+	task, err := vcd.vapp.PowerOn(ctx)
 	check.Assert(err, IsNil)
 	// This must wait until vApp changes status from initialVappStatus
-	err = vcd.vapp.BlockWhileStatus(initialVappStatus, vcd.vapp.client.MaxRetryTimeout)
+	err = vcd.vapp.BlockWhileStatus(ctx, initialVappStatus, vcd.vapp.client.MaxRetryTimeout)
 	check.Assert(err, IsNil)
 
 	// Ensure the powerOn operation succeeded
@@ -110,7 +111,7 @@ func (vcd *TestVCD) Test_BlockWhileStatus(check *C) {
 	check.Assert(task.Task.Status, Equals, "success")
 
 	// Clean up and leave it down
-	task, err = vcd.vapp.PowerOff()
+	task, err = vcd.vapp.PowerOff(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
@@ -124,7 +125,7 @@ func (vcd *TestVCD) Test_SetOvf(check *C) {
 	}
 	var test = make(map[string]string)
 	test["guestinfo.hostname"] = "testhostname"
-	task, err := vcd.vapp.SetOvf(test)
+	task, err := vcd.vapp.SetOvf(ctx, test)
 
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
@@ -139,7 +140,7 @@ func (vcd *TestVCD) Test_RunCustomizationScript(check *C) {
 		check.Skip("Skipping test because vApp was not successfully created at setup")
 	}
 	// Run Script on Test Vapp
-	task, err := vcd.vapp.RunCustomizationScript("computername", "this is my script")
+	task, err := vcd.vapp.RunCustomizationScript(ctx, "computername", "this is my script")
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
@@ -151,7 +152,7 @@ func (vcd *TestVCD) Test_ChangeCPUcount(check *C) {
 	if vcd.skipVappTests {
 		check.Skip("Skipping test because vApp was not successfully created at setup")
 	}
-	task, err := vcd.vapp.ChangeCPUCount(1)
+	task, err := vcd.vapp.ChangeCPUCount(ctx, 1)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
@@ -180,13 +181,13 @@ func (vcd *TestVCD) Test_ChangeCPUCountWithCore(check *C) {
 
 	cores := 2
 	cpuCount := int64(4)
-	task, err := vcd.vapp.ChangeCPUCountWithCore(int(cpuCount), &cores)
+	task, err := vcd.vapp.ChangeCPUCountWithCore(ctx, int(cpuCount), &cores)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
-	err = vcd.vapp.Refresh()
+	err = vcd.vapp.Refresh(ctx)
 	check.Assert(err, IsNil)
 	foundItem := false
 	if nil != vcd.vapp.VApp.Children.VM[0] && nil != vcd.vapp.VApp.Children.VM[0].VirtualHardwareSection && nil != vcd.vapp.VApp.Children.VM[0].VirtualHardwareSection.Item {
@@ -202,7 +203,7 @@ func (vcd *TestVCD) Test_ChangeCPUCountWithCore(check *C) {
 	}
 
 	// return tu previous value
-	task, err = vcd.vapp.ChangeCPUCountWithCore(int(currentCpus), &currentCores)
+	task, err = vcd.vapp.ChangeCPUCountWithCore(ctx, int(currentCpus), &currentCores)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
@@ -214,7 +215,7 @@ func (vcd *TestVCD) Test_ChangeMemorySize(check *C) {
 	if vcd.skipVappTests {
 		check.Skip("Skipping test because vapp was not successfully created at setup")
 	}
-	task, err := vcd.vapp.ChangeMemorySize(512)
+	task, err := vcd.vapp.ChangeMemorySize(ctx, 512)
 
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
@@ -230,7 +231,7 @@ func (vcd *TestVCD) Test_ChangeStorageProfile(check *C) {
 	if vcd.config.VCD.StorageProfile.SP2 == "" {
 		check.Skip("Skipping test because second storage profile not given")
 	}
-	task, err := vcd.vapp.ChangeStorageProfile(vcd.config.VCD.StorageProfile.SP2)
+	task, err := vcd.vapp.ChangeStorageProfile(ctx, vcd.config.VCD.StorageProfile.SP2)
 	errStr := fmt.Sprintf("%s", err)
 
 	re := regexp.MustCompile(`error retrieving storage profile`)
@@ -247,7 +248,7 @@ func (vcd *TestVCD) Test_ChangeVMName(check *C) {
 	if vcd.skipVappTests {
 		check.Skip("Skipping test because vapp was not successfully created at setup")
 	}
-	task, err := vcd.vapp.ChangeVMName("My-vm")
+	task, err := vcd.vapp.ChangeVMName(ctx, "My-vm")
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
@@ -260,11 +261,11 @@ func (vcd *TestVCD) Test_Reset(check *C) {
 	if vcd.skipVappTests {
 		check.Skip("Skipping test because vapp was not successfully created at setup")
 	}
-	task, err := vcd.vapp.PowerOn()
+	task, err := vcd.vapp.PowerOn(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
-	task, err = vcd.vapp.Reset()
+	task, err = vcd.vapp.Reset(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
@@ -277,13 +278,13 @@ func (vcd *TestVCD) Test_Suspend(check *C) {
 	if vcd.skipVappTests {
 		check.Skip("Skipping test because vapp was not successfully created at setup")
 	}
-	task, err := vcd.vapp.PowerOn()
+	task, err := vcd.vapp.PowerOn(ctx)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion(context.Background())
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
-	task, err = vcd.vapp.Suspend()
+	task, err = vcd.vapp.Suspend(ctx)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion(context.Background())
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
@@ -295,11 +296,11 @@ func (vcd *TestVCD) Test_Shutdown(check *C) {
 	if vcd.skipVappTests {
 		check.Skip("Skipping test because vapp was not successfully created at setup")
 	}
-	task, err := vcd.vapp.PowerOn()
+	task, err := vcd.vapp.PowerOn(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
-	task, err = vcd.vapp.Shutdown()
+	task, err = vcd.vapp.Shutdown(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
@@ -312,7 +313,7 @@ func (vcd *TestVCD) Test_Deploy(check *C) {
 		check.Skip("Skipping test because vapp was not successfully created at setup")
 	}
 	// Deploy
-	task, err := vcd.vapp.Deploy()
+	task, err := vcd.vapp.Deploy(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
@@ -325,11 +326,11 @@ func (vcd *TestVCD) Test_PowerOff(check *C) {
 	if vcd.skipVappTests {
 		check.Skip("Skipping test because vapp was not successfully created at setup")
 	}
-	task, err := vcd.vapp.PowerOn()
+	task, err := vcd.vapp.PowerOn(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
-	task, err = vcd.vapp.PowerOff()
+	task, err = vcd.vapp.PowerOff(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
@@ -342,16 +343,16 @@ func (vcd *TestVCD) Test_Undeploy(check *C) {
 		check.Skip("Skipping test because vapp was not successfully created at setup")
 	}
 	// Check if the vapp has been deployed yet
-	err := vcd.vapp.Refresh()
+	err := vcd.vapp.Refresh(ctx)
 	check.Assert(err, IsNil)
 	if !vcd.vapp.VApp.Deployed {
-		task, err := vcd.vapp.Deploy()
+		task, err := vcd.vapp.Deploy(ctx)
 		check.Assert(err, IsNil)
 		err = task.WaitTaskCompletion(context.Background())
 		check.Assert(err, IsNil)
 	}
 	// Undeploy
-	task, err := vcd.vapp.Undeploy()
+	task, err := vcd.vapp.Undeploy(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
@@ -359,7 +360,7 @@ func (vcd *TestVCD) Test_Undeploy(check *C) {
 	// Deploy
 	// For some reason it will not work without redeploying
 	// TODO: EVENTUALLY REMOVE THIS REDEPLOY
-	task, err = vcd.vapp.Deploy()
+	task, err = vcd.vapp.Deploy(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
@@ -397,15 +398,15 @@ func (vcd *TestVCD) Test_AddAndRemoveIsolatedNetwork(check *C) {
 		DhcpSettings:     &DhcpSettings{IsEnabled: true, MaxLeaseTime: maxLeaseTime, DefaultLeaseTime: defaultLeaseTime, IPRange: &types.IPRange{StartAddress: dhcpStartAddress, EndAddress: dhcpEndAddress}},
 	}
 
-	task, err := vcd.vapp.AddIsolatedNetwork(vappNetworkSettings)
+	task, err := vcd.vapp.AddIsolatedNetwork(ctx, vappNetworkSettings)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
-	err = vcd.vapp.Refresh()
+	err = vcd.vapp.Refresh(ctx)
 	check.Assert(err, IsNil)
-	networkConfig, err := vcd.vapp.GetNetworkConfig()
+	networkConfig, err := vcd.vapp.GetNetworkConfig(ctx)
 	check.Assert(err, IsNil)
 
 	networkFound := types.VAppNetworkConfiguration{}
@@ -429,15 +430,15 @@ func (vcd *TestVCD) Test_AddAndRemoveIsolatedNetwork(check *C) {
 	check.Assert(networkFound.Configuration.Features.DhcpService.IPRange.StartAddress, Equals, dhcpStartAddress)
 	check.Assert(networkFound.Configuration.Features.DhcpService.IPRange.EndAddress, Equals, dhcpEndAddress)
 
-	task, err = vcd.vapp.RemoveIsolatedNetwork(networkName)
+	task, err = vcd.vapp.RemoveIsolatedNetwork(ctx, networkName)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
-	err = vcd.vapp.Refresh()
+	err = vcd.vapp.Refresh(ctx)
 	check.Assert(err, IsNil)
-	networkConfig, err = vcd.vapp.GetNetworkConfig()
+	networkConfig, err = vcd.vapp.GetNetworkConfig(ctx)
 	check.Assert(err, IsNil)
 
 	isExist := false
@@ -462,23 +463,23 @@ func (vcd *TestVCD) Test_AddNewVMNilNIC(check *C) {
 	}
 
 	// Populate Catalog
-	cat, err := vcd.org.GetCatalogByName(vcd.config.VCD.Catalog.Name, false)
+	cat, err := vcd.org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, fctx, alse)
 	check.Assert(err, IsNil)
 	check.Assert(cat, NotNil)
 
 	// Populate Catalog Item
-	catitem, err := cat.GetCatalogItemByName(vcd.config.VCD.Catalog.CatalogItem, false)
+	catitem, err := cat.GetCatalogItemByName(ctx, vcd.config.VCD.Catalog.CatalogItem, false)
 	check.Assert(err, IsNil)
 	check.Assert(catitem, NotNil)
 
 	// Get VAppTemplate
-	vapptemplate, err := catitem.GetVAppTemplate()
+	vapptemplate, err := catitem.GetVAppTemplate(ctx)
 	check.Assert(err, IsNil)
 
 	vapp, err := deployVappForTest(vcd, "Test_AddNewVMNilNIC")
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
-	task, err := vapp.AddNewVM(check.TestName(), vapptemplate, nil, true)
+	task, err := vapp.AddNewVM(ctx, check.TestName(), vapptemplate, nil, true)
 
 	check.Assert(err, IsNil)
 
@@ -486,13 +487,13 @@ func (vcd *TestVCD) Test_AddNewVMNilNIC(check *C) {
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
 
-	vm, err := vapp.GetVMByName(check.TestName(), true)
+	vm, err := vapp.GetVMByName(ctx, check.TestName(), true)
 	check.Assert(err, IsNil)
 
 	// Cleanup the created VM
-	err = vapp.RemoveVM(*vm)
+	err = vapp.RemoveVM(ctx, *vm)
 	check.Assert(err, IsNil)
-	task, err = vapp.Delete()
+	task, err = vapp.Delete(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
@@ -517,17 +518,17 @@ func (vcd *TestVCD) Test_AddNewVMMultiNIC(check *C) {
 	}
 
 	// Populate Catalog
-	cat, err := vcd.org.GetCatalogByName(vcd.config.VCD.Catalog.Name, true)
+	cat, err := vcd.org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, true)
 	check.Assert(err, IsNil)
 	check.Assert(cat, NotNil)
 
 	// Populate Catalog Item
-	catitem, err := cat.GetCatalogItemByName(vcd.config.VCD.Catalog.CatalogItem, false)
+	catitem, err := cat.GetCatalogItemByName(ctx, vcd.config.VCD.Catalog.CatalogItem, false)
 	check.Assert(err, IsNil)
 	check.Assert(catitem, NotNil)
 
 	// Get VAppTemplate
-	vapptemplate, err := catitem.GetVAppTemplate()
+	vapptemplate, err := catitem.GetVAppTemplate(ctx)
 	check.Assert(err, IsNil)
 
 	vapp, err := deployVappForTest(vcd, "Test_AddNewVMMultiNIC")

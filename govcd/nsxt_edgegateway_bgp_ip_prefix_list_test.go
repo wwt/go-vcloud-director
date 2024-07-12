@@ -13,11 +13,11 @@ func (vcd *TestVCD) Test_NsxEdgeBgpIpPrefixList(check *C) {
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointEdgeBgpConfigPrefixLists)
 	vcd.skipIfNotSysAdmin(check)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
-	nsxtVdc, err := org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	// Switch Edge Gateway to use dedicated uplink for the time of this test and then turn it off
@@ -43,24 +43,24 @@ func (vcd *TestVCD) Test_NsxEdgeBgpIpPrefixList(check *C) {
 		},
 	}
 
-	bgpIpPrefix, err := edge.CreateBgpIpPrefixList(bgpIpPrefixList)
+	bgpIpPrefix, err := edge.CreateBgpIpPrefixList(ctx, bgpIpPrefixList)
 	check.Assert(err, IsNil)
 	check.Assert(bgpIpPrefix, NotNil)
 
 	// Get all BGP IP Prefix Lists
-	bgpIpPrefixLists, err := edge.GetAllBgpIpPrefixLists(nil)
+	bgpIpPrefixLists, err := edge.GetAllBgpIpPrefixLists(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(bgpIpPrefixLists, NotNil)
 	check.Assert(len(bgpIpPrefixLists), Equals, 1)
 	check.Assert(bgpIpPrefixLists[0].EdgeBgpIpPrefixList.Name, Equals, bgpIpPrefixList.Name)
 
 	// Get By Name
-	bgpPrefixListByName, err := edge.GetBgpIpPrefixListByName(bgpIpPrefixList.Name)
+	bgpPrefixListByName, err := edge.GetBgpIpPrefixListByName(ctx, bgpIpPrefixList.Name)
 	check.Assert(err, IsNil)
 	check.Assert(bgpPrefixListByName, NotNil)
 
 	// Get By Id
-	bgpPrefixListById, err := edge.GetBgpIpPrefixListById(bgpIpPrefix.EdgeBgpIpPrefixList.ID)
+	bgpPrefixListById, err := edge.GetBgpIpPrefixListById(ctx, bgpIpPrefix.EdgeBgpIpPrefixList.ID)
 	check.Assert(err, IsNil)
 	check.Assert(bgpPrefixListById, NotNil)
 
@@ -69,22 +69,22 @@ func (vcd *TestVCD) Test_NsxEdgeBgpIpPrefixList(check *C) {
 	bgpIpPrefixList.Description = "test-description-updated"
 	bgpIpPrefixList.ID = bgpIpPrefixLists[0].EdgeBgpIpPrefixList.ID
 
-	updatedBgpIpPrefixList, err := bgpIpPrefixLists[0].Update(bgpIpPrefixList)
+	updatedBgpIpPrefixList, err := bgpIpPrefixLists[0].Update(ctx, bgpIpPrefixList)
 	check.Assert(err, IsNil)
 	check.Assert(updatedBgpIpPrefixList, NotNil)
 
 	check.Assert(updatedBgpIpPrefixList.EdgeBgpIpPrefixList.ID, Equals, bgpIpPrefixLists[0].EdgeBgpIpPrefixList.ID)
 
 	// Delete
-	err = bgpIpPrefixLists[0].Delete()
+	err = bgpIpPrefixLists[0].Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Try to get once again and ensure it is not there
-	notFoundByName, err := edge.GetBgpIpPrefixListByName(bgpIpPrefixList.Name)
+	notFoundByName, err := edge.GetBgpIpPrefixListByName(ctx, bgpIpPrefixList.Name)
 	check.Assert(err, NotNil)
 	check.Assert(notFoundByName, IsNil)
 
-	notFoundById, err := edge.GetBgpIpPrefixListById(bgpIpPrefix.EdgeBgpIpPrefixList.ID)
+	notFoundById, err := edge.GetBgpIpPrefixListById(ctx, bgpIpPrefix.EdgeBgpIpPrefixList.ID)
 	check.Assert(err, NotNil)
 	check.Assert(notFoundById, IsNil)
 

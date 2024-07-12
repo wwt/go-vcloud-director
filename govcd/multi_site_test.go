@@ -90,22 +90,22 @@ func (vcd *TestVCD) Test_SiteAssociations(check *C) {
 	// The second VCD must be different from the first one
 	check.Assert(os.Getenv(secondVcdUrl), Not(Equals), firstVcdClient.Client.VCDHREF.String())
 
-	version1, _, err := firstVcdClient.Client.GetVcdVersion()
+	version1, _, err := firstVcdClient.Client.GetVcdVersion(ctx)
 	check.Assert(err, IsNil)
-	version2, _, err := secondVcdClient.Client.GetVcdVersion()
+	version2, _, err := secondVcdClient.Client.GetVcdVersion(ctx)
 	check.Assert(err, IsNil)
 
 	// Both VCDs must have the same version
 	check.Assert(version1, Equals, version2)
 
 	// STEP 1 Get the site association data from both VCDs
-	firstVcdStructuredAssociationData, err := firstVcdClient.Client.GetSiteAssociationData()
+	firstVcdStructuredAssociationData, err := firstVcdClient.Client.GetSiteAssociationData(ctx)
 	check.Assert(err, IsNil)
-	firstVcdRawAssociationData, err := firstVcdClient.Client.GetSiteRawAssociationData()
+	firstVcdRawAssociationData, err := firstVcdClient.Client.GetSiteRawAssociationData(ctx)
 	check.Assert(err, IsNil)
-	secondVcdStructuredAssociationData, err := secondVcdClient.Client.GetSiteAssociationData()
+	secondVcdStructuredAssociationData, err := secondVcdClient.Client.GetSiteAssociationData(ctx)
 	check.Assert(err, IsNil)
-	secondVcdRawAssociationData, err := secondVcdClient.Client.GetSiteRawAssociationData()
+	secondVcdRawAssociationData, err := secondVcdClient.Client.GetSiteRawAssociationData(ctx)
 	check.Assert(err, IsNil)
 
 	// Check that the raw data is equivalent to the structured data
@@ -121,59 +121,59 @@ func (vcd *TestVCD) Test_SiteAssociations(check *C) {
 	check.Assert(secondConvertedAssociationData.RestEndpointCertificate, Equals, secondVcdStructuredAssociationData.RestEndpointCertificate)
 
 	// STEP 2 Get the list of current site associations from both sites for further comparison
-	orgs1before, err := firstVcdClient.GetAllOrgs(nil, false)
+	orgs1before, err := firstVcdClient.GetAllOrgs(ctx, nil, false)
 	check.Assert(err, IsNil)
-	orgs2before, err := secondVcdClient.GetAllOrgs(nil, false)
+	orgs2before, err := secondVcdClient.GetAllOrgs(ctx, nil, false)
 	check.Assert(err, IsNil)
 
-	associations1before, err := firstVcdClient.Client.GetSiteAssociations()
+	associations1before, err := firstVcdClient.Client.GetSiteAssociations(ctx)
 	check.Assert(err, IsNil)
-	associations2before, err := secondVcdClient.Client.GetSiteAssociations()
+	associations2before, err := secondVcdClient.Client.GetSiteAssociations(ctx)
 	check.Assert(err, IsNil)
 
 	// STEP 3 Set the associations in both VCDs
-	err = firstVcdClient.Client.SetSiteAssociation(*secondVcdStructuredAssociationData)
+	err = firstVcdClient.Client.SetSiteAssociation(ctx, *secondVcdStructuredAssociationData)
 	check.Assert(err, IsNil)
-	err = secondVcdClient.Client.SetSiteAssociation(*firstVcdStructuredAssociationData)
+	err = secondVcdClient.Client.SetSiteAssociation(ctx, *firstVcdStructuredAssociationData)
 	check.Assert(err, IsNil)
 	// Note: there is no call to AddToCleanupList, because we can't defer that action to a temporary client in a separate VCD
 
 	// STEP 4 get the list of associations and organizations
-	associations1, err := firstVcdClient.Client.GetSiteAssociations()
+	associations1, err := firstVcdClient.Client.GetSiteAssociations(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(len(associations1), Equals, len(associations1before)+1)
-	associations2, err := secondVcdClient.Client.GetSiteAssociations()
+	associations2, err := secondVcdClient.Client.GetSiteAssociations(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(len(associations2), Equals, len(associations2before)+1)
 
 	// STEP 5 retrieve the specific associations that we have just created (used for removal)
-	association1, err := firstVcdClient.Client.GetSiteAssociationBySiteId(secondVcdStructuredAssociationData.SiteID)
+	association1, err := firstVcdClient.Client.GetSiteAssociationBySiteId(ctx, secondVcdStructuredAssociationData.SiteID)
 	check.Assert(err, IsNil)
-	association2, err := secondVcdClient.Client.GetSiteAssociationBySiteId(firstVcdStructuredAssociationData.SiteID)
+	association2, err := secondVcdClient.Client.GetSiteAssociationBySiteId(ctx, firstVcdStructuredAssociationData.SiteID)
 	check.Assert(err, IsNil)
 
 	// STEP 6 trigger the site association removal (at the end of tests)
 	defer func() {
 		fmt.Println("removing site association 1")
-		err = firstVcdClient.Client.RemoveSiteAssociation(association1.Href)
+		err = firstVcdClient.Client.RemoveSiteAssociation(ctx, association1.Href)
 		check.Assert(err, IsNil)
 		fmt.Println("removing site association 2")
-		err = secondVcdClient.Client.RemoveSiteAssociation(association2.Href)
+		err = secondVcdClient.Client.RemoveSiteAssociation(ctx, association2.Href)
 		check.Assert(err, IsNil)
 	}()
 
 	// STEP 7 Check that the association is complete
-	status1, elapsed1, err := firstVcdClient.Client.CheckSiteAssociation(secondVcdStructuredAssociationData.SiteID, 120*time.Second)
+	status1, elapsed1, err := firstVcdClient.Client.CheckSiteAssociation(ctx, secondVcdStructuredAssociationData.SiteID, 120*time.Second)
 	check.Assert(err, IsNil)
 	fmt.Printf("site #1: status: %s - elapsed: %s\n", status1, elapsed1)
-	status2, elapsed2, err := secondVcdClient.Client.CheckSiteAssociation(firstVcdStructuredAssociationData.SiteID, 120*time.Second)
+	status2, elapsed2, err := secondVcdClient.Client.CheckSiteAssociation(ctx, firstVcdStructuredAssociationData.SiteID, 120*time.Second)
 	check.Assert(err, IsNil)
 	fmt.Printf("site #2: status: %s - elapsed: %s\n", status2, elapsed2)
 
 	// STEP 8 check number of organizations
-	orgs1after, err := firstVcdClient.GetAllOrgs(nil, true)
+	orgs1after, err := firstVcdClient.GetAllOrgs(ctx, nil, true)
 	check.Assert(err, IsNil)
-	orgs2after, err := secondVcdClient.GetAllOrgs(nil, true)
+	orgs2after, err := secondVcdClient.GetAllOrgs(ctx, nil, true)
 	check.Assert(err, IsNil)
 	fmt.Printf("site #1 - Number of orgs before associations: %d - after association: %d\n", len(orgs1before), len(orgs1after))
 	fmt.Printf("site #2 - Number of orgs before associations: %d - after association: %d\n", len(orgs2before), len(orgs2after))
@@ -193,7 +193,7 @@ func (vcd *TestVCD) Test_SiteAssociations(check *C) {
 		vcd.config.Tenants[0].Password,
 		vcd.config.Tenants[0].SysOrg, true)
 	check.Assert(err, IsNil)
-	localOrg, err := localUser.GetAdminOrgByName(vcd.config.Tenants[0].SysOrg)
+	localOrg, err := localUser.GetAdminOrgByName(ctx, vcd.config.Tenants[0].SysOrg)
 	fmt.Printf("Using Org user '%s@%s' (site 1 %s)\n", vcd.config.Tenants[0].User, vcd.config.Tenants[0].SysOrg, firstVcdClient.Client.VCDHREF.String())
 	check.Assert(err, IsNil)
 
@@ -205,7 +205,7 @@ func (vcd *TestVCD) Test_SiteAssociations(check *C) {
 		fmt.Printf("one or more of [%s %s %s] was not defined\n", secondVcdOrg2, secondVcdOrgUser2, secondVcdOrgUserPassword2)
 		return
 	}
-	_, err = secondVcdClient.GetOrgByName(remoteOrgName)
+	_, err = secondVcdClient.GetOrgByName(ctx, remoteOrgName)
 	if err != nil {
 		fmt.Printf("Error retrieving Org '%s' in site %s\n", remoteOrgName, secondVcdClient.Client.VCDHREF.String())
 	}
@@ -217,42 +217,42 @@ func (vcd *TestVCD) Test_SiteAssociations(check *C) {
 		remoteOrgPassword,
 		remoteOrgName, true)
 	check.Assert(err, IsNil)
-	remoteOrg, err := remoteUser.GetAdminOrgByName(remoteOrgName)
+	remoteOrg, err := remoteUser.GetAdminOrgByName(ctx, remoteOrgName)
 	check.Assert(err, IsNil)
 	fmt.Println("org2 (site2) connected")
 
-	orgAssociationData1, err := localOrg.GetOrgAssociationData()
+	orgAssociationData1, err := localOrg.GetOrgAssociationData(ctx)
 	check.Assert(err, IsNil)
-	orgAssociationData2, err := remoteOrg.GetOrgAssociationData()
+	orgAssociationData2, err := remoteOrg.GetOrgAssociationData(ctx)
 	check.Assert(err, IsNil)
 
 	// STEP 10: set org association between two VCDs
-	err = localOrg.SetOrgAssociation(*orgAssociationData2)
+	err = localOrg.SetOrgAssociation(ctx, *orgAssociationData2)
 	check.Assert(err, IsNil)
-	err = remoteOrg.SetOrgAssociation(*orgAssociationData1)
+	err = remoteOrg.SetOrgAssociation(ctx, *orgAssociationData1)
 	check.Assert(err, IsNil)
 
 	// STEP 12: retrieve the specific associations that we have just created (used for removal)
-	orgAssociation1, err := localOrg.GetOrgAssociationByOrgId(orgAssociationData2.OrgID)
+	orgAssociation1, err := localOrg.GetOrgAssociationByOrgId(ctx, orgAssociationData2.OrgID)
 	check.Assert(err, IsNil)
-	orgAssociation2, err := remoteOrg.GetOrgAssociationByOrgId(orgAssociationData1.OrgID)
+	orgAssociation2, err := remoteOrg.GetOrgAssociationByOrgId(ctx, orgAssociationData1.OrgID)
 	check.Assert(err, IsNil)
 
 	// STEP 11: trigger association removal (at the end of the test: it will happen before the removal of site association)
 	defer func() {
 		fmt.Println("removing org association 1")
-		err = localOrg.RemoveOrgAssociation(orgAssociation1.Href)
+		err = localOrg.RemoveOrgAssociation(ctx, orgAssociation1.Href)
 		check.Assert(err, IsNil)
 		fmt.Println("removing org association 2")
-		err = remoteOrg.RemoveOrgAssociation(orgAssociation2.Href)
+		err = remoteOrg.RemoveOrgAssociation(ctx, orgAssociation2.Href)
 		check.Assert(err, IsNil)
 	}()
 
 	// STEP 12: check org association connection
-	status1, elapsed1, err = localOrg.CheckOrgAssociation(orgAssociationData2.OrgID, 120*time.Second)
+	status1, elapsed1, err = localOrg.CheckOrgAssociation(ctx, orgAssociationData2.OrgID, 120*time.Second)
 	check.Assert(err, IsNil)
 	fmt.Printf("org #1 '%s' (from site 1): status: %s - elapsed: %s\n", localOrg.AdminOrg.Name, status1, elapsed1)
-	status2, elapsed2, err = remoteOrg.CheckOrgAssociation(orgAssociationData1.OrgID, 120*time.Second)
+	status2, elapsed2, err = remoteOrg.CheckOrgAssociation(ctx, orgAssociationData1.OrgID, 120*time.Second)
 	check.Assert(err, IsNil)
 	fmt.Printf("org #2 '%s' (from site 2): status: %s - elapsed: %s\n", remoteOrg.AdminOrg.Name, status2, elapsed2)
 
@@ -295,20 +295,20 @@ func (vcd *TestVCD) Test_OrgAssociations(check *C) {
 	// STEP 1: get organization association data from both sides, using their own Org users
 	var firstOrg *AdminOrg
 	var secondOrg *AdminOrg
-	firstOrg, err = firstVcdClient.GetAdminOrgByName(firstOrgName)
+	firstOrg, err = firstVcdClient.GetAdminOrgByName(ctx, firstOrgName)
 	check.Assert(err, IsNil)
-	secondOrg, err = secondVcdClient.GetAdminOrgByName(secondOrgName)
+	secondOrg, err = secondVcdClient.GetAdminOrgByName(ctx, secondOrgName)
 	check.Assert(err, IsNil)
 
-	orgAssociationData1, err := firstOrg.GetOrgAssociationData()
+	orgAssociationData1, err := firstOrg.GetOrgAssociationData(ctx)
 	check.Assert(err, IsNil)
-	rawOrgAssociationData1, err := firstOrg.GetOrgRawAssociationData()
+	rawOrgAssociationData1, err := firstOrg.GetOrgRawAssociationData(ctx)
 	check.Assert(err, IsNil)
-	orgAssociationData2, err := secondOrg.GetOrgAssociationData()
+	orgAssociationData2, err := secondOrg.GetOrgAssociationData(ctx)
 	check.Assert(err, IsNil)
 
 	// Check that the raw data is the same as the structured data
-	rawOrgAssociationData2, err := secondOrg.GetOrgRawAssociationData()
+	rawOrgAssociationData2, err := secondOrg.GetOrgRawAssociationData(ctx)
 	check.Assert(err, IsNil)
 	convertedAssociationData1, err := RawDataToStructuredXml[types.OrgAssociationMember](rawOrgAssociationData1)
 	check.Assert(err, IsNil)
@@ -320,44 +320,44 @@ func (vcd *TestVCD) Test_OrgAssociations(check *C) {
 	check.Assert(orgAssociationData2.OrgPublicKey, Equals, convertedAssociationData2.OrgPublicKey)
 
 	// Check number of networks for future comparison
-	networks1Before, err := firstOrg.GetAllOpenApiOrgVdcNetworks(nil, false)
+	networks1Before, err := firstOrg.GetAllOpenApiOrgVdcNetworks(ctx, nil, false)
 	check.Assert(err, IsNil)
-	networks2Before, err := secondOrg.GetAllOpenApiOrgVdcNetworks(nil, false)
+	networks2Before, err := secondOrg.GetAllOpenApiOrgVdcNetworks(ctx, nil, false)
 	check.Assert(err, IsNil)
 
 	// STEP 2: set org associations within the same VCD
-	err = firstOrg.SetOrgAssociation(*orgAssociationData2)
+	err = firstOrg.SetOrgAssociation(ctx, *orgAssociationData2)
 	check.Assert(err, IsNil)
-	err = secondOrg.SetOrgAssociation(*orgAssociationData1)
+	err = secondOrg.SetOrgAssociation(ctx, *orgAssociationData1)
 	check.Assert(err, IsNil)
 
 	// STEP 3: check association connection
-	status1, elapsed1, err := firstOrg.CheckOrgAssociation(orgAssociationData2.OrgID, 120*time.Second)
+	status1, elapsed1, err := firstOrg.CheckOrgAssociation(ctx, orgAssociationData2.OrgID, 120*time.Second)
 	check.Assert(err, IsNil)
 	fmt.Printf("org #1 (same site): status: %s - elapsed: %s\n", status1, elapsed1)
-	status2, elapsed2, err := secondOrg.CheckOrgAssociation(orgAssociationData1.OrgID, 120*time.Second)
+	status2, elapsed2, err := secondOrg.CheckOrgAssociation(ctx, orgAssociationData1.OrgID, 120*time.Second)
 	check.Assert(err, IsNil)
 	fmt.Printf("org #2 (same site): status: %s - elapsed: %s\n", status2, elapsed2)
 
 	// STEP 4 retrieve the specific associations that we have just created (used for removal)
-	orgAssociation1, err := firstOrg.GetOrgAssociationByOrgId(orgAssociationData2.OrgID)
+	orgAssociation1, err := firstOrg.GetOrgAssociationByOrgId(ctx, orgAssociationData2.OrgID)
 	check.Assert(err, IsNil)
-	orgAssociation2, err := secondOrg.GetOrgAssociationByOrgId(orgAssociationData1.OrgID)
+	orgAssociation2, err := secondOrg.GetOrgAssociationByOrgId(ctx, orgAssociationData1.OrgID)
 	check.Assert(err, IsNil)
 
 	// STEP 5: trigger association removal
 	defer func() {
 		check.Assert(err, IsNil)
-		err = firstOrg.RemoveOrgAssociation(orgAssociation1.Href)
+		err = firstOrg.RemoveOrgAssociation(ctx, orgAssociation1.Href)
 		check.Assert(err, IsNil)
-		err = secondOrg.RemoveOrgAssociation(orgAssociation2.Href)
+		err = secondOrg.RemoveOrgAssociation(ctx, orgAssociation2.Href)
 		check.Assert(err, IsNil)
 	}()
 
 	// STEP 6: check number of networks after association
-	networks1After, err := firstOrg.GetAllOpenApiOrgVdcNetworks(nil, true)
+	networks1After, err := firstOrg.GetAllOpenApiOrgVdcNetworks(ctx, nil, true)
 	check.Assert(err, IsNil)
-	networks2After, err := secondOrg.GetAllOpenApiOrgVdcNetworks(nil, true)
+	networks2After, err := secondOrg.GetAllOpenApiOrgVdcNetworks(ctx, nil, true)
 	check.Assert(err, IsNil)
 
 	fmt.Printf("org #1 - Networks before associations: %d - after association: %d\n", len(networks1Before), len(networks1After))

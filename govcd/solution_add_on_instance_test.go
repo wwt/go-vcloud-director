@@ -12,7 +12,7 @@ import (
 )
 
 func (vcd *TestVCD) Test_SolutionAddOnInstanceAndPublishing(check *C) {
-	if vcd.client.Client.APIVCDMaxVersionIs("< 37.1") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, "< 37.1") {
 		check.Skip("Solution Landing Zones are supported in VCD 10.4.1+")
 	}
 
@@ -28,83 +28,83 @@ func (vcd *TestVCD) Test_SolutionAddOnInstanceAndPublishing(check *C) {
 	inputs["name"] = check.TestName()
 	inputs["input-delete-previous-uiplugin-versions"] = false
 
-	addOnInstance, res, err := addOn.CreateSolutionAddOnInstance(inputs)
+	addOnInstance, res, err := addOn.CreateSolutionAddOnInstance(ctx, inputs)
 	check.Assert(err, IsNil)
 	check.Assert(addOnInstance, NotNil)
 	check.Assert(res, Not(Equals), "")
 
 	// Get by Id
-	addOnInstanceByName, err := vcd.client.GetSolutionAddOnInstanceById(addOnInstance.RdeId())
+	addOnInstanceByName, err := vcd.client.GetSolutionAddOnInstanceById(ctx, addOnInstance.RdeId())
 	check.Assert(err, IsNil)
 	check.Assert(addOnInstanceByName.SolutionAddOnInstance.Name, Equals, addOnInstance.SolutionAddOnInstance.Name)
 
 	// Get all by Name
-	allAddOnInstancesByName, err := vcd.client.GetAllSolutionAddonInstancesByName(addOnInstance.SolutionAddOnInstance.Name)
+	allAddOnInstancesByName, err := vcd.client.GetAllSolutionAddonInstancesByName(ctx, addOnInstance.SolutionAddOnInstance.Name)
 	check.Assert(err, IsNil)
 	check.Assert(len(allAddOnInstancesByName), Equals, 1)
 	check.Assert(allAddOnInstancesByName[0].SolutionAddOnInstance.Name, Equals, addOnInstance.SolutionAddOnInstance.Name)
 
 	// Get all instances of a specific Add-On
-	allAddOnChildren, err := addOn.GetAllInstances()
+	allAddOnChildren, err := addOn.GetAllInstances(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(len(allAddOnChildren), Equals, 1)
 	check.Assert(allAddOnChildren[0].SolutionAddOnInstance.Name, Equals, addOnInstance.SolutionAddOnInstance.Name)
 
 	// Get child instance by name
-	addOnChildByName, err := addOn.GetInstanceByName(addOnInstance.SolutionAddOnInstance.Name)
+	addOnChildByName, err := addOn.GetInstanceByName(ctx, addOnInstance.SolutionAddOnInstance.Name)
 	check.Assert(err, IsNil)
 	check.Assert(addOnChildByName.RdeId(), Equals, addOnInstance.RdeId())
 
 	// Get parent Solution Add-On
-	parentSolutionAddOn, err := addOnInstance.GetParentSolutionAddOn()
+	parentSolutionAddOn, err := addOnInstance.GetParentSolutionAddOn(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(parentSolutionAddOn.RdeId(), Equals, addOn.RdeId())
 
 	// Publish Solution Add-On Instance
 	scope := []string{vcd.config.Cse.TenantOrg}
-	_, err = addOnInstance.Publishing(scope, false)
+	_, err = addOnInstance.Publishing(ctx, scope, false)
 	check.Assert(err, IsNil)
 
 	// Unpublish Solution Add-On Instance
-	_, err = addOnInstance.Publishing(nil, false)
+	_, err = addOnInstance.Publishing(ctx, nil, false)
 	check.Assert(err, IsNil)
 
 	// Delete Solution Add-On Instance
 	deleteInputs := make(map[string]interface{})
 	deleteInputs["name"] = addOnInstance.SolutionAddOnInstance.AddonInstanceSolutionName
 	deleteInputs["input-force-delete"] = true
-	res2, err := addOnInstance.Delete(deleteInputs)
+	res2, err := addOnInstance.Delete(ctx, deleteInputs)
 	check.Assert(err, IsNil)
 	check.Assert(res2, Not(Equals), "")
 
 	// Cleanup
-	err = addOn.Delete()
+	err = addOn.Delete(ctx)
 	check.Assert(err, IsNil)
 
-	err = slz.Delete()
+	err = slz.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
 // createSlzAddOn depends on CSE build (having vcd.config.SolutionAddOn configuration present)
 func createSlzAddOn(vcd *TestVCD, check *C) (*SolutionLandingZone, *SolutionAddOn) {
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.SolutionAddOn.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.SolutionAddOn.Org)
 	check.Assert(err, IsNil)
 
-	adminVdc, err := adminOrg.GetAdminVDCByName(vcd.config.SolutionAddOn.Vdc, false)
+	adminVdc, err := adminOrg.GetAdminVDCByName(ctx, vcd.config.SolutionAddOn.Vdc, false)
 	check.Assert(err, IsNil)
-	vdc, err := adminOrg.GetVDCByName(vcd.config.SolutionAddOn.Vdc, false)
+	vdc, err := adminOrg.GetVDCByName(ctx, vcd.config.SolutionAddOn.Vdc, false)
 	check.Assert(err, IsNil)
 
-	orgNetwork, err := vdc.GetOpenApiOrgVdcNetworkByName(vcd.config.SolutionAddOn.RoutedNetwork)
+	orgNetwork, err := vdc.GetOpenApiOrgVdcNetworkByName(ctx, vcd.config.SolutionAddOn.RoutedNetwork)
 	check.Assert(err, IsNil)
 	check.Assert(orgNetwork, NotNil)
-	computePolicy, err := adminVdc.GetAllAssignedVdcComputePoliciesV2(nil)
+	computePolicy, err := adminVdc.GetAllAssignedVdcComputePoliciesV2(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(computePolicy, NotNil)
-	storageProfileRef, err := adminVdc.GetDefaultStorageProfileReference()
+	storageProfileRef, err := adminVdc.GetDefaultStorageProfileReference(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(storageProfileRef, NotNil)
-	catalog, err := adminOrg.GetCatalogByName(vcd.config.SolutionAddOn.Catalog, false)
+	catalog, err := adminOrg.GetCatalogByName(ctx, vcd.config.SolutionAddOn.Catalog, false)
 	check.Assert(err, IsNil)
 	check.Assert(catalog, NotNil)
 	slzCfg := &types.SolutionLandingZoneType{
@@ -149,7 +149,7 @@ func createSlzAddOn(vcd *TestVCD, check *C) (*SolutionLandingZone, *SolutionAddO
 			},
 		},
 	}
-	slz, err := vcd.client.CreateSolutionLandingZone(slzCfg)
+	slz, err := vcd.client.CreateSolutionLandingZone(ctx, slzCfg)
 	check.Assert(err, IsNil)
 	check.Assert(slz, NotNil)
 
@@ -158,7 +158,7 @@ func createSlzAddOn(vcd *TestVCD, check *C) (*SolutionLandingZone, *SolutionAddO
 	cacheFilePath, err := fetchCacheFile(catalog, vcd.config.SolutionAddOn.AddonImageDse, check)
 	check.Assert(err, IsNil)
 
-	catItem, err := catalog.GetCatalogItemByName(vcd.config.SolutionAddOn.AddonImageDse, false)
+	catItem, err := catalog.GetCatalogItemByName(ctx, vcd.config.SolutionAddOn.AddonImageDse, false)
 	check.Assert(err, IsNil)
 
 	createCfg := SolutionAddOnConfig{
@@ -167,7 +167,7 @@ func createSlzAddOn(vcd *TestVCD, check *C) (*SolutionLandingZone, *SolutionAddO
 		CatalogItemId:        catItem.CatalogItem.ID,
 		AutoTrustCertificate: true,
 	}
-	solutionAddOn, err := vcd.client.CreateSolutionAddOn(createCfg)
+	solutionAddOn, err := vcd.client.CreateSolutionAddOn(ctx, createCfg)
 	check.Assert(err, IsNil)
 	PrependToCleanupListOpenApi(solutionAddOn.DefinedEntity.DefinedEntity.ID, check.TestName(), types.OpenApiPathVersion1_0_0+types.OpenApiEndpointRdeEntities+solutionAddOn.DefinedEntity.DefinedEntity.ID)
 

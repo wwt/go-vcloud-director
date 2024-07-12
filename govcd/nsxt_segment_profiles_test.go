@@ -17,7 +17,7 @@ func (vcd *TestVCD) Test_GetNsxtSegmentProfiles(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
 	vcd.skipIfNotSysAdmin(check)
 
-	nsxtManager, err := vcd.client.GetNsxtManagerByName(vcd.config.VCD.Nsxt.Manager)
+	nsxtManager, err := vcd.client.GetNsxtManagerByName(ctx, vcd.config.VCD.Nsxt.Manager)
 	check.Assert(err, IsNil)
 	check.Assert(nsxtManager, NotNil)
 
@@ -32,10 +32,10 @@ func (vcd *TestVCD) Test_GetNsxtSegmentProfiles(check *C) {
 	checkNsxtSegmentAllProfilesByFilter(vcd, check, filterByVdc)
 
 	// Check filtering by VDC Group ID
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.org.Org.Name)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.org.Org.Name)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
-	vdcGroup, err := adminOrg.GetVdcGroupByName(vcd.config.VCD.Nsxt.VdcGroup)
+	vdcGroup, err := adminOrg.GetVdcGroupByName(ctx, vcd.config.VCD.Nsxt.VdcGroup)
 	check.Assert(err, IsNil)
 	check.Assert(vdcGroup, NotNil)
 
@@ -44,118 +44,118 @@ func (vcd *TestVCD) Test_GetNsxtSegmentProfiles(check *C) {
 	checkNsxtSegmentAllProfilesByFilter(vcd, check, filterByVdcGroup)
 
 	// IP Discovery profile by name
-	ipDiscoveryProfileByNameInNsxtManager, err := vcd.client.GetIpDiscoveryProfileByName(vcd.config.VCD.Nsxt.IpDiscoveryProfile, filterByNsxtManager)
+	ipDiscoveryProfileByNameInNsxtManager, err := vcd.client.GetIpDiscoveryProfileByName(ctx, vcd.config.VCD.Nsxt.IpDiscoveryProfile, filterByNsxtManager)
 	check.Assert(err, IsNil)
 	check.Assert(ipDiscoveryProfileByNameInNsxtManager.DisplayName, Equals, vcd.config.VCD.Nsxt.IpDiscoveryProfile)
 
-	ipDiscoveryProfileByNameInVdc, err := vcd.client.GetIpDiscoveryProfileByName(vcd.config.VCD.Nsxt.IpDiscoveryProfile, filterByVdc)
+	ipDiscoveryProfileByNameInVdc, err := vcd.client.GetIpDiscoveryProfileByName(ctx, vcd.config.VCD.Nsxt.IpDiscoveryProfile, filterByVdc)
 	check.Assert(err, IsNil)
 	check.Assert(ipDiscoveryProfileByNameInVdc.DisplayName, Equals, vcd.config.VCD.Nsxt.IpDiscoveryProfile)
 
-	ipDiscoveryProfileByNameInVdcGroup, err := vcd.client.GetIpDiscoveryProfileByName(vcd.config.VCD.Nsxt.IpDiscoveryProfile, filterByVdcGroup)
+	ipDiscoveryProfileByNameInVdcGroup, err := vcd.client.GetIpDiscoveryProfileByName(ctx, vcd.config.VCD.Nsxt.IpDiscoveryProfile, filterByVdcGroup)
 	check.Assert(err, IsNil)
 	check.Assert(ipDiscoveryProfileByNameInVdcGroup.DisplayName, Equals, vcd.config.VCD.Nsxt.IpDiscoveryProfile)
 
 	// not found
-	notFoundipDiscoveryProfileByNameInNsxtManager, err := vcd.client.GetIpDiscoveryProfileByName("invalid-name", filterByNsxtManager)
+	notFoundipDiscoveryProfileByNameInNsxtManager, err := vcd.client.GetIpDiscoveryProfileByName(ctx, "invalid-name", filterByNsxtManager)
 	check.Assert(ContainsNotFound(err), Equals, true)
 	check.Assert(notFoundipDiscoveryProfileByNameInNsxtManager, IsNil)
 
 	// Mac Discovery Profile by name
-	macDiscoveryProfileByNameInNsxtManager, err := vcd.client.GetMacDiscoveryProfileByName(vcd.config.VCD.Nsxt.MacDiscoveryProfile, filterByNsxtManager)
+	macDiscoveryProfileByNameInNsxtManager, err := vcd.client.GetMacDiscoveryProfileByName(ctx, vcd.config.VCD.Nsxt.MacDiscoveryProfile, filterByNsxtManager)
 	check.Assert(err, IsNil)
 	check.Assert(macDiscoveryProfileByNameInNsxtManager.DisplayName, Equals, vcd.config.VCD.Nsxt.MacDiscoveryProfile)
 
-	macDiscoveryProfileByNameInVdc, err := vcd.client.GetMacDiscoveryProfileByName(vcd.config.VCD.Nsxt.MacDiscoveryProfile, filterByVdc)
+	macDiscoveryProfileByNameInVdc, err := vcd.client.GetMacDiscoveryProfileByName(ctx, vcd.config.VCD.Nsxt.MacDiscoveryProfile, filterByVdc)
 	check.Assert(err, IsNil)
 	check.Assert(macDiscoveryProfileByNameInVdc.DisplayName, Equals, vcd.config.VCD.Nsxt.MacDiscoveryProfile)
 
-	macDiscoveryProfileByNameInVdcGroup, err := vcd.client.GetMacDiscoveryProfileByName(vcd.config.VCD.Nsxt.MacDiscoveryProfile, filterByVdcGroup)
+	macDiscoveryProfileByNameInVdcGroup, err := vcd.client.GetMacDiscoveryProfileByName(ctx, vcd.config.VCD.Nsxt.MacDiscoveryProfile, filterByVdcGroup)
 	check.Assert(err, IsNil)
 	check.Assert(macDiscoveryProfileByNameInVdcGroup.DisplayName, Equals, vcd.config.VCD.Nsxt.MacDiscoveryProfile)
 
 	// not found
-	notFoundmacDiscoveryProfileByNameInNsxtManager, err := vcd.client.GetMacDiscoveryProfileByName("invalid-name", filterByNsxtManager)
+	notFoundmacDiscoveryProfileByNameInNsxtManager, err := vcd.client.GetMacDiscoveryProfileByName(ctx, "invalid-name", filterByNsxtManager)
 	check.Assert(ContainsNotFound(err), Equals, true)
 	check.Assert(notFoundmacDiscoveryProfileByNameInNsxtManager, IsNil)
 
 	// Spoof Guard Profile by name
-	spoofGuardProfileByNameInNsxtManager, err := vcd.client.GetSpoofGuardProfileByName(vcd.config.VCD.Nsxt.SpoofGuardProfile, filterByNsxtManager)
+	spoofGuardProfileByNameInNsxtManager, err := vcd.client.GetSpoofGuardProfileByName(ctx, vcd.config.VCD.Nsxt.SpoofGuardProfile, filterByNsxtManager)
 	check.Assert(err, IsNil)
 	check.Assert(spoofGuardProfileByNameInNsxtManager.DisplayName, Equals, vcd.config.VCD.Nsxt.SpoofGuardProfile)
 
-	spoofGuardProfileByNameInVdc, err := vcd.client.GetSpoofGuardProfileByName(vcd.config.VCD.Nsxt.SpoofGuardProfile, filterByVdc)
+	spoofGuardProfileByNameInVdc, err := vcd.client.GetSpoofGuardProfileByName(ctx, vcd.config.VCD.Nsxt.SpoofGuardProfile, filterByVdc)
 	check.Assert(err, IsNil)
 	check.Assert(spoofGuardProfileByNameInVdc.DisplayName, Equals, vcd.config.VCD.Nsxt.SpoofGuardProfile)
 
-	spoofGuardProfileByNameInVdcGroup, err := vcd.client.GetSpoofGuardProfileByName(vcd.config.VCD.Nsxt.SpoofGuardProfile, filterByVdcGroup)
+	spoofGuardProfileByNameInVdcGroup, err := vcd.client.GetSpoofGuardProfileByName(ctx, vcd.config.VCD.Nsxt.SpoofGuardProfile, filterByVdcGroup)
 	check.Assert(err, IsNil)
 	check.Assert(spoofGuardProfileByNameInVdcGroup.DisplayName, Equals, vcd.config.VCD.Nsxt.SpoofGuardProfile)
 
 	// not found
-	notFoundspoofGuardProfileByNameInVdcGroup, err := vcd.client.GetSpoofGuardProfileByName("invalid-name", filterByNsxtManager)
+	notFoundspoofGuardProfileByNameInVdcGroup, err := vcd.client.GetSpoofGuardProfileByName(ctx, "invalid-name", filterByNsxtManager)
 	check.Assert(ContainsNotFound(err), Equals, true)
 	check.Assert(notFoundspoofGuardProfileByNameInVdcGroup, IsNil)
 
 	// QoS Profile by name
-	qosProfileByNameInNsxtManager, err := vcd.client.GetQoSProfileByName(vcd.config.VCD.Nsxt.QosProfile, filterByNsxtManager)
+	qosProfileByNameInNsxtManager, err := vcd.client.GetQoSProfileByName(ctx, vcd.config.VCD.Nsxt.QosProfile, filterByNsxtManager)
 	check.Assert(err, IsNil)
 	check.Assert(qosProfileByNameInNsxtManager.DisplayName, Equals, vcd.config.VCD.Nsxt.QosProfile)
 
-	qosProfileByNameInVdc, err := vcd.client.GetQoSProfileByName(vcd.config.VCD.Nsxt.QosProfile, filterByVdc)
+	qosProfileByNameInVdc, err := vcd.client.GetQoSProfileByName(ctx, vcd.config.VCD.Nsxt.QosProfile, filterByVdc)
 	check.Assert(err, IsNil)
 	check.Assert(qosProfileByNameInVdc.DisplayName, Equals, vcd.config.VCD.Nsxt.QosProfile)
 
-	qosProfileByNameInVdcGroup, err := vcd.client.GetQoSProfileByName(vcd.config.VCD.Nsxt.QosProfile, filterByVdcGroup)
+	qosProfileByNameInVdcGroup, err := vcd.client.GetQoSProfileByName(ctx, vcd.config.VCD.Nsxt.QosProfile, filterByVdcGroup)
 	check.Assert(err, IsNil)
 	check.Assert(qosProfileByNameInVdcGroup.DisplayName, Equals, vcd.config.VCD.Nsxt.QosProfile)
 
 	// not found
-	notFoundqosProfileByNameInNsxtManager, err := vcd.client.GetQoSProfileByName("invalid-name", filterByNsxtManager)
+	notFoundqosProfileByNameInNsxtManager, err := vcd.client.GetQoSProfileByName(ctx, "invalid-name", filterByNsxtManager)
 	check.Assert(ContainsNotFound(err), Equals, true)
 	check.Assert(notFoundqosProfileByNameInNsxtManager, IsNil)
 
 	// Segment Security Profile by name
-	segmentSecurityProfileByNameInNsxtManager, err := vcd.client.GetSegmentSecurityProfileByName(vcd.config.VCD.Nsxt.SegmentSecurityProfile, filterByNsxtManager)
+	segmentSecurityProfileByNameInNsxtManager, err := vcd.client.GetSegmentSecurityProfileByName(ctx, vcd.config.VCD.Nsxt.SegmentSecurityProfile, filterByNsxtManager)
 	check.Assert(err, IsNil)
 	check.Assert(segmentSecurityProfileByNameInNsxtManager.DisplayName, Equals, vcd.config.VCD.Nsxt.SegmentSecurityProfile)
 
-	segmentSecurityProfileByNameInVdc, err := vcd.client.GetSegmentSecurityProfileByName(vcd.config.VCD.Nsxt.SegmentSecurityProfile, filterByVdc)
+	segmentSecurityProfileByNameInVdc, err := vcd.client.GetSegmentSecurityProfileByName(ctx, vcd.config.VCD.Nsxt.SegmentSecurityProfile, filterByVdc)
 	check.Assert(err, IsNil)
 	check.Assert(segmentSecurityProfileByNameInVdc.DisplayName, Equals, vcd.config.VCD.Nsxt.SegmentSecurityProfile)
 
-	segmentSecurityProfileByNameInVdcGroup, err := vcd.client.GetSegmentSecurityProfileByName(vcd.config.VCD.Nsxt.SegmentSecurityProfile, filterByVdcGroup)
+	segmentSecurityProfileByNameInVdcGroup, err := vcd.client.GetSegmentSecurityProfileByName(ctx, vcd.config.VCD.Nsxt.SegmentSecurityProfile, filterByVdcGroup)
 	check.Assert(err, IsNil)
 	check.Assert(segmentSecurityProfileByNameInVdcGroup.DisplayName, Equals, vcd.config.VCD.Nsxt.SegmentSecurityProfile)
 
 	// not found
-	notFoundSegmentSecurityProfileByNameInVdcGroup, err := vcd.client.GetSegmentSecurityProfileByName("invalid-name", filterByNsxtManager)
+	notFoundSegmentSecurityProfileByNameInVdcGroup, err := vcd.client.GetSegmentSecurityProfileByName(ctx, "invalid-name", filterByNsxtManager)
 	check.Assert(ContainsNotFound(err), Equals, true)
 	check.Assert(notFoundSegmentSecurityProfileByNameInVdcGroup, IsNil)
 }
 
 func checkNsxtSegmentAllProfilesByFilter(vcd *TestVCD, check *C, filter url.Values) {
-	ipDiscoverProfiles, err := vcd.client.GetAllIpDiscoveryProfiles(filter)
+	ipDiscoverProfiles, err := vcd.client.GetAllIpDiscoveryProfiles(ctx, filter)
 	check.Assert(err, IsNil)
 	check.Assert(ipDiscoverProfiles, NotNil)
 	check.Assert(len(ipDiscoverProfiles) > 1, Equals, true)
 
-	macDiscoverProfiles, err := vcd.client.GetAllMacDiscoveryProfiles(filter)
+	macDiscoverProfiles, err := vcd.client.GetAllMacDiscoveryProfiles(ctx, filter)
 	check.Assert(err, IsNil)
 	check.Assert(macDiscoverProfiles, NotNil)
 	check.Assert(len(macDiscoverProfiles) > 1, Equals, true)
 
-	spoofGuardDiscoverProfiles, err := vcd.client.GetAllSpoofGuardProfiles(filter)
+	spoofGuardDiscoverProfiles, err := vcd.client.GetAllSpoofGuardProfiles(ctx, filter)
 	check.Assert(err, IsNil)
 	check.Assert(spoofGuardDiscoverProfiles, NotNil)
 	check.Assert(len(spoofGuardDiscoverProfiles) > 1, Equals, true)
 
-	qosDiscoverProfiles, err := vcd.client.GetAllQoSProfiles(filter)
+	qosDiscoverProfiles, err := vcd.client.GetAllQoSProfiles(ctx, filter)
 	check.Assert(err, IsNil)
 	check.Assert(qosDiscoverProfiles, NotNil)
 	check.Assert(len(qosDiscoverProfiles) > 1, Equals, true)
 
-	segmentSecurityDiscoverProfiles, err := vcd.client.GetAllSegmentSecurityProfiles(filter)
+	segmentSecurityDiscoverProfiles, err := vcd.client.GetAllSegmentSecurityProfiles(ctx, filter)
 	check.Assert(err, IsNil)
 	check.Assert(segmentSecurityDiscoverProfiles, NotNil)
 	check.Assert(len(segmentSecurityDiscoverProfiles) > 1, Equals, true)

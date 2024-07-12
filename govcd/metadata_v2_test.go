@@ -82,7 +82,7 @@ func testVdcMetadata(vcd *TestVCD, check *C, testCase metadataTest) {
 func (vcd *TestVCD) TestProviderVdcMetadata(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
 	vcd.skipIfNotSysAdmin(check)
-	providerVdc, err := vcd.client.GetProviderVdcByName(vcd.config.VCD.NsxtProviderVdc.Name)
+	providerVdc, err := vcd.client.GetProviderVdcByName(ctx, vcd.config.VCD.NsxtProviderVdc.Name)
 	if err != nil {
 		check.Skip(fmt.Sprintf("%s: Provider VDC %s not found. Test can't proceed", check.TestName(), vcd.config.VCD.NsxtProviderVdc.Name))
 		return
@@ -135,11 +135,11 @@ func (vcd *TestVCD) TestMediaRecordMetadata(check *C) {
 	check.Assert(err, IsNil)
 	// cleanup uploaded media so that other tests don't fail
 	defer func() {
-		media, err := catalog.GetMediaByName(check.TestName(), true)
+		media, err := catalog.GetMediaByName(ctx, check.TestName(), true)
 		check.Assert(err, IsNil)
 		check.Assert(media, NotNil)
 
-		deleteTask, err := media.Delete()
+		deleteTask, err := media.Delete(ctx)
 		check.Assert(err, IsNil)
 		check.Assert(deleteTask, NotNil)
 		err = deleteTask.WaitTaskCompletion(context.Background())
@@ -262,7 +262,7 @@ func (vcd *TestVCD) TestDiskMetadata(check *C) {
 	vcd.testMetadataCRUDActions(disk, check, nil)
 	vcd.testMetadataIgnore(disk, "disk", disk.Disk.Name, check)
 
-	task, err = disk.Delete()
+	task, err = disk.Delete(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
@@ -298,19 +298,19 @@ func (vcd *TestVCD) TestCatalogItemMetadata(check *C) {
 }
 
 func (vcd *TestVCD) testMetadataIgnore(resource metadataCompatible, objectType, objectName string, check *C) {
-	existingMetadata, err := resource.GetMetadata()
+	existingMetadata, err := resource.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 
-	err = resource.AddMetadataEntryWithVisibility("foo", "bar", types.MetadataStringValue, types.MetadataReadWriteVisibility, false)
+	err = resource.AddMetadataEntryWithVisibility(ctx, "foo", "bar", types.MetadataStringValue, types.MetadataReadWriteVisibility, false)
 	check.Assert(err, IsNil)
 
 	// Add a new entry that won't be filtered out
-	err = resource.AddMetadataEntryWithVisibility("not_ignored", "bar2", types.MetadataStringValue, types.MetadataReadWriteVisibility, false)
+	err = resource.AddMetadataEntryWithVisibility(ctx, "not_ignored", "bar2", types.MetadataStringValue, types.MetadataReadWriteVisibility, false)
 	check.Assert(err, IsNil)
 
 	cleanup := func() {
 		vcd.client.Client.IgnoredMetadata = nil
-		metadata, err := resource.GetMetadata()
+		metadata, err := resource.GetMetadata(ctx)
 		check.Assert(err, IsNil)
 		for _, entry := range metadata.MetadataEntry {
 			itWasAlreadyPresent := false
@@ -321,11 +321,11 @@ func (vcd *TestVCD) testMetadataIgnore(resource metadataCompatible, objectType, 
 				}
 			}
 			if !itWasAlreadyPresent {
-				err = resource.DeleteMetadataEntryWithDomain(entry.Key, entry.Domain != nil && entry.Domain.Domain == "SYSTEM")
+				err = resource.DeleteMetadataEntryWithDomain(ctx, entry.Key, entry.Domain != nil && entry.Domain.Domain == "SYSTEM")
 				check.Assert(err, IsNil)
 			}
 		}
-		metadata, err = resource.GetMetadata()
+		metadata, err = resource.GetMetadata(ctx)
 		check.Assert(err, IsNil)
 		check.Assert(metadata, NotNil)
 		check.Assert(len(metadata.MetadataEntry), Equals, len(existingMetadata.MetadataEntry))
@@ -387,7 +387,7 @@ func (vcd *TestVCD) testMetadataIgnore(resource metadataCompatible, objectType, 
 		vcd.client.Client.IgnoredMetadata = tt.ignoredMetadata
 
 		// Tests getting a simple metadata entry by its key
-		singleMetadata, err := resource.GetMetadataByKey("foo", false)
+		singleMetadata, err := resource.GetMetadataByKey(ctx, "foo", false)
 		if tt.metadataIsIgnored {
 			check.Assert(err, NotNil)
 			check.Assert(true, Equals, strings.Contains(err.Error(), "ignored"))
@@ -398,7 +398,7 @@ func (vcd *TestVCD) testMetadataIgnore(resource metadataCompatible, objectType, 
 		}
 
 		// Retrieve all metadata
-		allMetadata, err := resource.GetMetadata()
+		allMetadata, err := resource.GetMetadata(ctx)
 		check.Assert(err, IsNil)
 		check.Assert(allMetadata, NotNil)
 		if tt.metadataIsIgnored {
@@ -417,12 +417,12 @@ func (vcd *TestVCD) testMetadataIgnore(resource metadataCompatible, objectType, 
 	}
 
 	// Tries to delete a metadata entry that is ignored, it should hence fail
-	err = resource.DeleteMetadataEntryWithDomain("foo", false)
+	err = resource.DeleteMetadataEntryWithDomain(ctx, "foo", false)
 	check.Assert(err, NotNil)
 	check.Assert(true, Equals, strings.Contains(err.Error(), "ignored"))
 
 	// Tries to merge metadata that is filtered out, hence it should fail
-	err = resource.MergeMetadataWithMetadataValues(map[string]types.MetadataValue{
+	err = resource.MergeMetadataWithMetadataValues(ctx, map[string]types.MetadataValue{
 		"foo": {
 			TypedValue: &types.MetadataTypedValue{
 				XsiType: types.MetadataStringValue,
@@ -434,7 +434,7 @@ func (vcd *TestVCD) testMetadataIgnore(resource metadataCompatible, objectType, 
 	check.Assert(true, Equals, strings.Contains(err.Error(), "after filtering metadata, there is no metadata to merge"))
 
 	// Tries to merge metadata, one entry is filtered out, another is not
-	err = resource.MergeMetadataWithMetadataValues(map[string]types.MetadataValue{
+	err = resource.MergeMetadataWithMetadataValues(ctx, map[string]types.MetadataValue{
 		"foo": {
 			TypedValue: &types.MetadataTypedValue{
 				XsiType: types.MetadataStringValue,
@@ -578,7 +578,7 @@ func (vcd *TestVCD) testMetadataCRUDActions(resource metadataCompatible, check *
 			continue
 		}
 
-		err = resource.AddMetadataEntryWithVisibility(testCase.Key, testCase.Value, testCase.Type, testCase.Visibility, testCase.IsSystem)
+		err = resource.AddMetadataEntryWithVisibility(ctx, testCase.Key, testCase.Value, testCase.Type, testCase.Visibility, testCase.IsSystem)
 		if testCase.ExpectErrorOnFirstAdd {
 			check.Assert(err, NotNil)
 			continue

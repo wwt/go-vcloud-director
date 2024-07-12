@@ -16,7 +16,7 @@ import (
 )
 
 func (vcd *TestVCD) Test_SolutionAddOn(check *C) {
-	if vcd.client.Client.APIVCDMaxVersionIs("< 37.1") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, "< 37.1") {
 		check.Skip("Solution Landing Zones are supported in VCD 10.4.1+")
 	}
 
@@ -26,20 +26,20 @@ func (vcd *TestVCD) Test_SolutionAddOn(check *C) {
 	catalogMediaName := vcd.config.VCD.Catalog.NsxtCatalogAddonDse
 
 	slz := createSlz(vcd, check)
-	err := slz.Refresh()
+	err := slz.Refresh(ctx)
 	check.Assert(err, IsNil)
 
-	addOnCatalog, err := vcd.org.GetCatalogByName(vcd.config.VCD.Catalog.NsxtBackedCatalogName, false)
+	addOnCatalog, err := vcd.org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.NsxtBackedCatalogName, false)
 	check.Assert(err, IsNil)
 
 	cacheFilePath, err := fetchCacheFile(addOnCatalog, catalogMediaName, check)
 	check.Assert(err, IsNil)
 
-	org, err := vcd.client.GetOrgById(slz.SolutionLandingZoneType.ID)
+	org, err := vcd.client.GetOrgById(ctx, slz.SolutionLandingZoneType.ID)
 	check.Assert(err, IsNil)
-	catalog, err := org.GetCatalogById(slz.SolutionLandingZoneType.Catalogs[0].ID, false)
+	catalog, err := org.GetCatalogById(ctx, slz.SolutionLandingZoneType.Catalogs[0].ID, false)
 	check.Assert(err, IsNil)
-	catItem, err := catalog.GetCatalogItemByName(catalogMediaName, false)
+	catItem, err := catalog.GetCatalogItemByName(ctx, catalogMediaName, false)
 	check.Assert(err, IsNil)
 
 	createCfg := SolutionAddOnConfig{
@@ -48,12 +48,12 @@ func (vcd *TestVCD) Test_SolutionAddOn(check *C) {
 		CatalogItemId:        catItem.CatalogItem.ID,
 		AutoTrustCertificate: true,
 	}
-	solutionAddOn, err := vcd.client.CreateSolutionAddOn(createCfg)
+	solutionAddOn, err := vcd.client.CreateSolutionAddOn(ctx, createCfg)
 	check.Assert(err, IsNil)
 	PrependToCleanupListOpenApi(solutionAddOn.DefinedEntity.DefinedEntity.ID, check.TestName(), types.OpenApiPathVersion1_0_0+types.OpenApiEndpointRdeEntities+solutionAddOn.DefinedEntity.DefinedEntity.ID)
 
 	// Get all
-	allSolutionAddOns, err := vcd.client.GetAllSolutionAddons(nil)
+	allSolutionAddOns, err := vcd.client.GetAllSolutionAddons(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(allSolutionAddOns) >= 1, Equals, true) // VCD has a few baked in Solution Add-Ons (e.g. 'service-account-solutions-system-user', 'vmware.solution-addon-landing-zone-1.0.0')
 
@@ -68,41 +68,41 @@ func (vcd *TestVCD) Test_SolutionAddOn(check *C) {
 
 	// Get all with filter
 	queryParams := queryParameterFilterAnd("id=="+solutionAddOn.RdeId(), nil)
-	filteredSolutionAddon, err := vcd.client.GetAllSolutionAddons(queryParams)
+	filteredSolutionAddon, err := vcd.client.GetAllSolutionAddons(ctx, queryParams)
 	check.Assert(err, IsNil)
 	check.Assert(len(filteredSolutionAddon), Equals, 1)
 
 	// By ID
-	sao, err := vcd.client.GetSolutionAddonById(solutionAddOn.RdeId())
+	sao, err := vcd.client.GetSolutionAddonById(ctx, solutionAddOn.RdeId())
 	check.Assert(err, IsNil)
 	check.Assert(sao.RdeId(), Equals, solutionAddOn.RdeId())
 
 	// By Name
-	saoByName, err := vcd.client.GetSolutionAddonByName(solutionAddOn.DefinedEntity.DefinedEntity.Name)
+	saoByName, err := vcd.client.GetSolutionAddonByName(ctx, solutionAddOn.DefinedEntity.DefinedEntity.Name)
 	check.Assert(err, IsNil)
 	check.Assert(saoByName.RdeId(), Equals, solutionAddOn.RdeId())
 
 	// Update - pointing at wrong catalog image
-	catItemPhoton, err := catalog.GetCatalogItemByName(vcd.config.VCD.Catalog.NsxtCatalogItem, false)
+	catItemPhoton, err := catalog.GetCatalogItemByName(ctx, vcd.config.VCD.Catalog.NsxtCatalogItem, false)
 	check.Assert(err, IsNil)
 
 	solutionAddOnUpdate := saoByName.SolutionAddOnEntity
 	solutionAddOnUpdate.Origin.CatalogItemId = catItemPhoton.CatalogItem.ID
 
-	updatedSao, err := sao.Update(solutionAddOnUpdate)
+	updatedSao, err := sao.Update(ctx, solutionAddOnUpdate)
 	check.Assert(err, IsNil)
 	check.Assert(updatedSao.RdeId(), Equals, sao.RdeId())
 
 	// Delete
-	err = sao.Delete()
+	err = sao.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Verify no more Add-Ons remaining
-	allSolutionAddOnsAfterCleanup, err := vcd.client.GetAllSolutionAddons(nil)
+	allSolutionAddOnsAfterCleanup, err := vcd.client.GetAllSolutionAddons(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(len(allSolutionAddOnsAfterCleanup), Equals, len(allSolutionAddOns)-1)
 
-	err = slz.Delete()
+	err = slz.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -129,10 +129,10 @@ func fetchCacheFile(catalog *Catalog, fileName string, check *C) (string, error)
 		}
 
 		fmt.Printf("# Downloading Solution Add-On '%s' from VCD...", fileName)
-		addOnMediaItem, err := catalog.GetMediaByName(fileName, false)
+		addOnMediaItem, err := catalog.GetMediaByName(ctx, fileName, false)
 		check.Assert(err, IsNil)
 
-		addOn, err := addOnMediaItem.Download()
+		addOn, err := addOnMediaItem.Download(ctx)
 		check.Assert(err, IsNil)
 
 		err = os.WriteFile(cacheFilePath, addOn, 0600)

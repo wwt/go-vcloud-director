@@ -16,18 +16,18 @@ import (
 
 // TestVappfromTemplateAndClone creates a vApp with multiple VMs at once, then clones such vApp into a new one
 func (vcd *TestVCD) TestVappfromTemplateAndClone(check *C) {
-	org, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	vdc, err := org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	vdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
 	check.Assert(vdc, NotNil)
 
 	name := check.TestName()
 	description := "test compose raw vApp with template"
 
-	catalog, err := org.GetCatalogByName(vcd.config.VCD.Catalog.NsxtBackedCatalogName, false)
+	catalog, err := org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.NsxtBackedCatalogName, false)
 	check.Assert(err, IsNil)
 	vappTemplateName := vcd.config.VCD.Catalog.CatalogItemWithMultiVms
 	if vappTemplateName == "" {
@@ -35,7 +35,7 @@ func (vcd *TestVCD) TestVappfromTemplateAndClone(check *C) {
 			" Using test_resources/vapp_with_3_vms.ova",
 			vcd.config.VCD.Catalog.NsxtBackedCatalogName))
 	}
-	vappTemplate, err := catalog.GetVAppTemplateByName(vappTemplateName)
+	vappTemplate, err := catalog.GetVAppTemplateByName(ctx, vappTemplateName)
 	if err != nil {
 		if ContainsNotFound(err) {
 			check.Skip(fmt.Sprintf("vApp template %s not found - Make sure there is such template in catalog %s -"+
@@ -62,7 +62,7 @@ func (vcd *TestVCD) TestVappfromTemplateAndClone(check *C) {
 
 	start := time.Now()
 	printVerbose("creating vapp '%s' from template '%s'\n", name, vappTemplateName)
-	vapp, err := vdc.CreateVappFromTemplate(&def)
+	vapp, err := vdc.CreateVappFromTemplate(ctx, &def)
 	check.Assert(err, IsNil)
 	printVerbose("** created in %s\n", time.Since(start))
 
@@ -90,25 +90,25 @@ func (vcd *TestVCD) TestVappfromTemplateAndClone(check *C) {
 
 	start = time.Now()
 	printVerbose("cloning vapp '%s' from vapp '%s'\n", cloneName, name)
-	vapp2, err := vdc.CloneVapp(&defClone)
+	vapp2, err := vdc.CloneVapp(ctx, &defClone)
 	check.Assert(err, IsNil)
 	printVerbose("** cloned in %s\n", time.Since(start))
 
 	AddToCleanupList(cloneName, "vapp", vdc.Vdc.Name, name)
 
-	status, err := vapp2.GetStatus()
+	status, err := vapp2.GetStatus(ctx)
 	check.Assert(err, IsNil)
 	if status == "SUSPENDED" {
 		printVerbose("\t discarding suspended state for vApp %s\n", vapp2.VApp.Name)
-		err = vapp2.DiscardSuspendedState()
+		err = vapp2.DiscardSuspendedState(ctx)
 		check.Assert(err, IsNil)
-		status, err = vapp2.GetStatus()
+		status, err = vapp2.GetStatus(ctx)
 		check.Assert(err, IsNil)
 		if status != "POWERED_ON" {
 			printVerbose("\t powering on vApp %s\n", vapp2.VApp.Name)
-			task, err := vapp2.PowerOn()
+			task, err := vapp2.PowerOn(ctx)
 			check.Assert(err, IsNil)
-			err = task.WaitTaskCompletion()
+			err = task.WaitTaskCompletion(ctx)
 			check.Assert(err, IsNil)
 		}
 	}
@@ -124,25 +124,25 @@ func (vcd *TestVCD) TestVappfromTemplateAndClone(check *C) {
 func vappRemove(vapp *VApp, check *C) {
 	var task Task
 	var err error
-	status, err := vapp.GetStatus()
+	status, err := vapp.GetStatus(ctx)
 	check.Assert(err, IsNil)
 	if status == "POWERED_ON" {
 		printVerbose("powering off vApp '%s'\n", vapp.VApp.Name)
-		task, err = vapp.Undeploy()
+		task, err = vapp.Undeploy(ctx)
 		check.Assert(err, IsNil)
-		err = task.WaitTaskCompletion()
+		err = task.WaitTaskCompletion(ctx)
 		check.Assert(err, IsNil)
 	}
 
 	printVerbose("removing networks from vApp '%s'\n", vapp.VApp.Name)
-	task, err = vapp.RemoveAllNetworks()
+	task, err = vapp.RemoveAllNetworks(ctx)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
 	printVerbose("removing vApp '%s'\n", vapp.VApp.Name)
-	task, err = vapp.Delete()
+	task, err = vapp.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 }

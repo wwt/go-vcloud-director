@@ -156,7 +156,7 @@ func buildTestLBVirtualServerPrereqs(node1Ip, node2Ip, componentsName string, ch
 		MaxRetries: 3,
 		Type:       "http",
 	}
-	err := deleteLbServiceMonitorIfExists(ctx, edge, lbMon.Name)
+	err := deleteLbServiceMonitorIfExists(edge, lbMon.Name)
 	check.Assert(err, IsNil)
 	lbMonitor, err := edge.CreateLbServiceMonitor(ctx, lbMon)
 	check.Assert(err, IsNil)
@@ -184,7 +184,7 @@ func buildTestLBVirtualServerPrereqs(node1Ip, node2Ip, componentsName string, ch
 		},
 	}
 
-	err = deleteLbServerPoolIfExists(ctx, edge, lbPoolConfig.Name)
+	err = deleteLbServerPoolIfExists(edge, lbPoolConfig.Name)
 	check.Assert(err, IsNil)
 	lbPool, err := edge.CreateLbServerPool(ctx, lbPoolConfig)
 	check.Assert(err, IsNil)
@@ -195,7 +195,7 @@ func buildTestLBVirtualServerPrereqs(node1Ip, node2Ip, componentsName string, ch
 		Template: "HTTP",
 	}
 
-	err = deleteLbAppProfileIfExists(ctx, edge, lbAppProfileConfig.Name)
+	err = deleteLbAppProfileIfExists(edge, lbAppProfileConfig.Name)
 	check.Assert(err, IsNil)
 	lbAppProfile, err := edge.CreateLbAppProfile(ctx, lbAppProfileConfig)
 	check.Assert(err, IsNil)
@@ -206,7 +206,7 @@ func buildTestLBVirtualServerPrereqs(node1Ip, node2Ip, componentsName string, ch
 	}
 
 	// Create prerequisites - application rule
-	err = deleteLbAppRuleIfExists(ctx, edge, lbAppRuleConfig.Name)
+	err = deleteLbAppRuleIfExists(edge, lbAppRuleConfig.Name)
 	check.Assert(err, IsNil)
 	lbAppRule, err := edge.CreateLbAppRule(ctx, lbAppRuleConfig)
 	check.Assert(err, IsNil)

@@ -165,15 +165,15 @@ func (vcd *TestVCD) Test_NsxtSecurityGroupGetAssociatedVms(check *C) {
 
 	check.Assert(foundStandalone, Equals, true)
 	check.Assert(foundVappVm, Equals, true)
-	task, err := vapp.Delete()
+	task, err := vapp.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion(context.Background())
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
-	err = standaloneVm.Delete()
+	err = standaloneVm.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = createdSecGroup.Delete()
+	err = createdSecGroup.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = routedNet.Delete()
+	err = routedNet.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 

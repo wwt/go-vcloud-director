@@ -40,7 +40,7 @@ func (vcd *TestVCD) Test_LBAppProfile(check *C) {
 		ServerSslEnabled:              false,
 	}
 
-	err = deleteLbAppProfileIfExists(ctx, *edge, lbAppProfileConfig.Name)
+	err = deleteLbAppProfileIfExists(*edge, lbAppProfileConfig.Name)
 	check.Assert(err, IsNil)
 	createdLbAppProfile, err := edge.CreateLbAppProfile(ctx, lbAppProfileConfig)
 	check.Assert(err, IsNil)

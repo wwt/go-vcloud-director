@@ -39,7 +39,7 @@ func (vcd *TestVCD) Test_LBServerPool(check *C) {
 		MaxRetries: 3,
 		Type:       "http",
 	}
-	err = deleteLbServiceMonitorIfExists(ctx, *edge, lbMon.Name)
+	err = deleteLbServiceMonitorIfExists(*edge, lbMon.Name)
 	check.Assert(err, IsNil)
 	lbMonitor, err := edge.CreateLbServiceMonitor(ctx, lbMon)
 	check.Assert(err, IsNil)
@@ -73,7 +73,7 @@ func (vcd *TestVCD) Test_LBServerPool(check *C) {
 		},
 	}
 
-	err = deleteLbServerPoolIfExists(ctx, *edge, lbMon.Name)
+	err = deleteLbServerPoolIfExists(*edge, lbMon.Name)
 	check.Assert(err, IsNil)
 	createdLbPool, err := edge.CreateLbServerPool(ctx, lbPoolConfig)
 	check.Assert(err, IsNil)

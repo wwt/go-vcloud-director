@@ -7,6 +7,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -119,7 +120,7 @@ func (vcd *TestVCD) Test_CreateOrg(check *C) {
 		}
 		orgName := TestCreateOrg + "_" + od.name
 
-		if vcd.client.Client.APIVCDMaxVersionIs("= 37.2") && !od.enabled {
+		if vcd.client.Client.APIVCDMaxVersionIs(ctx, "= 37.2") && !od.enabled {
 			// TODO revisit once bug is fixed in VCD
 			fmt.Println("[INFO] VCD 10.4.2 has a bug that prevents creating a disabled Org - Changing 'enabled' parameter to 'true'")
 			od.enabled = true
@@ -151,7 +152,7 @@ func (vcd *TestVCD) Test_CreateOrg(check *C) {
 		// Delete, with force and recursive true
 		err = adminOrg.Delete(ctx, true, true)
 		check.Assert(err, IsNil)
-		doesOrgExist(ctx, check, vcd)
+		doesOrgExist(check, vcd)
 	}
 }
 
@@ -241,7 +242,7 @@ func (vcd *TestVCD) Test_CreateDeleteEdgeGateway(check *C) {
 func (vcd *TestVCD) Test_CreateDeleteEdgeGatewayAdvanced(check *C) {
 	// Setup external network with multiple IP scopes and multiple ranges
 	dnsSuffix := "some.net"
-	skippingReason, externalNetwork, task, err := vcd.testCreateExternalNetwork(ctx, check.TestName(), check.TestName(), dnsSuffix)
+	skippingReason, externalNetwork, task, err := vcd.testCreateExternalNetwork(check.TestName(), check.TestName(), dnsSuffix)
 	if skippingReason != "" {
 		check.Skip(skippingReason)
 	}
@@ -474,9 +475,9 @@ func (vcd *TestVCD) Test_QueryOrgVdcNetworkByNameWithSpace(check *C) {
 	check.Assert(len(orgVdcNetwork), Not(Equals), 0)
 	check.Assert(orgVdcNetwork[0].Name, Equals, networkName)
 	check.Assert(orgVdcNetwork[0].ConnectedTo, Equals, externalNetwork.ExternalNetwork.Name)
-	network, err := vcd.vdc.GetOrgVdcNetworkByName(networkName, true)
+	network, err := vcd.vdc.GetOrgVdcNetworkByName(ctx, networkName, true)
 	check.Assert(err, IsNil)
-	task, err = network.Delete()
+	task, err = network.Delete(ctx)
 	check.Assert(err, IsNil)
 	err = task.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
@@ -701,7 +702,7 @@ func (vcd *TestVCD) Test_GetStorageProfile(check *C) {
 	check.Assert(foundStorageProfile.IopsSettings, Not(Equals), types.VdcStorageProfileIopsSettings{})
 
 	// Get storage profile by ID
-	foundStorageProfile2, err := vcd.client.GetStorageProfileById(foundStorageProfile.ID)
+	foundStorageProfile2, err := vcd.client.GetStorageProfileById(ctx, foundStorageProfile.ID)
 	check.Assert(err, IsNil)
 	check.Assert(foundStorageProfile, DeepEquals, foundStorageProfile2)
 }
@@ -767,7 +768,7 @@ func (vcd *TestVCD) Test_NsxtGlobalDefaultSegmentProfileTemplate(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
 	vcd.skipIfNotSysAdmin(check)
 
-	nsxtManager, err := vcd.client.GetNsxtManagerByName(vcd.config.VCD.Nsxt.Manager)
+	nsxtManager, err := vcd.client.GetNsxtManagerByName(ctx, vcd.config.VCD.Nsxt.Manager)
 	check.Assert(err, IsNil)
 	check.Assert(nsxtManager, NotNil)
 	nsxtManagerUrn, err := nsxtManager.Urn()
@@ -778,15 +779,15 @@ func (vcd *TestVCD) Test_NsxtGlobalDefaultSegmentProfileTemplate(check *C) {
 	queryParams = queryParameterFilterAnd(fmt.Sprintf("nsxTManagerRef.id==%s", nsxtManagerUrn), queryParams)
 
 	// Lookup prerequisite profiles for Segment Profile template creation
-	ipDiscoveryProfile, err := vcd.client.GetIpDiscoveryProfileByName(vcd.config.VCD.Nsxt.IpDiscoveryProfile, queryParams)
+	ipDiscoveryProfile, err := vcd.client.GetIpDiscoveryProfileByName(ctx, vcd.config.VCD.Nsxt.IpDiscoveryProfile, queryParams)
 	check.Assert(err, IsNil)
-	macDiscoveryProfile, err := vcd.client.GetMacDiscoveryProfileByName(vcd.config.VCD.Nsxt.MacDiscoveryProfile, queryParams)
+	macDiscoveryProfile, err := vcd.client.GetMacDiscoveryProfileByName(ctx, vcd.config.VCD.Nsxt.MacDiscoveryProfile, queryParams)
 	check.Assert(err, IsNil)
-	spoofGuardProfile, err := vcd.client.GetSpoofGuardProfileByName(vcd.config.VCD.Nsxt.SpoofGuardProfile, queryParams)
+	spoofGuardProfile, err := vcd.client.GetSpoofGuardProfileByName(ctx, vcd.config.VCD.Nsxt.SpoofGuardProfile, queryParams)
 	check.Assert(err, IsNil)
-	qosProfile, err := vcd.client.GetQoSProfileByName(vcd.config.VCD.Nsxt.QosProfile, queryParams)
+	qosProfile, err := vcd.client.GetQoSProfileByName(ctx, vcd.config.VCD.Nsxt.QosProfile, queryParams)
 	check.Assert(err, IsNil)
-	segmentSecurityProfile, err := vcd.client.GetSegmentSecurityProfileByName(vcd.config.VCD.Nsxt.SegmentSecurityProfile, queryParams)
+	segmentSecurityProfile, err := vcd.client.GetSegmentSecurityProfileByName(ctx, vcd.config.VCD.Nsxt.SegmentSecurityProfile, queryParams)
 	check.Assert(err, IsNil)
 
 	config := &types.NsxtSegmentProfileTemplate{
@@ -800,7 +801,7 @@ func (vcd *TestVCD) Test_NsxtGlobalDefaultSegmentProfileTemplate(check *C) {
 		SourceNsxTManagerRef:   &types.OpenApiReference{ID: nsxtManager.NsxtManager.ID},
 	}
 
-	createdSegmentProfileTemplate, err := vcd.client.CreateSegmentProfileTemplate(config)
+	createdSegmentProfileTemplate, err := vcd.client.CreateSegmentProfileTemplate(ctx, config)
 	check.Assert(err, IsNil)
 	check.Assert(createdSegmentProfileTemplate, NotNil)
 
@@ -814,7 +815,7 @@ func (vcd *TestVCD) Test_NsxtGlobalDefaultSegmentProfileTemplate(check *C) {
 		VdcNetworkSegmentProfileTemplateRef:  &types.OpenApiReference{ID: createdSegmentProfileTemplate.NsxtSegmentProfileTemplate.ID},
 	}
 
-	updatedDefaults, err := vcd.client.UpdateGlobalDefaultSegmentProfileTemplates(globalDefaultSegmentProfileConfig)
+	updatedDefaults, err := vcd.client.UpdateGlobalDefaultSegmentProfileTemplates(ctx, globalDefaultSegmentProfileConfig)
 	check.Assert(err, IsNil)
 	check.Assert(updatedDefaults, NotNil)
 	check.Assert(updatedDefaults.VappNetworkSegmentProfileTemplateRef.ID, Equals, createdSegmentProfileTemplate.NsxtSegmentProfileTemplate.ID)
@@ -824,13 +825,13 @@ func (vcd *TestVCD) Test_NsxtGlobalDefaultSegmentProfileTemplate(check *C) {
 	PrependToCleanupList(openApiEndpoint, "OpenApiEntityGlobalDefaultSegmentProfileTemplate", "", check.TestName())
 
 	// Cleanup
-	resetDefaults, err := vcd.client.UpdateGlobalDefaultSegmentProfileTemplates(&types.NsxtGlobalDefaultSegmentProfileTemplate{})
+	resetDefaults, err := vcd.client.UpdateGlobalDefaultSegmentProfileTemplates(ctx, &types.NsxtGlobalDefaultSegmentProfileTemplate{})
 	check.Assert(err, IsNil)
 	check.Assert(resetDefaults, NotNil)
 	check.Assert(resetDefaults.VappNetworkSegmentProfileTemplateRef, IsNil)
 	check.Assert(resetDefaults.VdcNetworkSegmentProfileTemplateRef, IsNil)
 
-	err = createdSegmentProfileTemplate.Delete()
+	err = createdSegmentProfileTemplate.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
@@ -842,7 +843,7 @@ func (vcd *TestVCD) Test_QueryAllOrgs(check *C) {
 		return
 	}
 
-	orgs, err := vcd.client.QueryAllOrgs()
+	orgs, err := vcd.client.QueryAllOrgs(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(orgs, NotNil)
 
@@ -863,7 +864,7 @@ func (vcd *TestVCD) Test_QueryOrgByName(check *C) {
 		return
 	}
 
-	org, err := vcd.client.QueryOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.QueryOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	orgFound := false
@@ -889,13 +890,13 @@ func (vcd *TestVCD) Test_QueryOrgById(check *C) {
 		return
 	}
 
-	namedOrg, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	namedOrg, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	orgFound := false
 	if vcd.config.VCD.Org == namedOrg.Org.Name {
 
-		idOrg, err := vcd.client.QueryOrgByID(namedOrg.Org.ID)
+		idOrg, err := vcd.client.QueryOrgByID(ctx, namedOrg.Org.ID)
 		check.Assert(err, IsNil)
 
 		if idOrg.HREF == namedOrg.Org.HREF {

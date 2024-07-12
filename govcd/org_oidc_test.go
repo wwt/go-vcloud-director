@@ -24,11 +24,11 @@ func (vcd *TestVCD) Test_OrgOidcSettingsSystemAdminCreateWithWellKnownEndpoint(c
 	}
 	oidcServerUrl := validateAndGetOidcServerUrl(check, vcd)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
-	settings, err := adminOrg.GetOpenIdConnectSettings()
+	settings, err := adminOrg.GetOpenIdConnectSettings(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(settings, NotNil)
 	check.Assert(settings.Enabled, Equals, false)
@@ -78,11 +78,11 @@ func (vcd *TestVCD) Test_OrgOidcSettingsSystemAdminCreateWithWellKnownEndpointAn
 	}
 	oidcServerUrl := validateAndGetOidcServerUrl(check, vcd)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
-	settings, err := adminOrg.GetOpenIdConnectSettings()
+	settings, err := adminOrg.GetOpenIdConnectSettings(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(settings, NotNil)
 	check.Assert(true, Equals, strings.HasSuffix(settings.OrgRedirectUri, vcd.config.VCD.Org))
@@ -134,7 +134,7 @@ func (vcd *TestVCD) Test_OrgOidcSettingsSystemAdminCreateWithCustomValues(check 
 
 	oidcServerUrl := validateAndGetOidcServerUrl(check, vcd)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
@@ -226,11 +226,11 @@ func (vcd *TestVCD) Test_OrgOidcSettingsSystemAdminUpdate(check *C) {
 
 	oidcServerUrl := validateAndGetOidcServerUrl(check, vcd)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
-	settings, err := adminOrg.GetOpenIdConnectSettings()
+	settings, err := adminOrg.GetOpenIdConnectSettings(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(settings, NotNil)
 	check.Assert(settings.Enabled, Equals, false)
@@ -298,10 +298,10 @@ func (vcd *TestVCD) Test_OrgOidcSettingsWithTenantUser(check *C) {
 	password := vcd.config.Tenants[0].Password
 
 	vcdClient := NewVCDClient(vcd.client.Client.VCDHREF, true)
-	err := vcdClient.Authenticate(userName, password, orgName)
+	err := vcdClient.Authenticate(ctx, userName, password, orgName)
 	check.Assert(err, IsNil)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(orgName)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, orgName)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
@@ -336,7 +336,7 @@ func (vcd *TestVCD) Test_OrgOidcSettingsWithTenantUser(check *C) {
 	check.Assert(settings.OAuthKeyConfigurations, NotNil)
 	check.Assert(len(settings.OAuthKeyConfigurations.OAuthKeyConfiguration), Not(Equals), 0)
 
-	settings2, err := adminOrg.GetOpenIdConnectSettings()
+	settings2, err := adminOrg.GetOpenIdConnectSettings(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(settings2, DeepEquals, settings)
 }
@@ -351,11 +351,11 @@ func (vcd *TestVCD) Test_OrgOidcSettingsDifferentVersions(check *C) {
 
 	oidcServerUrl := validateAndGetOidcServerUrl(check, vcd)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
-	settings, err := adminOrg.GetOpenIdConnectSettings()
+	settings, err := adminOrg.GetOpenIdConnectSettings(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(settings, NotNil)
 	check.Assert(settings.Enabled, Equals, false)
@@ -371,14 +371,14 @@ func (vcd *TestVCD) Test_OrgOidcSettingsDifferentVersions(check *C) {
 		MaxClockSkew:      60,
 		WellKnownEndpoint: oidcServerUrl.String(),
 	}
-	if vcd.client.Client.APIVCDMaxVersionIs(">= 37.1") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, ">= 37.1") {
 		s.EnableIdTokenClaims = addrOf(true)
 	}
-	if vcd.client.Client.APIVCDMaxVersionIs(">= 38.0") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, ">= 38.0") {
 		s.SendClientCredentialsAsAuthorizationHeader = addrOf(true)
 		s.UsePKCE = addrOf(true)
 	}
-	if vcd.client.Client.APIVCDMaxVersionIs(">= 38.1") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, ">= 38.1") {
 		s.CustomUiButtonLabel = addrOf("this is a test")
 	}
 
@@ -389,13 +389,13 @@ func (vcd *TestVCD) Test_OrgOidcSettingsDifferentVersions(check *C) {
 	}()
 
 	check.Assert(settings, NotNil)
-	if vcd.client.Client.APIVCDMaxVersionIs(">= 37.1") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, ">= 37.1") {
 		check.Assert(settings.EnableIdTokenClaims, NotNil)
 		check.Assert(*settings.EnableIdTokenClaims, Equals, true)
 	} else {
 		check.Assert(settings.EnableIdTokenClaims, IsNil)
 	}
-	if vcd.client.Client.APIVCDMaxVersionIs(">= 38.0") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, ">= 38.0") {
 		check.Assert(settings.SendClientCredentialsAsAuthorizationHeader, NotNil)
 		check.Assert(settings.UsePKCE, NotNil)
 		check.Assert(*settings.SendClientCredentialsAsAuthorizationHeader, Equals, true)
@@ -404,7 +404,7 @@ func (vcd *TestVCD) Test_OrgOidcSettingsDifferentVersions(check *C) {
 		check.Assert(settings.SendClientCredentialsAsAuthorizationHeader, IsNil)
 		check.Assert(settings.UsePKCE, IsNil)
 	}
-	if vcd.client.Client.APIVCDMaxVersionIs(">= 38.1") {
+	if vcd.client.Client.APIVCDMaxVersionIs(ctx, ">= 38.1") {
 		check.Assert(settings.CustomUiButtonLabel, NotNil)
 		check.Assert(*settings.CustomUiButtonLabel, Equals, "this is a test")
 	} else {
@@ -418,7 +418,7 @@ func (vcd *TestVCD) Test_OrgOidcSettingsValidationErrors(check *C) {
 		check.Skip("test requires system administrator privileges")
 	}
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
@@ -586,7 +586,7 @@ func (vcd *TestVCD) Test_OrgOidcSettingsValidationErrors(check *C) {
 	}
 
 	for _, test := range tests {
-		_, err := adminOrg.SetOpenIdConnectSettings(test.wrongConfig)
+		_, err := adminOrg.SetOpenIdConnectSettings(ctx, test.wrongConfig)
 		check.Assert(err, NotNil)
 		check.Assert(true, Equals, strings.Contains(err.Error(), test.errorMsg))
 	}
@@ -600,7 +600,7 @@ func setOIDCSettings(adminOrg *AdminOrg, settings types.OrgOAuthSettings) (*type
 	var err error
 	for tries < 5 {
 		tries++
-		newSettings, err = adminOrg.SetOpenIdConnectSettings(settings)
+		newSettings, err = adminOrg.SetOpenIdConnectSettings(ctx, settings)
 		if err == nil {
 			break
 		}
@@ -616,10 +616,10 @@ func setOIDCSettings(adminOrg *AdminOrg, settings types.OrgOAuthSettings) (*type
 
 // deleteOIDCSettings deletes the current OIDC settings for the given Organization
 func deleteOIDCSettings(check *C, adminOrg *AdminOrg) {
-	err := adminOrg.DeleteOpenIdConnectSettings()
+	err := adminOrg.DeleteOpenIdConnectSettings(ctx)
 	check.Assert(err, IsNil)
 
-	settings, err := adminOrg.GetOpenIdConnectSettings()
+	settings, err := adminOrg.GetOpenIdConnectSettings(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(settings, NotNil)
 	check.Assert(settings.Enabled, Equals, false)

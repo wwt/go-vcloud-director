@@ -13,12 +13,12 @@ import (
 
 func (vcd *TestVCD) Test_CheckCumulativeQuery(check *C) {
 	vcd.skipIfNotSysAdmin(check)
-	pvdcs, err := vcd.client.QueryProviderVdcs()
+	pvdcs, err := vcd.client.QueryProviderVdcs(ctx)
 	check.Assert(err, IsNil)
 	var storageProfileMap = make(map[string]bool)
 
 	for _, pvdcRec := range pvdcs {
-		pvdc, err := vcd.client.GetProviderVdcByHref(pvdcRec.HREF)
+		pvdc, err := vcd.client.GetProviderVdcByHref(ctx, pvdcRec.HREF)
 		check.Assert(err, IsNil)
 		for _, sp := range pvdc.ProviderVdc.StorageProfiles.ProviderVdcStorageProfile {
 			storageProfileMap[sp.Name] = true
@@ -30,7 +30,7 @@ func (vcd *TestVCD) Test_CheckCumulativeQuery(check *C) {
 
 	checkQuery := func(pageSize string) {
 		var foundStorageProfileMap = make(map[string]bool)
-		results, err := vcd.client.Client.cumulativeQuery(types.QtProviderVdcStorageProfile, nil, map[string]string{
+		results, err := vcd.client.Client.cumulativeQuery(ctx, types.QtProviderVdcStorageProfile, nil, map[string]string{
 			"type":     types.QtProviderVdcStorageProfile,
 			"pageSize": pageSize,
 		})

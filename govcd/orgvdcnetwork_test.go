@@ -84,13 +84,13 @@ func (vcd *TestVCD) testCreateUpdateOrgVdcNetworkRouted(check *C, ipSubnet strin
 		Configuration: &types.NetworkConfiguration{
 			FenceMode: types.FenceModeNAT,
 			IPScopes: &types.IPScopes{
-				IPScope: []*types.IPScope{&types.IPScope{
+				IPScope: []*types.IPScope{{
 					IsInherited: false,
 					Gateway:     gateway,
 					Netmask:     "255.255.255.0",
 					IPRanges: &types.IPRanges{
 						IPRange: []*types.IPRange{
-							&types.IPRange{
+							{
 								StartAddress: startAddress,
 								EndAddress:   endAddress,
 							},
@@ -394,9 +394,9 @@ func (vcd *TestVCD) Test_CreateUpdateOrgVdcNetworkIso(check *C) {
 	check.Assert(len(network.OrgVDCNetwork.Configuration.IPScopes.IPScope[0].IPRanges.IPRange), Not(Equals), 0)
 	check.Assert(network.OrgVDCNetwork.Configuration.IPScopes.IPScope[0].IPRanges.IPRange[0].StartAddress, Equals, updatedStartAddress)
 	check.Assert(network.OrgVDCNetwork.Configuration.IPScopes.IPScope[0].IPRanges.IPRange[0].EndAddress, Equals, updatedEndAddress)
-	task, err := network.Delete()
+	task, err := network.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = task.WaitTaskCompletion(context.Background())
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
 }

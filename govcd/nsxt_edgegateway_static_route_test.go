@@ -12,11 +12,11 @@ func (vcd *TestVCD) Test_NsxEdgeStaticRoute(check *C) {
 	skipOpenApiEndpointTest(vcd, check, types.OpenApiPathVersion1_0_0+types.OpenApiEndpointEdgeGatewayStaticRoutes)
 	vcd.skipIfNotSysAdmin(check)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
-	nsxtVdc, err := org.GetVDCByName(vcd.config.VCD.Nsxt.Vdc, false)
+	nsxtVdc, err := org.GetVDCByName(ctx, vcd.config.VCD.Nsxt.Vdc, false)
 	check.Assert(err, IsNil)
-	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(vcd.config.VCD.Nsxt.EdgeGateway)
+	edge, err := nsxtVdc.GetNsxtEdgeGatewayByName(ctx, vcd.config.VCD.Nsxt.EdgeGateway)
 	check.Assert(err, IsNil)
 
 	// Switch Edge Gateway to use dedicated uplink for the time of this test and then turn it off
@@ -28,7 +28,7 @@ func (vcd *TestVCD) Test_NsxEdgeStaticRoute(check *C) {
 	}()
 
 	// Get Org VDC routed network
-	orgVdcNet, err := nsxtVdc.GetOpenApiOrgVdcNetworkByName(vcd.config.VCD.Nsxt.RoutedNetwork)
+	orgVdcNet, err := nsxtVdc.GetOpenApiOrgVdcNetworkByName(ctx, vcd.config.VCD.Nsxt.RoutedNetwork)
 	check.Assert(err, IsNil)
 	check.Assert(orgVdcNet, NotNil)
 
@@ -48,29 +48,29 @@ func (vcd *TestVCD) Test_NsxEdgeStaticRoute(check *C) {
 		},
 	}
 
-	staticRoute, err := edge.CreateStaticRoute(staticRouteConfig)
+	staticRoute, err := edge.CreateStaticRoute(ctx, staticRouteConfig)
 	check.Assert(err, IsNil)
 	check.Assert(staticRoute, NotNil)
 
 	// Get all BGP IP Prefix Lists
-	staticRouteList, err := edge.GetAllStaticRoutes(nil)
+	staticRouteList, err := edge.GetAllStaticRoutes(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(staticRouteList, NotNil)
 	check.Assert(len(staticRouteList), Equals, 1)
 	check.Assert(staticRouteList[0].NsxtEdgeGatewayStaticRoute.Name, Equals, staticRoute.NsxtEdgeGatewayStaticRoute.Name)
 
 	// Get By Name
-	staticRouteByName, err := edge.GetStaticRouteByName(staticRoute.NsxtEdgeGatewayStaticRoute.Name)
+	staticRouteByName, err := edge.GetStaticRouteByName(ctx, staticRoute.NsxtEdgeGatewayStaticRoute.Name)
 	check.Assert(err, IsNil)
 	check.Assert(staticRouteByName, NotNil)
 
 	// Get By Id
-	staticRouteById, err := edge.GetStaticRouteById(staticRoute.NsxtEdgeGatewayStaticRoute.ID)
+	staticRouteById, err := edge.GetStaticRouteById(ctx, staticRoute.NsxtEdgeGatewayStaticRoute.ID)
 	check.Assert(err, IsNil)
 	check.Assert(staticRouteById, NotNil)
 
 	// Get By Network CIDR
-	staticRouteByNetworkCidr, err := edge.GetStaticRouteByNetworkCidr(staticRoute.NsxtEdgeGatewayStaticRoute.NetworkCidr)
+	staticRouteByNetworkCidr, err := edge.GetStaticRouteByNetworkCidr(ctx, staticRoute.NsxtEdgeGatewayStaticRoute.NetworkCidr)
 	check.Assert(err, IsNil)
 	check.Assert(staticRouteByNetworkCidr, NotNil)
 
@@ -80,28 +80,28 @@ func (vcd *TestVCD) Test_NsxEdgeStaticRoute(check *C) {
 	staticRouteConfig.ID = staticRouteByNetworkCidr.NsxtEdgeGatewayStaticRoute.ID
 
 	// staticRoute
-	updatedStaticRoute, err := staticRoute.Update(staticRouteConfig)
+	updatedStaticRoute, err := staticRoute.Update(ctx, staticRouteConfig)
 	check.Assert(err, IsNil)
 	check.Assert(updatedStaticRoute, NotNil)
 
 	check.Assert(updatedStaticRoute.NsxtEdgeGatewayStaticRoute.ID, Equals, staticRouteByName.NsxtEdgeGatewayStaticRoute.ID)
 
 	// Delete
-	err = staticRoute.Delete()
+	err = staticRoute.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Try to get once again and ensure it is not there
-	notFoundByName, err := edge.GetStaticRouteByName(staticRoute.NsxtEdgeGatewayStaticRoute.Name)
+	notFoundByName, err := edge.GetStaticRouteByName(ctx, staticRoute.NsxtEdgeGatewayStaticRoute.Name)
 	check.Assert(err, NotNil)
 	check.Assert(ContainsNotFound(err), Equals, true)
 	check.Assert(notFoundByName, IsNil)
 
-	notFoundById, err := edge.GetStaticRouteById(staticRoute.NsxtEdgeGatewayStaticRoute.ID)
+	notFoundById, err := edge.GetStaticRouteById(ctx, staticRoute.NsxtEdgeGatewayStaticRoute.ID)
 	check.Assert(err, NotNil)
 	check.Assert(ContainsNotFound(err), Equals, true)
 	check.Assert(notFoundById, IsNil)
 
-	notFoundByCidr, err := edge.GetStaticRouteByNetworkCidr(staticRoute.NsxtEdgeGatewayStaticRoute.NetworkCidr)
+	notFoundByCidr, err := edge.GetStaticRouteByNetworkCidr(ctx, staticRoute.NsxtEdgeGatewayStaticRoute.NetworkCidr)
 	check.Assert(err, NotNil)
 	check.Assert(ContainsNotFound(err), Equals, true)
 	check.Assert(notFoundByCidr, IsNil)

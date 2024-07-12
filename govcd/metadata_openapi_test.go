@@ -7,6 +7,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 	. "gopkg.in/check.v1"
@@ -18,18 +19,18 @@ func (vcd *TestVCD) TestRdeMetadata(check *C) {
 	fmt.Printf("Running: %s\n", check.TestName())
 
 	// This RDE type comes out of the box in VCD
-	rdeType, err := vcd.client.GetRdeType("vmware", "tkgcluster", "1.0.0")
+	rdeType, err := vcd.client.GetRdeType(ctx, "vmware", "tkgcluster", "1.0.0")
 	check.Assert(err, IsNil)
 	check.Assert(rdeType, NotNil)
 
-	rde, err := rdeType.CreateRde(types.DefinedEntity{
+	rde, err := rdeType.CreateRde(ctx, types.DefinedEntity{
 		Name:   check.TestName(),
 		Entity: map[string]interface{}{"foo": "bar"}, // We don't care about schema correctness here
 	}, nil)
 	check.Assert(err, IsNil)
 	check.Assert(rde, NotNil)
 
-	err = rde.Resolve() // State will be RESOLUTION_ERROR, but we don't care. We resolve to be able to delete it later.
+	err = rde.Resolve(ctx) // State will be RESOLUTION_ERROR, but we don't care. We resolve to be able to delete it later.
 	check.Assert(err, IsNil)
 
 	// The RDE can't be deleted until rde.Resolve() is called
@@ -38,16 +39,16 @@ func (vcd *TestVCD) TestRdeMetadata(check *C) {
 	testOpenApiMetadataCRUDActions(rde, check)
 	vcd.testOpenApiMetadataIgnore(rde, "entity", rde.DefinedEntity.Name, check)
 
-	err = rde.Delete()
+	err = rde.Delete(ctx)
 	check.Assert(err, IsNil)
 }
 
 // openApiMetadataCompatible allows centralizing and generalizing the tests for OpenAPI metadata compatible resources.
 type openApiMetadataCompatible interface {
-	GetMetadata() ([]*OpenApiMetadataEntry, error)
-	GetMetadataByKey(domain, namespace, key string) (*OpenApiMetadataEntry, error)
-	GetMetadataById(id string) (*OpenApiMetadataEntry, error)
-	AddMetadata(metadataEntry types.OpenApiMetadataEntry) (*OpenApiMetadataEntry, error)
+	GetMetadata(ctx context.Context) ([]*OpenApiMetadataEntry, error)
+	GetMetadataByKey(ctx context.Context, domain, namespace, key string) (*OpenApiMetadataEntry, error)
+	GetMetadataById(ctx context.Context, id string) (*OpenApiMetadataEntry, error)
+	AddMetadata(ctx context.Context, metadataEntry types.OpenApiMetadataEntry) (*OpenApiMetadataEntry, error)
 }
 
 type openApiMetadataTest struct {
@@ -66,7 +67,7 @@ type openApiMetadataTest struct {
 // for an OpenAPI metadata compatible resource.
 func testOpenApiMetadataCRUDActions(resource openApiMetadataCompatible, check *C) {
 	// Check how much metadata exists
-	metadata, err := resource.GetMetadata()
+	metadata, err := resource.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(metadata, NotNil)
 	existingMetaDataCount := len(metadata)
@@ -166,7 +167,7 @@ func testOpenApiMetadataCRUDActions(resource openApiMetadataCompatible, check *C
 	for _, testCase := range testCases {
 
 		var createdEntry *OpenApiMetadataEntry
-		createdEntry, err = resource.AddMetadata(types.OpenApiMetadataEntry{
+		createdEntry, err = resource.AddMetadata(ctx, types.OpenApiMetadataEntry{
 			KeyValue: types.OpenApiMetadataKeyValue{
 				Domain:    testCase.Domain,
 				Key:       testCase.Key,
@@ -193,7 +194,7 @@ func testOpenApiMetadataCRUDActions(resource openApiMetadataCompatible, check *C
 		check.Assert(createdEntry.MetadataEntry.ID, Not(Equals), "")
 
 		// Check if metadata was added correctly
-		metadata, err = resource.GetMetadata()
+		metadata, err = resource.GetMetadata(ctx)
 		check.Assert(err, IsNil)
 		check.Assert(len(metadata), Equals, existingMetaDataCount+1)
 		found := false
@@ -206,7 +207,7 @@ func testOpenApiMetadataCRUDActions(resource openApiMetadataCompatible, check *C
 		}
 		check.Assert(found, Equals, true)
 
-		metadataByKey, err := resource.GetMetadataByKey(createdEntry.MetadataEntry.KeyValue.Domain, createdEntry.MetadataEntry.KeyValue.Namespace, createdEntry.MetadataEntry.KeyValue.Key)
+		metadataByKey, err := resource.GetMetadataByKey(ctx, createdEntry.MetadataEntry.KeyValue.Domain, createdEntry.MetadataEntry.KeyValue.Namespace, createdEntry.MetadataEntry.KeyValue.Key)
 		check.Assert(err, IsNil)
 		check.Assert(metadataByKey, NotNil)
 		check.Assert(metadataByKey.MetadataEntry, NotNil)
@@ -215,7 +216,7 @@ func testOpenApiMetadataCRUDActions(resource openApiMetadataCompatible, check *C
 		check.Assert(metadataByKey.parentEndpoint, Equals, createdEntry.parentEndpoint)
 		check.Assert(metadataByKey.href, Equals, createdEntry.href)
 
-		metadataById, err := resource.GetMetadataById(metadataByKey.MetadataEntry.ID)
+		metadataById, err := resource.GetMetadataById(ctx, metadataByKey.MetadataEntry.ID)
 		check.Assert(err, IsNil)
 		check.Assert(metadataById, NotNil)
 		check.Assert(metadataById.MetadataEntry, NotNil)
@@ -226,7 +227,7 @@ func testOpenApiMetadataCRUDActions(resource openApiMetadataCompatible, check *C
 
 		if testCase.UpdateValue != nil {
 			oldEtag := metadataById.Etag
-			err = metadataById.Update(testCase.UpdateValue, !metadataById.MetadataEntry.IsPersistent)
+			err = metadataById.Update(ctx, testCase.UpdateValue, !metadataById.MetadataEntry.IsPersistent)
 			check.Assert(err, IsNil)
 			check.Assert(metadataById, NotNil)
 			check.Assert(metadataById.MetadataEntry, NotNil)
@@ -243,7 +244,7 @@ func testOpenApiMetadataCRUDActions(resource openApiMetadataCompatible, check *C
 			check.Assert(metadataById.href, Equals, metadataByKey.href)
 		}
 
-		err = metadataById.Delete()
+		err = metadataById.Delete(ctx)
 		check.Assert(err, IsNil)
 		check.Assert(*metadataById.MetadataEntry, DeepEquals, types.OpenApiMetadataEntry{})
 		check.Assert(metadataById.Etag, Equals, "")
@@ -251,7 +252,7 @@ func testOpenApiMetadataCRUDActions(resource openApiMetadataCompatible, check *C
 		check.Assert(metadataById.parentEndpoint, Equals, "")
 
 		// Check if metadata was deleted correctly
-		deletedMetadata, err := resource.GetMetadataById(metadataByKey.MetadataEntry.ID)
+		deletedMetadata, err := resource.GetMetadataById(ctx, metadataByKey.MetadataEntry.ID)
 		check.Assert(err, NotNil)
 		check.Assert(deletedMetadata, IsNil)
 		check.Assert(true, Equals, ContainsNotFound(err))
@@ -259,10 +260,10 @@ func testOpenApiMetadataCRUDActions(resource openApiMetadataCompatible, check *C
 }
 
 func (vcd *TestVCD) testOpenApiMetadataIgnore(resource openApiMetadataCompatible, objectType, objectName string, check *C) {
-	existingMetadata, err := resource.GetMetadata()
+	existingMetadata, err := resource.GetMetadata(ctx)
 	check.Assert(err, IsNil)
 
-	_, err = resource.AddMetadata(types.OpenApiMetadataEntry{
+	_, err = resource.AddMetadata(ctx, types.OpenApiMetadataEntry{
 		IsPersistent: false,
 		IsReadOnly:   false,
 		KeyValue: types.OpenApiMetadataKeyValue{
@@ -276,7 +277,7 @@ func (vcd *TestVCD) testOpenApiMetadataIgnore(resource openApiMetadataCompatible
 		},
 	})
 	check.Assert(err, IsNil)
-	_, err = resource.AddMetadata(types.OpenApiMetadataEntry{
+	_, err = resource.AddMetadata(ctx, types.OpenApiMetadataEntry{
 		IsPersistent: false,
 		IsReadOnly:   false,
 		KeyValue: types.OpenApiMetadataKeyValue{
@@ -293,7 +294,7 @@ func (vcd *TestVCD) testOpenApiMetadataIgnore(resource openApiMetadataCompatible
 
 	cleanup := func() {
 		vcd.client.Client.IgnoredMetadata = nil
-		metadata, err := resource.GetMetadata()
+		metadata, err := resource.GetMetadata(ctx)
 		check.Assert(err, IsNil)
 		for _, entry := range metadata {
 			itWasAlreadyPresent := false
@@ -306,13 +307,13 @@ func (vcd *TestVCD) testOpenApiMetadataIgnore(resource openApiMetadataCompatible
 				}
 			}
 			if !itWasAlreadyPresent {
-				toDelete, err := resource.GetMetadataById(entry.MetadataEntry.ID)
+				toDelete, err := resource.GetMetadataById(ctx, entry.MetadataEntry.ID)
 				check.Assert(err, IsNil)
-				err = toDelete.Delete()
+				err = toDelete.Delete(ctx)
 				check.Assert(err, IsNil)
 			}
 		}
-		metadata, err = resource.GetMetadata()
+		metadata, err = resource.GetMetadata(ctx)
 		check.Assert(err, IsNil)
 		check.Assert(len(metadata), Equals, len(existingMetadata))
 	}
@@ -364,7 +365,7 @@ func (vcd *TestVCD) testOpenApiMetadataIgnore(resource openApiMetadataCompatible
 		vcd.client.Client.IgnoredMetadata = tt.ignoredMetadata
 
 		// Tests getting a simple metadata entry by its key
-		singleMetadata, err := resource.GetMetadataByKey("", "", "foo")
+		singleMetadata, err := resource.GetMetadataByKey(ctx, "", "", "foo")
 		if tt.metadataIsIgnored {
 			check.Assert(err, NotNil)
 			check.Assert(true, Equals, strings.Contains(err.Error(), "could not find the metadata associated to object"))
@@ -375,7 +376,7 @@ func (vcd *TestVCD) testOpenApiMetadataIgnore(resource openApiMetadataCompatible
 		}
 
 		// Retrieve all metadata
-		allMetadata, err := resource.GetMetadata()
+		allMetadata, err := resource.GetMetadata(ctx)
 		check.Assert(err, IsNil)
 		check.Assert(allMetadata, NotNil)
 		if tt.metadataIsIgnored {

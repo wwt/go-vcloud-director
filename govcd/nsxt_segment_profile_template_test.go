@@ -17,7 +17,7 @@ func (vcd *TestVCD) Test_NsxtSegmentProfileTemplate(check *C) {
 	skipNoNsxtConfiguration(vcd, check)
 	vcd.skipIfNotSysAdmin(check)
 
-	nsxtManager, err := vcd.client.GetNsxtManagerByName(vcd.config.VCD.Nsxt.Manager)
+	nsxtManager, err := vcd.client.GetNsxtManagerByName(ctx, vcd.config.VCD.Nsxt.Manager)
 	check.Assert(err, IsNil)
 	check.Assert(nsxtManager, NotNil)
 
@@ -29,15 +29,15 @@ func (vcd *TestVCD) Test_NsxtSegmentProfileTemplate(check *C) {
 	queryParams = queryParameterFilterAnd(fmt.Sprintf("nsxTManagerRef.id==%s", nsxtManagerUrn), queryParams)
 
 	// Lookup prerequisite profiles for Segment Profile template creation
-	ipDiscoveryProfile, err := vcd.client.GetIpDiscoveryProfileByName(vcd.config.VCD.Nsxt.IpDiscoveryProfile, queryParams)
+	ipDiscoveryProfile, err := vcd.client.GetIpDiscoveryProfileByName(ctx, vcd.config.VCD.Nsxt.IpDiscoveryProfile, queryParams)
 	check.Assert(err, IsNil)
-	macDiscoveryProfile, err := vcd.client.GetMacDiscoveryProfileByName(vcd.config.VCD.Nsxt.MacDiscoveryProfile, queryParams)
+	macDiscoveryProfile, err := vcd.client.GetMacDiscoveryProfileByName(ctx, vcd.config.VCD.Nsxt.MacDiscoveryProfile, queryParams)
 	check.Assert(err, IsNil)
-	spoofGuardProfile, err := vcd.client.GetSpoofGuardProfileByName(vcd.config.VCD.Nsxt.SpoofGuardProfile, queryParams)
+	spoofGuardProfile, err := vcd.client.GetSpoofGuardProfileByName(ctx, vcd.config.VCD.Nsxt.SpoofGuardProfile, queryParams)
 	check.Assert(err, IsNil)
-	qosProfile, err := vcd.client.GetQoSProfileByName(vcd.config.VCD.Nsxt.QosProfile, queryParams)
+	qosProfile, err := vcd.client.GetQoSProfileByName(ctx, vcd.config.VCD.Nsxt.QosProfile, queryParams)
 	check.Assert(err, IsNil)
-	segmentSecurityProfile, err := vcd.client.GetSegmentSecurityProfileByName(vcd.config.VCD.Nsxt.SegmentSecurityProfile, queryParams)
+	segmentSecurityProfile, err := vcd.client.GetSegmentSecurityProfileByName(ctx, vcd.config.VCD.Nsxt.SegmentSecurityProfile, queryParams)
 	check.Assert(err, IsNil)
 
 	config := &types.NsxtSegmentProfileTemplate{
@@ -51,7 +51,7 @@ func (vcd *TestVCD) Test_NsxtSegmentProfileTemplate(check *C) {
 		SourceNsxTManagerRef:   &types.OpenApiReference{ID: nsxtManager.NsxtManager.ID},
 	}
 
-	createdSegmentProfileTemplate, err := vcd.client.CreateSegmentProfileTemplate(config)
+	createdSegmentProfileTemplate, err := vcd.client.CreateSegmentProfileTemplate(ctx, config)
 	check.Assert(err, IsNil)
 	check.Assert(createdSegmentProfileTemplate, NotNil)
 
@@ -60,12 +60,12 @@ func (vcd *TestVCD) Test_NsxtSegmentProfileTemplate(check *C) {
 	AddToCleanupListOpenApi(config.Name, check.TestName(), openApiEndpoint)
 
 	// Retrieve segment profile template
-	retrievedSpt, err := vcd.client.GetSegmentProfileTemplateById(createdSegmentProfileTemplate.NsxtSegmentProfileTemplate.ID)
+	retrievedSpt, err := vcd.client.GetSegmentProfileTemplateById(ctx, createdSegmentProfileTemplate.NsxtSegmentProfileTemplate.ID)
 	check.Assert(err, IsNil)
 	check.Assert(retrievedSpt.NsxtSegmentProfileTemplate, DeepEquals, createdSegmentProfileTemplate.NsxtSegmentProfileTemplate)
 
 	// Get all and look for the required one
-	allSpts, err := vcd.client.GetAllSegmentProfileTemplates(nil)
+	allSpts, err := vcd.client.GetAllSegmentProfileTemplates(ctx, nil)
 	check.Assert(err, IsNil)
 	check.Assert(allSpts, NotNil)
 	found := false
@@ -80,17 +80,17 @@ func (vcd *TestVCD) Test_NsxtSegmentProfileTemplate(check *C) {
 
 	// Test update
 	createdSegmentProfileTemplate.NsxtSegmentProfileTemplate.Description = check.TestName() + "updated"
-	updatedSegmentProfileTemplate, err := createdSegmentProfileTemplate.Update(createdSegmentProfileTemplate.NsxtSegmentProfileTemplate)
+	updatedSegmentProfileTemplate, err := createdSegmentProfileTemplate.Update(ctx, createdSegmentProfileTemplate.NsxtSegmentProfileTemplate)
 	check.Assert(err, IsNil)
 	check.Assert(updatedSegmentProfileTemplate.NsxtSegmentProfileTemplate.Description, Equals, createdSegmentProfileTemplate.NsxtSegmentProfileTemplate.Description)
 	check.Assert(updatedSegmentProfileTemplate.NsxtSegmentProfileTemplate.ID, Equals, createdSegmentProfileTemplate.NsxtSegmentProfileTemplate.ID)
 
 	// Delete
-	err = createdSegmentProfileTemplate.Delete()
+	err = createdSegmentProfileTemplate.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Check that it returns sentinel error 'ErrorEntityNotFound' when an entity is not found
-	notFoundSpt, err := vcd.client.GetSegmentProfileTemplateById(createdSegmentProfileTemplate.NsxtSegmentProfileTemplate.ID)
+	notFoundSpt, err := vcd.client.GetSegmentProfileTemplateById(ctx, createdSegmentProfileTemplate.NsxtSegmentProfileTemplate.ID)
 	check.Assert(ContainsNotFound(err), Equals, true)
 	check.Assert(notFoundSpt, IsNil)
 }

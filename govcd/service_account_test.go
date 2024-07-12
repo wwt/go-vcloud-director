@@ -12,13 +12,13 @@ import (
 )
 
 func (vcd *TestVCD) Test_ServiceAccount(check *C) {
-	isApiTokenEnabled, err := vcd.client.Client.VersionEqualOrGreater("10.4.0", 3)
+	isApiTokenEnabled, err := vcd.client.Client.VersionEqualOrGreater(ctx, "10.4.0", 3)
 	check.Assert(err, IsNil)
 	if !isApiTokenEnabled {
 		check.Skip("This test requires VCD 10.4.0 or greater")
 	}
 
-	serviceAccount, err := vcd.client.CreateServiceAccount(
+	serviceAccount, err := vcd.client.CreateServiceAccount(ctx,
 		vcd.config.VCD.Org,
 		check.TestName(),
 		"urn:vcloud:role:vApp%20Author",
@@ -35,48 +35,48 @@ func (vcd *TestVCD) Test_ServiceAccount(check *C) {
 
 	AddToCleanupListOpenApi(check.TestName(), check.TestName(), endpoint+serviceAccount.ServiceAccount.ID)
 
-	err = serviceAccount.Authorize()
+	err = serviceAccount.Authorize(ctx)
 	check.Assert(err, IsNil)
 
-	err = serviceAccount.Refresh()
+	err = serviceAccount.Refresh(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(serviceAccount.ServiceAccount.Status, Equals, "REQUESTED")
 
-	err = serviceAccount.Grant()
+	err = serviceAccount.Grant(ctx)
 	check.Assert(err, IsNil)
 
-	err = serviceAccount.Refresh()
+	err = serviceAccount.Refresh(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(serviceAccount.ServiceAccount.Status, Equals, "GRANTED")
 
-	_, err = serviceAccount.GetInitialApiToken()
+	_, err = serviceAccount.GetInitialApiToken(ctx)
 	check.Assert(err, IsNil)
 
-	err = serviceAccount.Refresh()
+	err = serviceAccount.Refresh(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(serviceAccount.ServiceAccount.Status, Equals, "ACTIVE")
 
-	err = serviceAccount.Revoke()
+	err = serviceAccount.Revoke(ctx)
 	check.Assert(err, IsNil)
 
-	err = serviceAccount.Refresh()
+	err = serviceAccount.Refresh(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(serviceAccount.ServiceAccount.Status, Equals, "CREATED")
 
-	err = serviceAccount.Delete()
+	err = serviceAccount.Delete(ctx)
 	check.Assert(err, IsNil)
 
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
 
-	notFound, err := org.GetServiceAccountById(serviceAccount.ServiceAccount.ID)
+	notFound, err := org.GetServiceAccountById(ctx, serviceAccount.ServiceAccount.ID)
 	check.Assert(err, NotNil)
 	check.Assert(notFound, IsNil)
 }
 
 func (vcd *TestVCD) Test_ServiceAccount_SysOrg(check *C) {
-	isApiTokenEnabled, err := vcd.client.Client.VersionEqualOrGreater("10.4.0", 3)
+	isApiTokenEnabled, err := vcd.client.Client.VersionEqualOrGreater(ctx, "10.4.0", 3)
 	check.Assert(err, IsNil)
 	if !isApiTokenEnabled {
 		check.Skip("This test requires VCD 10.4.0 or greater")
@@ -86,7 +86,7 @@ func (vcd *TestVCD) Test_ServiceAccount_SysOrg(check *C) {
 		check.Skip("This test requires System Administrator role")
 	}
 
-	serviceAccountSysOrg, err := vcd.client.CreateServiceAccount(
+	serviceAccountSysOrg, err := vcd.client.CreateServiceAccount(ctx,
 		vcd.config.Provider.SysOrg,
 		check.TestName(),
 		"urn:vcloud:role:System%20Administrator",
@@ -103,42 +103,42 @@ func (vcd *TestVCD) Test_ServiceAccount_SysOrg(check *C) {
 
 	AddToCleanupListOpenApi(check.TestName(), check.TestName(), endpoint+serviceAccountSysOrg.ServiceAccount.ID)
 
-	err = serviceAccountSysOrg.Authorize()
+	err = serviceAccountSysOrg.Authorize(ctx)
 	check.Assert(err, IsNil)
 
-	err = serviceAccountSysOrg.Refresh()
+	err = serviceAccountSysOrg.Refresh(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(serviceAccountSysOrg.ServiceAccount.Status, Equals, "REQUESTED")
 
-	err = serviceAccountSysOrg.Grant()
+	err = serviceAccountSysOrg.Grant(ctx)
 	check.Assert(err, IsNil)
 
-	err = serviceAccountSysOrg.Refresh()
+	err = serviceAccountSysOrg.Refresh(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(serviceAccountSysOrg.ServiceAccount.Status, Equals, "GRANTED")
 
-	_, err = serviceAccountSysOrg.GetInitialApiToken()
+	_, err = serviceAccountSysOrg.GetInitialApiToken(ctx)
 	check.Assert(err, IsNil)
 
-	err = serviceAccountSysOrg.Refresh()
+	err = serviceAccountSysOrg.Refresh(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(serviceAccountSysOrg.ServiceAccount.Status, Equals, "ACTIVE")
 
-	err = serviceAccountSysOrg.Revoke()
+	err = serviceAccountSysOrg.Revoke(ctx)
 	check.Assert(err, IsNil)
 
-	err = serviceAccountSysOrg.Refresh()
+	err = serviceAccountSysOrg.Refresh(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(serviceAccountSysOrg.ServiceAccount.Status, Equals, "CREATED")
 
-	err = serviceAccountSysOrg.Delete()
+	err = serviceAccountSysOrg.Delete(ctx)
 	check.Assert(err, IsNil)
 
-	sysorg, err := vcd.client.GetOrgByName(vcd.config.Provider.SysOrg)
+	sysorg, err := vcd.client.GetOrgByName(ctx, vcd.config.Provider.SysOrg)
 	check.Assert(err, IsNil)
 	check.Assert(sysorg, NotNil)
 
-	notFound, err := sysorg.GetServiceAccountById(serviceAccountSysOrg.ServiceAccount.ID)
+	notFound, err := sysorg.GetServiceAccountById(ctx, serviceAccountSysOrg.ServiceAccount.ID)
 	check.Assert(err, NotNil)
 	check.Assert(notFound, IsNil)
 }

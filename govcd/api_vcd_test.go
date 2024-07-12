@@ -2141,10 +2141,10 @@ func (vcd *TestVCD) skipIfNotSysAdmin(check *C) {
 // retryOnError is a function that will attempt to execute function with signature `func() error`
 // multiple times (until maxRetries) and waiting given retryInterval between tries. It will return
 // original deletion error for troubleshooting.
-func retryOnError(operation func() error, maxRetries int, retryInterval time.Duration) error {
+func retryOnError(operation func(ctx context.Context) error, maxRetries int, retryInterval time.Duration) error {
 	var err error
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		err = operation()
+		err = operation(ctx)
 		if err == nil {
 			return nil
 		}

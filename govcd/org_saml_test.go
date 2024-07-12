@@ -26,18 +26,18 @@ func (vcd *TestVCD) Test_OrgSamlSettingsCRUD(check *C) {
 
 	orgName := check.TestName()
 
-	task, err := CreateOrg(vcd.client, orgName, orgName, orgName, &types.OrgSettings{}, true)
+	task, err := CreateOrg(ctx, vcd.client, orgName, orgName, orgName, &types.OrgSettings{}, true)
 	check.Assert(err, IsNil)
 	check.Assert(task, NotNil)
 	AddToCleanupList(orgName, "org", "", check.TestName())
-	err = task.WaitTaskCompletion()
+	err = task.WaitTaskCompletion(ctx)
 	check.Assert(err, IsNil)
 
-	adminOrg, err := vcd.client.GetAdminOrgByName(orgName)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, orgName)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 
-	settings, err := adminOrg.GetFederationSettings()
+	settings, err := adminOrg.GetFederationSettings(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(settings, NotNil)
 
@@ -45,7 +45,7 @@ func (vcd *TestVCD) Test_OrgSamlSettingsCRUD(check *C) {
 		fmt.Printf("# 1 %# v\n", pretty.Formatter(settings))
 	}
 
-	metadata, err := adminOrg.GetServiceProviderSamlMetadata()
+	metadata, err := adminOrg.GetServiceProviderSamlMetadata(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(metadata, NotNil)
 	if testVerbose {
@@ -65,7 +65,7 @@ func (vcd *TestVCD) Test_OrgSamlSettingsCRUD(check *C) {
 	settings.SamlAttributeMapping.RoleAttributeName = "role"
 	settings.SamlAttributeMapping.GroupAttributeName = "group"
 	// Use a service provider metadata, without proper namespace settings: expecting an error
-	newSetting, err := adminOrg.SetFederationSettings(settings)
+	newSetting, err := adminOrg.SetFederationSettings(ctx, settings)
 	check.Assert(err, NotNil)
 	check.Assert(err.Error(), Matches, "(?i).*bad request.*is not a valid SAML 2.0 metadata document.*")
 	check.Assert(newSetting, IsNil)
@@ -74,13 +74,13 @@ func (vcd *TestVCD) Test_OrgSamlSettingsCRUD(check *C) {
 	newMetadataText, err := normalizeServiceProviderSamlMetadata(string(metadataText))
 	check.Assert(err, IsNil)
 	settings.SAMLMetadata = newMetadataText
-	newSetting, err = adminOrg.SetFederationSettings(settings)
+	newSetting, err = adminOrg.SetFederationSettings(ctx, settings)
 	check.Assert(err, IsNil)
 	check.Assert(newSetting, NotNil)
 
 	check.Assert(err, IsNil)
 	settings.SAMLMetadata = externalMetadata
-	newSetting, err = adminOrg.SetFederationSettings(settings)
+	newSetting, err = adminOrg.SetFederationSettings(ctx, settings)
 	check.Assert(err, IsNil)
 	check.Assert(newSetting, NotNil)
 	check.Assert(newSetting.SamlSPEntityID, Equals, "dummyId")
@@ -94,25 +94,25 @@ func (vcd *TestVCD) Test_OrgSamlSettingsCRUD(check *C) {
 	check.Assert(newSetting.SamlAttributeMapping.GroupAttributeName, Equals, "group")
 	check.Assert(newSetting, NotNil)
 
-	err = adminOrg.UnsetFederationSettings()
+	err = adminOrg.UnsetFederationSettings(ctx)
 	check.Assert(err, IsNil)
-	err = adminOrg.Refresh()
+	err = adminOrg.Refresh(ctx)
 	check.Assert(err, IsNil)
-	newSettings, err := adminOrg.GetFederationSettings()
+	newSettings, err := adminOrg.GetFederationSettings(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(newSettings.SamlSPEntityID, Equals, "dummyId")
 	check.Assert(newSettings.Enabled, Equals, false)
 
-	err = adminOrg.Disable()
+	err = adminOrg.Disable(ctx)
 	check.Assert(err, IsNil)
-	err = adminOrg.Delete(true, true)
+	err = adminOrg.Delete(ctx, true, true)
 	check.Assert(err, IsNil)
 }
 
 func (vcd *TestVCD) TestClient_RetrieveRemoteDoc(check *C) {
 	// samltest.id is a well known test site for SAML services
 	metadataUrl := "https://samltest.id/saml/idp"
-	metadata, err := vcd.client.Client.RetrieveRemoteDocument(metadataUrl)
+	metadata, err := vcd.client.Client.RetrieveRemoteDocument(ctx, metadataUrl)
 	if err != nil {
 		check.Skip("samltest.id is not responding")
 	}
@@ -126,10 +126,10 @@ func (vcd *TestVCD) TestClient_RetrieveRemoteSamlMetadata(check *C) {
 	if vcd.config.VCD.Org == "" {
 		check.Skip("No organization found")
 	}
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
-	metadataText, err := adminOrg.RetrieveServiceProviderSamlMetadata()
+	metadataText, err := adminOrg.RetrieveServiceProviderSamlMetadata(ctx)
 	check.Assert(err, IsNil)
 	errors := ValidateSamlServiceProviderMetadata(metadataText)
 	check.Assert(errors, IsNil)

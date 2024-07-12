@@ -50,7 +50,7 @@ func (vcd *TestVCD) Test_NsxtApplicationPortProfileReadTenant(check *C) {
 }
 
 func getAppProfileProvider(vcd *TestVCD, check *C) *types.NsxtAppPortProfile {
-	nsxtManager, err := vcd.client.QueryNsxtManagerByName(vcd.config.VCD.Nsxt.Manager)
+	nsxtManager, err := vcd.client.QueryNsxtManagerByName(ctx, vcd.config.VCD.Nsxt.Manager)
 	check.Assert(err, IsNil)
 
 	nsxtManagerUuid, err := GetUuidFromHref(nsxtManager[0].HREF, true)
@@ -76,7 +76,7 @@ func getAppProfileProvider(vcd *TestVCD, check *C) *types.NsxtAppPortProfile {
 }
 
 func getAppProfileTenant(vcd *TestVCD, check *C) *types.NsxtAppPortProfile {
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	// For PROVIDER scope application port profile must have ContextEntityId set as NSX-T Managers URN and no Org
@@ -98,9 +98,9 @@ func getAppProfileTenant(vcd *TestVCD, check *C) *types.NsxtAppPortProfile {
 }
 
 func testAppPortProfile(appPortProfileConfig *types.NsxtAppPortProfile, scope string, vcd *TestVCD, check *C) {
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
-	appProfile, err := org.CreateNsxtAppPortProfile(appPortProfileConfig)
+	appProfile, err := org.CreateNsxtAppPortProfile(ctx, appPortProfileConfig)
 	check.Assert(err, IsNil)
 
 	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAppPortProfiles + appProfile.NsxtAppPortProfile.ID
@@ -112,52 +112,52 @@ func testAppPortProfile(appPortProfileConfig *types.NsxtAppPortProfile, scope st
 
 	// Check update
 	appProfile.NsxtAppPortProfile.Description = appProfile.NsxtAppPortProfile.Description + "-Update"
-	updatedAppProfile, err := appProfile.Update(appProfile.NsxtAppPortProfile)
+	updatedAppProfile, err := appProfile.Update(ctx, appProfile.NsxtAppPortProfile)
 	check.Assert(err, IsNil)
 	check.Assert(updatedAppProfile.NsxtAppPortProfile, DeepEquals, appProfile.NsxtAppPortProfile)
 
 	// Check lookup
-	foundAppProfileById, err := org.GetNsxtAppPortProfileById(appProfile.NsxtAppPortProfile.ID)
+	foundAppProfileById, err := org.GetNsxtAppPortProfileById(ctx, appProfile.NsxtAppPortProfile.ID)
 	check.Assert(err, IsNil)
 	check.Assert(foundAppProfileById.NsxtAppPortProfile, DeepEquals, appProfile.NsxtAppPortProfile)
 
-	foundAppProfileByName, err := org.GetNsxtAppPortProfileByName(appProfile.NsxtAppPortProfile.Name, scope)
+	foundAppProfileByName, err := org.GetNsxtAppPortProfileByName(ctx, appProfile.NsxtAppPortProfile.Name, scope)
 	check.Assert(err, IsNil)
 	check.Assert(foundAppProfileByName.NsxtAppPortProfile, DeepEquals, foundAppProfileById.NsxtAppPortProfile)
 
 	// Check VDC and VDC Group lookup
-	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	adminOrg, err := vcd.client.GetAdminOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(adminOrg, NotNil)
 	vdc, vdcGroup := test_CreateVdcGroup(check, adminOrg, vcd)
 
 	// Lookup by VDC
-	foundAppProfileByNameInVdc, err := vdc.GetNsxtAppPortProfileByName(appProfile.NsxtAppPortProfile.Name, scope)
+	foundAppProfileByNameInVdc, err := vdc.GetNsxtAppPortProfileByName(ctx, appProfile.NsxtAppPortProfile.Name, scope)
 	check.Assert(err, IsNil)
 	check.Assert(foundAppProfileByNameInVdc.NsxtAppPortProfile, DeepEquals, foundAppProfileById.NsxtAppPortProfile)
 
-	foundAppProfileByNameInVdcGroup, err := vdcGroup.GetNsxtAppPortProfileByName(appProfile.NsxtAppPortProfile.Name, scope)
+	foundAppProfileByNameInVdcGroup, err := vdcGroup.GetNsxtAppPortProfileByName(ctx, appProfile.NsxtAppPortProfile.Name, scope)
 	check.Assert(err, IsNil)
 	check.Assert(foundAppProfileByNameInVdcGroup.NsxtAppPortProfile, DeepEquals, foundAppProfileById.NsxtAppPortProfile)
 	// Remove VDC group
-	err = vdcGroup.Delete()
+	err = vdcGroup.Delete(ctx)
 	check.Assert(err, IsNil)
-	err = vdc.DeleteWait(true, true)
+	err = vdc.DeleteWait(ctx, true, true)
 	check.Assert(err, IsNil)
 
-	err = appProfile.Delete()
+	err = appProfile.Delete(ctx)
 	check.Assert(err, IsNil)
 
 	// Expect a not found error
-	_, err = org.GetNsxtAppPortProfileById(appProfile.NsxtAppPortProfile.ID)
+	_, err = org.GetNsxtAppPortProfileById(ctx, appProfile.NsxtAppPortProfile.ID)
 	check.Assert(ContainsNotFound(err), Equals, true)
 
-	_, err = org.GetNsxtAppPortProfileByName(appProfile.NsxtAppPortProfile.Name, scope)
+	_, err = org.GetNsxtAppPortProfileByName(ctx, appProfile.NsxtAppPortProfile.Name, scope)
 	check.Assert(ContainsNotFound(err), Equals, true)
 }
 
 func testApplicationProfilesForScope(scope string, check *C, vcd *TestVCD) {
-	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	org, err := vcd.client.GetOrgByName(ctx, vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 
 	resultCount := getResultCountByScope(scope, check, vcd)
@@ -165,7 +165,7 @@ func testApplicationProfilesForScope(scope string, check *C, vcd *TestVCD) {
 		fmt.Printf("# API shows results for scope '%s': %d\n", scope, resultCount)
 	}
 
-	appProfileSlice, err := org.GetAllNsxtAppPortProfiles(nil, scope)
+	appProfileSlice, err := org.GetAllNsxtAppPortProfiles(ctx, nil, scope)
 	check.Assert(err, IsNil)
 
 	if testVerbose {
@@ -181,7 +181,7 @@ func getResultCountByScope(scope string, check *C, vcd *TestVCD) int {
 	// Get element count by using a simple query and parse response directly to compare it against paginated list of items
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointAppPortProfiles
 	skipOpenApiEndpointTest(vcd, check, endpoint)
-	apiVersion, err := vcd.client.Client.checkOpenApiEndpointCompatibility(endpoint)
+	apiVersion, err := vcd.client.Client.checkOpenApiEndpointCompatibility(ctx, endpoint)
 	check.Assert(err, IsNil)
 
 	urlRef, err := vcd.client.Client.OpenApiBuildEndpoint(endpoint)
