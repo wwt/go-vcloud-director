@@ -1,4 +1,4 @@
-module github.com/vmware/go-vcloud-director/v106
+module github.com/vmware/go-vcloud-director/v2
 
 go 1.22
 
