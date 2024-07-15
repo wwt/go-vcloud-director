@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
+ * Copyright 2023 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
  */
 
 package govcd
@@ -20,6 +20,7 @@ import (
 type Vdc struct {
 	Vdc    *types.Vdc
 	client *Client
+	parent organization
 }
 
 func NewVdc(cli *Client) *Vdc {
@@ -277,6 +278,8 @@ func (vdc *Vdc) FindStorageProfileReference(name string) (types.Reference, error
 	return types.Reference{}, fmt.Errorf("can't find any VDC Storage_profiles")
 }
 
+// GetDefaultStorageProfileReference should find the default storage profile for a VDC
+// Deprecated: unused and implemented in the wrong way. Use adminVdc.GetDefaultStorageProfileReference instead
 func (vdc *Vdc) GetDefaultStorageProfileReference(storageprofiles *types.QueryResultRecordsType) (types.Reference, error) {
 
 	err := vdc.Refresh()
@@ -386,6 +389,14 @@ func (vdc *Vdc) GetEdgeGatewayByHref(href string) (*EdgeGateway, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Edge gateways can sometimes come without any configured services which
+	// lead to nil pointer dereference when adding e.g a DNAT rule
+	// https://github.com/vmware/go-vcloud-director/issues/585
+	if edge.EdgeGateway.Configuration.EdgeGatewayServiceConfiguration == nil {
+		edge.EdgeGateway.Configuration.EdgeGatewayServiceConfiguration = &types.GatewayFeatures{}
+	}
+
 	return edge, nil
 }
 
@@ -464,14 +475,17 @@ func (vdc *Vdc) GetEdgeGatewayByNameOrId(identifier string, refresh bool) (*Edge
 	return entity.(*EdgeGateway), err
 }
 
-func (vdc *Vdc) ComposeRawVApp(name string) error {
+// ComposeRawVApp creates an empty vApp
+// Deprecated: use CreateRawVApp instead
+func (vdc *Vdc) ComposeRawVApp(name string, description string) error {
 	vcomp := &types.ComposeVAppParams{
-		Ovf:     types.XMLNamespaceOVF,
-		Xsi:     types.XMLNamespaceXSI,
-		Xmlns:   types.XMLNamespaceVCloud,
-		Deploy:  false,
-		Name:    name,
-		PowerOn: false,
+		Ovf:         types.XMLNamespaceOVF,
+		Xsi:         types.XMLNamespaceXSI,
+		Xmlns:       types.XMLNamespaceVCloud,
+		Deploy:      false,
+		Name:        name,
+		PowerOn:     false,
+		Description: description,
 	}
 
 	vdcHref, err := url.ParseRequestURI(vdc.Vdc.HREF)
@@ -480,6 +494,7 @@ func (vdc *Vdc) ComposeRawVApp(name string) error {
 	}
 	vdcHref.Path += "/action/composeVApp"
 
+	// This call is wrong: /action/composeVApp returns a vApp, not a task
 	task, err := vdc.client.ExecuteTaskRequest(vdcHref.String(), http.MethodPost,
 		types.MimeComposeVappParams, "error instantiating a new vApp:: %s", vcomp)
 	if err != nil {
@@ -494,10 +509,65 @@ func (vdc *Vdc) ComposeRawVApp(name string) error {
 	return nil
 }
 
+// CreateRawVApp creates an empty vApp
+func (vdc *Vdc) CreateRawVApp(name string, description string) (*VApp, error) {
+	vcomp := &types.ComposeVAppParams{
+		Ovf:         types.XMLNamespaceOVF,
+		Xsi:         types.XMLNamespaceXSI,
+		Xmlns:       types.XMLNamespaceVCloud,
+		Deploy:      false,
+		Name:        name,
+		PowerOn:     false,
+		Description: description,
+	}
+
+	vdcHref, err := url.ParseRequestURI(vdc.Vdc.HREF)
+	if err != nil {
+		return nil, fmt.Errorf("error getting vdc href: %s", err)
+	}
+	vdcHref.Path += "/action/composeVApp"
+
+	var vAppContents types.VApp
+
+	_, err = vdc.client.ExecuteRequest(vdcHref.String(), http.MethodPost,
+		types.MimeComposeVappParams, "error instantiating a new vApp:: %s", vcomp, &vAppContents)
+	if err != nil {
+		return nil, fmt.Errorf("error executing task request: %s", err)
+	}
+
+	if vAppContents.Tasks != nil {
+		for _, innerTask := range vAppContents.Tasks.Task {
+			if innerTask != nil {
+				task := NewTask(vdc.client)
+				task.Task = innerTask
+				err = task.WaitTaskCompletion()
+				if err != nil {
+					return nil, fmt.Errorf("error performing task: %s", err)
+				}
+			}
+		}
+	}
+
+	vapp := NewVApp(vdc.client)
+	vapp.VApp = &vAppContents
+
+	err = vapp.Refresh()
+	if err != nil {
+		return nil, err
+	}
+
+	err = vdc.Refresh()
+	if err != nil {
+		return nil, err
+	}
+	return vapp, nil
+}
+
 // ComposeVApp creates a vapp with the given template, name, and description
 // that uses the storageprofile and networks given. If you want all eulas
 // to be accepted set acceptalleulas to true. Returns a successful task
 // if completed successfully, otherwise returns an error and an empty task.
+// Deprecated: bad implementation
 func (vdc *Vdc) ComposeVApp(orgvdcnetworks []*types.OrgVDCNetwork, vapptemplate VAppTemplate, storageprofileref types.Reference, name string, description string, acceptalleulas bool) (Task, error) {
 	if vapptemplate.VAppTemplate.Children == nil || orgvdcnetworks == nil {
 		return Task{}, fmt.Errorf("can't compose a new vApp, objects passed are not valid")
@@ -579,6 +649,9 @@ func (vdc *Vdc) ComposeVApp(orgvdcnetworks []*types.OrgVDCNetwork, vapptemplate 
 	}
 	vdcHref.Path += "/action/composeVApp"
 
+	// Like ComposeRawVApp, this function returns a task, while it should be returning a vApp
+	// Since we don't use this function in terraform-provider-vcd, we are not going to
+	// replace it.
 	return vdc.client.ExecuteTaskRequest(vdcHref.String(), http.MethodPost,
 		types.MimeComposeVappParams, "error instantiating a new vApp: %s", vcomp)
 }
@@ -844,7 +917,9 @@ func (vdc *Vdc) QueryMediaList() ([]*types.MediaRecordType, error) {
 	return getExistingMedia(vdc)
 }
 
-// QueryVappVmTemplate Finds VM template using catalog name, vApp template name, VN name in template. Returns types.QueryResultVMRecordType
+// QueryVappVmTemplate Finds VM template using catalog name, vApp template name, VN name in template.
+// Returns types.QueryResultVMRecordType if it finds the VM. Returns ErrorEntityNotFound
+// if it's not found. Returns other error if it finds more than one or the search fails.
 func (vdc *Vdc) QueryVappVmTemplate(catalogName, vappTemplateName, vmNameInTemplate string) (*types.QueryResultVMRecordType, error) {
 
 	queryType := "vm"
@@ -877,6 +952,44 @@ func (vdc *Vdc) QueryVappVmTemplate(catalogName, vappTemplateName, vmNameInTempl
 	}
 
 	return vmResults[0], nil
+}
+
+// QueryVappSynchronizedVmTemplate Finds a catalog-synchronized VM inside a vApp Template using catalog name, vApp template name, VN name in template.
+// Returns types.QueryResultVMRecordType if it finds the VM and it's synchronized in the catalog. Returns ErrorEntityNotFound
+// if it's not found. Returns other error if it finds more than one or the search fails.
+func (vdc *Vdc) QueryVappSynchronizedVmTemplate(catalogName, vappTemplateName, vmNameInTemplate string) (*types.QueryResultVMRecordType, error) {
+	vmRecord, err := vdc.QueryVappVmTemplate(catalogName, vappTemplateName, vmNameInTemplate)
+	if err != nil {
+		return nil, err
+	}
+	if vmRecord.Status == "LOCAL_COPY_UNAVAILABLE" {
+		return nil, ErrorEntityNotFound
+	}
+	return vmRecord, nil
+}
+
+// GetVAppTemplateByName finds a VAppTemplate by Name
+// On success, returns a pointer to the VAppTemplate structure and a nil error
+// On failure, returns a nil pointer and an error
+func (vdc *Vdc) GetVAppTemplateByName(vAppTemplateName string) (*VAppTemplate, error) {
+	vAppTemplateQueryResult, err := vdc.QueryVappTemplateWithName(vAppTemplateName)
+	if err != nil {
+		return nil, err
+	}
+	return getVAppTemplateByHref(vdc.client, vAppTemplateQueryResult.HREF)
+}
+
+// GetVAppTemplateByNameOrId finds a vApp Template by Name or ID.
+// On success, returns a pointer to the VAppTemplate structure and a nil error
+// On failure, returns a nil pointer and an error
+func (vdc *Vdc) GetVAppTemplateByNameOrId(identifier string, refresh bool) (*VAppTemplate, error) {
+	getByName := func(name string, refresh bool) (interface{}, error) { return vdc.GetVAppTemplateByName(name) }
+	getById := func(id string, refresh bool) (interface{}, error) { return getVAppTemplateById(vdc.client, id) }
+	entity, err := getEntityByNameOrIdSkipNonId(getByName, getById, identifier, refresh)
+	if entity == nil {
+		return nil, err
+	}
+	return entity.(*VAppTemplate), err
 }
 
 // getLinkHref returns a link HREF for a wanted combination of rel and type
@@ -925,7 +1038,10 @@ func (vdc *Vdc) CreateStandaloneVmAsync(params *types.CreateVmParams) (Task, err
 	}
 	params.XmlnsOvf = types.XMLNamespaceOVF
 
-	return vdc.client.ExecuteTaskRequest(href, http.MethodPost, types.MimeCreateVmParams, "error creating standalone VM: %s", params)
+	// 37.1 Introduced new parameters to VM configuration
+	return vdc.client.ExecuteTaskRequestWithApiVersion(href, http.MethodPost,
+		types.MimeCreateVmParams, "error creating standalone VM: %s", params,
+		vdc.client.GetSpecificApiVersionOnCondition(">=37.1", "37.1"))
 }
 
 // getVmFromTask finds a VM from a running standalone VM creation task
@@ -992,10 +1108,25 @@ func (vdc *Vdc) QueryVmByName(name string) (*VM, error) {
 	return vdc.client.GetVMByHref(foundVM[0].HREF)
 }
 
-// QueryVmById retrieves a standalone VM by ID
+// QueryVmById retrieves a standalone VM by ID in an Org
+// It can also retrieve a standard VM (created from vApp)
+func (org *Org) QueryVmById(id string) (*VM, error) {
+	return queryVmById(id, org.client, org.QueryVmList)
+}
+
+// QueryVmById retrieves a standalone VM by ID in a Vdc
 // It can also retrieve a standard VM (created from vApp)
 func (vdc *Vdc) QueryVmById(id string) (*VM, error) {
-	vmList, err := vdc.QueryVmList(types.VmQueryFilterOnlyDeployed)
+	return queryVmById(id, vdc.client, vdc.QueryVmList)
+}
+
+// queryVmListFunc
+type queryVmListFunc func(filter types.VmQueryFilter) ([]*types.QueryResultVMRecordType, error)
+
+// queryVmById is shared between org.QueryVmById and vdc.QueryVmById which allow to search for VM
+// in different scope (Org or VDC)
+func queryVmById(id string, client *Client, queryFunc queryVmListFunc) (*VM, error) {
+	vmList, err := queryFunc(types.VmQueryFilterOnlyDeployed)
 	if err != nil {
 		return nil, err
 	}
@@ -1011,7 +1142,7 @@ func (vdc *Vdc) QueryVmById(id string) (*VM, error) {
 	if len(foundVM) > 1 {
 		return nil, fmt.Errorf("more than one VM found with ID %s", id)
 	}
-	return vdc.client.GetVMByHref(foundVM[0].HREF)
+	return client.GetVMByHref(foundVM[0].HREF)
 }
 
 // CreateStandaloneVMFromTemplateAsync starts a standalone VM creation using a template
@@ -1085,7 +1216,7 @@ func (vdc *Vdc) GetCapabilities() ([]types.VdcCapability, error) {
 	}
 
 	capabilities := make([]types.VdcCapability, 0)
-	err = vdc.client.OpenApiGetAllItems(minimumApiVersion, urlRef, nil, &capabilities)
+	err = vdc.client.OpenApiGetAllItems(minimumApiVersion, urlRef, nil, &capabilities, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1125,4 +1256,167 @@ func getCapabilityValue(capabilities []types.VdcCapability, fieldName string) st
 	}
 
 	return ""
+}
+
+func (vdc *Vdc) getParentOrg() (organization, error) {
+	for _, vdcLink := range vdc.Vdc.Link {
+		if vdcLink.Rel != "up" {
+			continue
+		}
+		switch vdcLink.Type {
+		case types.MimeOrg:
+			org, err := getOrgByHref(vdc.client, vdcLink.HREF)
+			if err != nil {
+				return nil, err
+			}
+			return org, nil
+		case types.MimeAdminOrg:
+			adminOrg, err := getAdminOrgByHref(vdc.client, vdcLink.HREF)
+			if err != nil {
+				return nil, err
+			}
+			return adminOrg, nil
+
+		default:
+			continue
+		}
+	}
+	return nil, fmt.Errorf("no parent found for VDC %s", vdc.Vdc.Name)
+}
+
+// CreateVappFromTemplate instantiates a new vApp from a vApp template
+// The template argument must contain at least:
+// * Name
+// * Source (a reference to the source vApp template)
+func (vdc *Vdc) CreateVappFromTemplate(template *types.InstantiateVAppTemplateParams) (*VApp, error) {
+	vdcHref, err := url.ParseRequestURI(vdc.Vdc.HREF)
+	if err != nil {
+		return nil, fmt.Errorf("error getting VDC href: %s", err)
+	}
+	vdcHref.Path += "/action/instantiateVAppTemplate"
+
+	vapp := NewVApp(vdc.client)
+
+	template.Xmlns = types.XMLNamespaceVCloud
+	template.Ovf = types.XMLNamespaceOVF
+	template.Deploy = true
+
+	_, err = vdc.client.ExecuteRequest(vdcHref.String(), http.MethodPost,
+		types.MimeInstantiateVappTemplateParams, "error instantiating a new vApp from Template: %s", template, vapp.VApp)
+	if err != nil {
+		return nil, err
+	}
+
+	task := NewTask(vdc.client)
+	for _, taskItem := range vapp.VApp.Tasks.Task {
+		task.Task = taskItem
+		err = task.WaitTaskCompletion()
+		if err != nil {
+			return nil, fmt.Errorf("error performing task: %s", err)
+		}
+	}
+	err = vapp.Refresh()
+	return vapp, err
+}
+
+// CloneVapp makes a copy of a vApp into a new one
+// The sourceVapp argument must contain at least:
+// * Name
+// * Source (a reference to the source vApp)
+func (vdc *Vdc) CloneVapp(sourceVapp *types.CloneVAppParams) (*VApp, error) {
+	vdcHref, err := url.ParseRequestURI(vdc.Vdc.HREF)
+	if err != nil {
+		return nil, fmt.Errorf("error getting VDC href: %s", err)
+	}
+	vdcHref.Path += "/action/cloneVApp"
+
+	vapp := NewVApp(vdc.client)
+
+	sourceVapp.Xmlns = types.XMLNamespaceVCloud
+	sourceVapp.Ovf = types.XMLNamespaceOVF
+	sourceVapp.Deploy = true
+
+	_, err = vdc.client.ExecuteRequest(vdcHref.String(), http.MethodPost,
+		types.MimeCloneVapp, "error cloning a vApp : %s", sourceVapp, vapp.VApp)
+	if err != nil {
+		return nil, err
+	}
+
+	task := NewTask(vdc.client)
+	for _, taskItem := range vapp.VApp.Tasks.Task {
+		task.Task = taskItem
+		err = task.WaitTaskCompletion()
+		if err != nil {
+			return nil, fmt.Errorf("error performing task: %s", err)
+		}
+	}
+	err = vapp.Refresh()
+	return vapp, err
+}
+
+// Get the details of a hardware version
+func (vdc *Vdc) GetHardwareVersion(name string) (*types.VirtualHardwareVersion, error) {
+	if len(vdc.Vdc.Capabilities) == 0 {
+		return nil, fmt.Errorf("VDC doesn't have any virtual hardware version support information stored")
+	}
+
+	found := false
+	for _, hwVersion := range vdc.Vdc.Capabilities[0].SupportedHardwareVersions.SupportedHardwareVersion {
+		if hwVersion.Name == name {
+			found = true
+		}
+	}
+	if !found {
+		return nil, fmt.Errorf("hardware version %s not found or not supported", name)
+	}
+
+	vdcHref, err := url.ParseRequestURI(vdc.Vdc.HREF)
+	if err != nil {
+		return nil, fmt.Errorf("error getting VDC href: %s", err)
+	}
+	vdcHref.Path += "/hwv/" + name
+
+	hardwareVersion := &types.VirtualHardwareVersion{}
+
+	_, err = vdc.client.ExecuteRequest(vdcHref.String(), http.MethodGet, types.MimeVirtualHardwareVersion, "error getting hardware version: %s", nil, hardwareVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	return hardwareVersion, nil
+}
+
+// Get highest supported hardware version of a VDC
+func (vdc *Vdc) GetHighestHardwareVersion() (*types.VirtualHardwareVersion, error) {
+	err := vdc.Refresh()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(vdc.Vdc.Capabilities) == 0 {
+		return nil, fmt.Errorf("VDC doesn't have any virtual hardware version support information stored")
+	}
+
+	hardwareVersions := vdc.Vdc.Capabilities[0].SupportedHardwareVersions.SupportedHardwareVersion
+	// Get last item (highest version) of SupportedHardwareVersions
+	highestVersion := hardwareVersions[len(hardwareVersions)-1].Name
+
+	hardwareVersion, err := vdc.GetHardwareVersion(highestVersion)
+	if err != nil {
+		return nil, err
+	}
+	return hardwareVersion, nil
+}
+
+// FindOsFromId attempts to find a OS by ID using the given hardware version
+func (vdc *Vdc) FindOsFromId(hardwareVersion *types.VirtualHardwareVersion, osId string) (*types.OperatingSystemInfoType, error) {
+	for _, osFamily := range hardwareVersion.SupportedOperatingSystems.OperatingSystemFamilyInfo {
+		for _, os := range osFamily.OperatingSystems {
+			if osId == os.InternalName {
+				return os, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("no OS found with ID: %s", osId)
 }

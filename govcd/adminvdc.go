@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
+ * Copyright 2021 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
  */
 
 package govcd
@@ -7,15 +7,17 @@ package govcd
 import (
 	"errors"
 	"fmt"
-	"github.com/vmware/go-vcloud-director/v2/types/v56"
-	"github.com/vmware/go-vcloud-director/v2/util"
 	"net/http"
 	"net/url"
+
+	"github.com/vmware/go-vcloud-director/v2/types/v56"
+	"github.com/vmware/go-vcloud-director/v2/util"
 )
 
 type AdminVdc struct {
 	AdminVdc *types.AdminVdc
 	client   *Client
+	parent   organization
 }
 
 func NewAdminVdc(cli *Client) *AdminVdc {
@@ -82,6 +84,7 @@ func (adminOrg *AdminOrg) GetAdminVdcByName(vdcname string) (AdminVdc, error) {
 // GetAdminVDCByHref retrieves a VDC using a direct call with the HREF
 func (adminOrg *AdminOrg) GetAdminVDCByHref(vdcHref string) (*AdminVdc, error) {
 	adminVdc := NewAdminVdc(adminOrg.client)
+	adminVdc.parent = adminOrg
 	_, err := adminOrg.client.ExecuteRequest(vdcHref, http.MethodGet,
 		"", "error getting vdc: %s", nil, adminVdc.AdminVdc)
 
@@ -170,6 +173,9 @@ func (adminOrg *AdminOrg) CreateVdc(vdcConfiguration *types.VdcConfiguration) (T
 
 	// Return the task
 	task := NewTask(adminOrg.client)
+	if adminVdc.AdminVdc.Tasks == nil || len(adminVdc.AdminVdc.Tasks.Task) == 0 {
+		return Task{}, fmt.Errorf("no task found after VDC %s creation", vdcConfiguration.Name)
+	}
 	task.Task = adminVdc.AdminVdc.Tasks.Task[0]
 	return *task, nil
 }
@@ -247,6 +253,10 @@ func (adminVdc *AdminVdc) Update() (AdminVdc, error) {
 	}
 
 	util.Logger.Printf("[DEBUG] Update call function for version %s", vdcFunctions.SupportedVersion)
+
+	// Explicitly remove ResourcePoolRefs because it cannot be set and breaks Go marshaling bug
+	// https://github.com/golang/go/issues/9519
+	adminVdc.AdminVdc.ResourcePoolRefs = nil
 
 	updatedAdminVdc, err := vdcFunctions.UpdateVdc(adminVdc)
 	if err != nil {
@@ -369,6 +379,9 @@ func createVdcAsyncV97(adminOrg *AdminOrg, vdcConfiguration *types.VdcConfigurat
 
 	// Return the task
 	task := NewTask(adminOrg.client)
+	if adminVdc.AdminVdc.Tasks == nil || len(adminVdc.AdminVdc.Tasks.Task) == 0 {
+		return Task{}, fmt.Errorf("no task found after VDC %s creation", vdcConfiguration.Name)
+	}
 	task.Task = adminVdc.AdminVdc.Tasks.Task[0]
 	return *task, nil
 }
@@ -420,4 +433,180 @@ func (vdc *AdminVdc) UpdateStorageProfile(storageProfileId string, storageProfil
 	}
 
 	return updateAdminVdcStorageProfile, err
+}
+
+// AddStorageProfile adds a storage profile to a VDC
+func (vdc *AdminVdc) AddStorageProfile(storageProfile *types.VdcStorageProfileConfiguration, description string) (Task, error) {
+	if vdc.client.VCDHREF.String() == "" {
+		return Task{}, fmt.Errorf("cannot add VDC storage profile, VCD HREF is unset")
+	}
+
+	href := vdc.AdminVdc.HREF + "/vdcStorageProfiles"
+
+	var updateStorageProfile = types.UpdateVdcStorageProfiles{
+		Xmlns:                types.XMLNamespaceVCloud,
+		Name:                 storageProfile.ProviderVdcStorageProfile.Name,
+		Description:          description,
+		AddStorageProfile:    storageProfile,
+		RemoveStorageProfile: nil,
+	}
+
+	task, err := vdc.client.ExecuteTaskRequest(href, http.MethodPost,
+		types.MimeUpdateVdcStorageProfiles, "error adding VDC storage profile: %s", &updateStorageProfile)
+	if err != nil {
+		return Task{}, fmt.Errorf("cannot add VDC storage profile, error: %s", err)
+	}
+
+	return task, nil
+}
+
+// AddStorageProfileWait adds a storage profile to a VDC and return a refreshed VDC
+func (vdc *AdminVdc) AddStorageProfileWait(storageProfile *types.VdcStorageProfileConfiguration, description string) error {
+	task, err := vdc.AddStorageProfile(storageProfile, description)
+	if err != nil {
+		return err
+	}
+	err = task.WaitTaskCompletion()
+	if err != nil {
+		return err
+	}
+	return vdc.Refresh()
+}
+
+// RemoveStorageProfile remove a storage profile from a VDC
+func (vdc *AdminVdc) RemoveStorageProfile(storageProfileName string) (Task, error) {
+	if vdc.client.VCDHREF.String() == "" {
+		return Task{}, fmt.Errorf("cannot remove VDC storage profile: VCD HREF is unset")
+	}
+
+	var storageProfile *types.Reference
+	for _, sp := range vdc.AdminVdc.VdcStorageProfiles.VdcStorageProfile {
+		if sp.Name == storageProfileName {
+			storageProfile = sp
+		}
+	}
+	if storageProfile == nil {
+		return Task{}, fmt.Errorf("cannot remove VDC storage profile: storage profile '%s' not found in VDC", storageProfileName)
+	}
+
+	vdcStorageProfileDetails, err := vdc.client.GetStorageProfileByHref(storageProfile.HREF)
+	if err != nil {
+		return Task{}, fmt.Errorf("cannot retrieve VDC storage profile '%s' details: %s", storageProfileName, err)
+	}
+	if vdcStorageProfileDetails.Enabled != nil && *vdcStorageProfileDetails.Enabled {
+		_, err = vdc.UpdateStorageProfile(extractUuid(storageProfile.HREF), &types.AdminVdcStorageProfile{
+			Name:    vdcStorageProfileDetails.Name,
+			Units:   vdcStorageProfileDetails.Units,
+			Limit:   vdcStorageProfileDetails.Limit,
+			Default: false,
+			Enabled: addrOf(false),
+			ProviderVdcStorageProfile: &types.Reference{
+				HREF: vdcStorageProfileDetails.ProviderVdcStorageProfile.HREF,
+			},
+		},
+		)
+		if err != nil {
+			return Task{}, fmt.Errorf("cannot disable VDC storage profile '%s': %s", storageProfileName, err)
+		}
+	}
+
+	href := vdc.AdminVdc.HREF + "/vdcStorageProfiles"
+
+	var updateStorageProfile = types.UpdateVdcStorageProfiles{
+		Xmlns:                types.XMLNamespaceVCloud,
+		Name:                 vdcStorageProfileDetails.Name,
+		Description:          "",
+		RemoveStorageProfile: storageProfile,
+	}
+
+	task, err := vdc.client.ExecuteTaskRequest(href, http.MethodPost,
+		types.MimeUpdateVdcStorageProfiles, "error removing VDC storage profile: %s", &updateStorageProfile)
+	if err != nil {
+		return Task{}, fmt.Errorf("cannot remove VDC storage profile, error: %s", err)
+	}
+
+	return task, nil
+}
+
+// RemoveStorageProfileWait removes a storege profile from a VDC and returns a refreshed VDC or an error
+func (vdc *AdminVdc) RemoveStorageProfileWait(storageProfileName string) error {
+	task, err := vdc.RemoveStorageProfile(storageProfileName)
+	if err != nil {
+		return err
+	}
+	err = task.WaitTaskCompletion()
+	if err != nil {
+		return err
+	}
+	return vdc.Refresh()
+}
+
+// SetDefaultStorageProfile sets a given storage profile as default
+// This operation will automatically unset the previous default storage profile.
+func (vdc *AdminVdc) SetDefaultStorageProfile(storageProfileName string) error {
+	if vdc.client.VCDHREF.String() == "" {
+		return fmt.Errorf("cannot set VDC default storage profile: VCD HREF is unset")
+	}
+
+	var storageProfile *types.Reference
+	for _, sp := range vdc.AdminVdc.VdcStorageProfiles.VdcStorageProfile {
+		if sp.Name == storageProfileName {
+			storageProfile = sp
+		}
+	}
+	if storageProfile == nil {
+		return fmt.Errorf("cannot set VDC default storage profile: storage profile '%s' not found in VDC", storageProfileName)
+	}
+
+	vdcStorageProfileDetails, err := vdc.client.GetStorageProfileByHref(storageProfile.HREF)
+	if err != nil {
+		return fmt.Errorf("cannot retrieve VDC storage profile '%s' details: %s", storageProfileName, err)
+	}
+	_, err = vdc.UpdateStorageProfile(extractUuid(storageProfile.HREF), &types.AdminVdcStorageProfile{
+		Name:    vdcStorageProfileDetails.Name,
+		Units:   vdcStorageProfileDetails.Units,
+		Limit:   vdcStorageProfileDetails.Limit,
+		Default: true,
+		Enabled: addrOf(true),
+		ProviderVdcStorageProfile: &types.Reference{
+			HREF: vdcStorageProfileDetails.ProviderVdcStorageProfile.HREF,
+		},
+	},
+	)
+	if err != nil {
+		return fmt.Errorf("cannot set VDC default storage profile '%s': %s", storageProfileName, err)
+	}
+	return vdc.Refresh()
+}
+
+// GetDefaultStorageProfileReference finds the default storage profile for the VDC
+func (adminVdc *AdminVdc) GetDefaultStorageProfileReference() (*types.Reference, error) {
+	var defaultSp *types.Reference
+	if adminVdc.AdminVdc.VdcStorageProfiles == nil || adminVdc.AdminVdc.VdcStorageProfiles.VdcStorageProfile == nil {
+		return nil, fmt.Errorf("no storage profiles found in VDC %s", adminVdc.AdminVdc.Name)
+	}
+	for _, sp := range adminVdc.AdminVdc.VdcStorageProfiles.VdcStorageProfile {
+		fullSp, err := adminVdc.client.GetStorageProfileByHref(sp.HREF)
+		if err != nil {
+			return nil, fmt.Errorf("error retrieving storage profile %s for VDC %s: %s", sp.Name, adminVdc.AdminVdc.Name, err)
+		}
+		if fullSp.Default {
+			if defaultSp != nil {
+				return nil, fmt.Errorf("more than one default storage profile found for VDC %s: '%s' and '%s'", adminVdc.AdminVdc.Name, sp.Name, defaultSp.Name)
+			}
+			defaultSp = sp
+		}
+	}
+	if defaultSp != nil {
+		return defaultSp, nil
+	}
+	return nil, fmt.Errorf("no default storage profile found for VDC %s", adminVdc.AdminVdc.Name)
+}
+
+// IsNsxv is a convenience function to check if the Admin VDC is backed by NSX-V Provider VDC
+func (adminVdc *AdminVdc) IsNsxv() bool {
+	vdc := NewVdc(adminVdc.client)
+	vdc.Vdc = &adminVdc.AdminVdc.Vdc
+	vdc.parent = adminVdc.parent
+	return vdc.IsNsxv()
 }

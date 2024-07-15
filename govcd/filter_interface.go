@@ -34,6 +34,10 @@ type (
 	QueryMedia         types.MediaRecordType
 	QueryVapp          types.QueryResultVAppRecordType
 	QueryVm            types.QueryResultVMRecordType
+	QueryOrgVdc        types.QueryResultOrgVdcRecordType
+	QueryTask          types.QueryResultTaskRecordType
+	QueryAdminTask     types.QueryResultTaskRecordType
+	QueryOrg           types.QueryResultOrgRecordType
 )
 
 // getMetadataValue is a generic metadata lookup for all query items
@@ -47,6 +51,20 @@ func getMetadataValue(metadata *types.Metadata, key string) string {
 		}
 	}
 	return ""
+}
+
+// --------------------------------------------------------------
+// Org VDC
+// --------------------------------------------------------------
+func (orgVdc QueryOrgVdc) GetHref() string       { return orgVdc.HREF }
+func (orgVdc QueryOrgVdc) GetName() string       { return orgVdc.Name }
+func (orgVdc QueryOrgVdc) GetType() string       { return "org_vdc" }
+func (orgVdc QueryOrgVdc) GetIp() string         { return "" } // IP does not apply to VDC
+func (orgVdc QueryOrgVdc) GetDate() string       { return "" } // Date does not aply to VDC
+func (orgVdc QueryOrgVdc) GetParentName() string { return orgVdc.OrgName }
+func (orgVdc QueryOrgVdc) GetParentId() string   { return orgVdc.Org }
+func (orgVdc QueryOrgVdc) GetMetadataValue(key string) string {
+	return getMetadataValue(orgVdc.Metadata, key)
 }
 
 // --------------------------------------------------------------
@@ -158,6 +176,34 @@ func (network QueryOrgVdcNetwork) GetMetadataValue(key string) string {
 }
 
 // --------------------------------------------------------------
+// Task
+// --------------------------------------------------------------
+func (task QueryTask) GetHref() string       { return task.HREF }
+func (task QueryTask) GetName() string       { return task.Name }
+func (task QueryTask) GetType() string       { return "Task" }
+func (task QueryTask) GetIp() string         { return "" }
+func (task QueryTask) GetDate() string       { return task.StartDate }
+func (task QueryTask) GetParentName() string { return task.OwnerName }
+func (task QueryTask) GetParentId() string   { return task.Org }
+func (task QueryTask) GetMetadataValue(key string) string {
+	return getMetadataValue(task.Metadata, key)
+}
+
+// --------------------------------------------------------------
+// AdminTask
+// --------------------------------------------------------------
+func (task QueryAdminTask) GetHref() string       { return task.HREF }
+func (task QueryAdminTask) GetName() string       { return task.Name }
+func (task QueryAdminTask) GetType() string       { return "Task" }
+func (task QueryAdminTask) GetIp() string         { return "" }
+func (task QueryAdminTask) GetDate() string       { return task.StartDate }
+func (task QueryAdminTask) GetParentName() string { return task.OwnerName }
+func (task QueryAdminTask) GetParentId() string   { return task.Org }
+func (task QueryAdminTask) GetMetadataValue(key string) string {
+	return getMetadataValue(task.Metadata, key)
+}
+
+// --------------------------------------------------------------
 // vApp
 // --------------------------------------------------------------
 func (vapp QueryVapp) GetHref() string       { return vapp.HREF }
@@ -183,6 +229,20 @@ func (vm QueryVm) GetParentName() string { return vm.ContainerName }
 func (vm QueryVm) GetParentId() string   { return vm.VdcHREF }
 func (vm QueryVm) GetMetadataValue(key string) string {
 	return getMetadataValue(vm.MetaData, key)
+}
+
+// --------------------------------------------------------------
+// Organization
+// --------------------------------------------------------------
+func (org QueryOrg) GetHref() string       { return org.HREF }
+func (org QueryOrg) GetName() string       { return org.Name }
+func (org QueryOrg) GetType() string       { return "organization" }
+func (org QueryOrg) GetDate() string       { return "" }
+func (org QueryOrg) GetIp() string         { return "" }
+func (org QueryOrg) GetParentId() string   { return "" }
+func (org QueryOrg) GetParentName() string { return "" }
+func (org QueryOrg) GetMetadataValue(key string) string {
+	return getMetadataValue(org.Metadata, key)
 }
 
 // --------------------------------------------------------------
@@ -228,6 +288,10 @@ func resultToQueryItems(queryType string, results Results) ([]QueryItem, error) 
 		for i, item := range results.Results.OrgVdcNetworkRecord {
 			items[i] = QueryOrgVdcNetwork(*item)
 		}
+	case types.QtOrg:
+		for i, item := range results.Results.OrgRecord {
+			items[i] = QueryOrg(*item)
+		}
 	case types.QtCatalog:
 		for i, item := range results.Results.CatalogRecord {
 			items[i] = QueryCatalog(*item)
@@ -252,6 +316,23 @@ func resultToQueryItems(queryType string, results Results) ([]QueryItem, error) 
 		for i, item := range results.Results.AdminVAppRecord {
 			items[i] = QueryVapp(*item)
 		}
+	case types.QtOrgVdc:
+		for i, item := range results.Results.OrgVdcRecord {
+			items[i] = QueryOrgVdc(*item)
+		}
+	case types.QtAdminOrgVdc:
+		for i, item := range results.Results.OrgVdcAdminRecord {
+			items[i] = QueryOrgVdc(*item)
+		}
+	case types.QtTask:
+		for i, item := range results.Results.TaskRecord {
+			items[i] = QueryTask(*item)
+		}
+	case types.QtAdminTask:
+		for i, item := range results.Results.TaskRecord {
+			items[i] = QueryAdminTask(*item)
+		}
+
 	}
 	if len(items) > 0 {
 		return items, nil

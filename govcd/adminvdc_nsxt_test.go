@@ -1,4 +1,4 @@
-// +build org functional nsxt ALL
+//go:build org || functional || nsxt || ALL
 
 /*
  * Copyright 2020 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -34,13 +34,10 @@ func (vcd *TestVCD) Test_CreateNsxtOrgVdc(check *C) {
 	}
 	providerVdcHref := pVdcs[0].HREF
 
-	pvdcStorageProfiles, err := QueryProviderVdcStorageProfileByName(vcd.client, vcd.config.VCD.NsxtProviderVdc.StorageProfile)
+	pvdcStorageProfile, err := vcd.client.QueryProviderVdcStorageProfileByName(vcd.config.VCD.NsxtProviderVdc.StorageProfile, providerVdcHref)
 
 	check.Assert(err, IsNil)
-	if len(pvdcStorageProfiles) == 0 {
-		check.Skip(fmt.Sprintf("No storage profile found with name '%s'", vcd.config.VCD.NsxtProviderVdc.StorageProfile))
-	}
-	providerVdcStorageProfileHref := pvdcStorageProfiles[0].HREF
+	providerVdcStorageProfileHref := pvdcStorageProfile.HREF
 
 	networkPools, err := QueryNetworkPoolByName(vcd.client, vcd.config.VCD.NsxtProviderVdc.NetworkPool)
 	check.Assert(err, IsNil)
@@ -71,7 +68,7 @@ func (vcd *TestVCD) Test_CreateNsxtOrgVdc(check *C) {
 				},
 			},
 			VdcStorageProfile: []*types.VdcStorageProfileConfiguration{&types.VdcStorageProfileConfiguration{
-				Enabled: true,
+				Enabled: addrOf(true),
 				Units:   "MB",
 				Limit:   1024,
 				Default: true,
@@ -94,6 +91,8 @@ func (vcd *TestVCD) Test_CreateNsxtOrgVdc(check *C) {
 		if allocationModel == "Flex" {
 			vdcConfiguration.IsElastic = &trueValue
 			vdcConfiguration.IncludeMemoryOverhead = &trueValue
+			// Memory guaranteed percentage is required when IncludeMemoryOverhead is true in VCD 10.6+
+			vdcConfiguration.ResourceGuaranteedMemory = addrOf(1.00)
 		}
 
 		vdc, _ := adminOrg.GetVDCByName(vdcConfiguration.Name, false)
@@ -123,6 +122,7 @@ func (vcd *TestVCD) Test_CreateNsxtOrgVdc(check *C) {
 		check.Assert(vdc.Vdc.Name, Equals, vdcConfiguration.Name)
 		check.Assert(vdc.Vdc.IsEnabled, Equals, vdcConfiguration.IsEnabled)
 		check.Assert(vdc.Vdc.AllocationModel, Equals, vdcConfiguration.AllocationModel)
+		check.Assert(len(adminVdc.AdminVdc.ResourcePoolRefs.VimObjectRef) > 0, Equals, true)
 
 		// Test  update
 		adminVdc.AdminVdc.Description = "updated-description" + check.TestName()

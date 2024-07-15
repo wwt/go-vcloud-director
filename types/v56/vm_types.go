@@ -42,6 +42,8 @@ type Vm struct {
 	// Section ovf:VirtualHardwareSection
 	VirtualHardwareSection *VirtualHardwareSection `xml:"VirtualHardwareSection,omitempty"`
 
+	RuntimeInfoSection *RuntimeInfoSection `xml:"RuntimeInfoSection,omitempty"`
+
 	// FIXME: Upstream bug? Missing NetworkConnectionSection
 	NetworkConnectionSection *NetworkConnectionSection `xml:"NetworkConnectionSection,omitempty"`
 
@@ -49,8 +51,8 @@ type Vm struct {
 
 	Snapshots *SnapshotSection `xml:"SnapshotSection,omitempty"`
 
-	// TODO: OVF Sections to be implemented
-	// Environment OVF_Environment `xml:"Environment,omitempty"
+	// The OVF environment defines how the guest software and the virtualization platform interact.
+	Environment *OvfEnvironment `xml:"Environment,omitempty"`
 
 	VmSpecSection *VmSpecSection `xml:"VmSpecSection,omitempty"`
 
@@ -63,6 +65,17 @@ type Vm struct {
 	ProductSection *ProductSection `xml:"ProductSection,omitempty"`
 	ComputePolicy  *ComputePolicy  `xml:"ComputePolicy,omitempty"` // accessible only from version API 33.0
 	Media          *Reference      `xml:"Media,omitempty"`         // Reference to the media object to insert in a new VM.
+	BootOptions    *BootOptions    `xml:"BootOptions,omitempty"`   // Accessible only from API version 37.1+
+}
+
+type RuntimeInfoSection struct {
+	Ns10        string `xml:"ns10,attr"`
+	Type        string `xml:"type,attr"`
+	Href        string `xml:"href,attr"`
+	Info        string `xml:"Info"`
+	VMWareTools struct {
+		Version string `xml:"version,attr"`
+	} `xml:"VMWareTools"`
 }
 
 // VmSpecSection from Vm struct
@@ -70,6 +83,7 @@ type VmSpecSection struct {
 	Modified          *bool             `xml:"Modified,attr,omitempty"`
 	Info              string            `xml:"ovf:Info"`
 	OsType            string            `xml:"OsType,omitempty"`            // The type of the OS. This parameter may be omitted when using the VmSpec to update the contents of an existing VM.
+	Firmware          string            `xml:"Firmware,omitempty"`          // Available since API 37.1. VM's Firmware, can be either 'bios' or 'efi'.
 	NumCpus           *int              `xml:"NumCpus,omitempty"`           // Number of CPUs. This parameter may be omitted when using the VmSpec to update the contents of an existing VM.
 	NumCoresPerSocket *int              `xml:"NumCoresPerSocket,omitempty"` // Number of cores among which to distribute CPUs in this virtual machine. This parameter may be omitted when using the VmSpec to update the contents of an existing VM.
 	CpuResourceMhz    *CpuResourceMhz   `xml:"CpuResourceMhz,omitempty"`    // CPU compute resources. This parameter may be omitted when using the VmSpec to update the contents of an existing VM.
@@ -82,11 +96,22 @@ type VmSpecSection struct {
 	TimeSyncWithHost  *bool             `xml:"TimeSyncWithHost,omitempty"`  // Synchronize the VM's time with the host.
 }
 
+// BootOptions allows to specify boot options of a VM
+type BootOptions struct {
+	BootDelay            *int   `xml:"BootDelay,omitempty"`            // Delay between power-on and boot of the VM
+	EnterBiosSetup       *bool  `xml:"EnterBIOSSetup,omitempty"`       // Set to false on the next boot
+	BootRetryEnabled     *bool  `xml:"BootRetryEnabled,omitempty"`     // Available since API 37.1
+	BootRetryDelay       *int   `xml:"BootRetryDelay,omitempty"`       // Available since API 37.1. Doesn't have an effect if BootRetryEnabled is set to false
+	EfiSecureBootEnabled *bool  `xml:"EfiSecureBootEnabled,omitempty"` // Available since API 37.1
+	NetworkBootProtocol  string `xml:"NetworkBootProtocol,omitempty"`  // Available since API 37.1
+}
+
 // RecomposeVAppParamsForEmptyVm represents a vApp structure which allows to create VM.
 type RecomposeVAppParamsForEmptyVm struct {
 	XMLName          xml.Name    `xml:"RecomposeVAppParams"`
 	XmlnsVcloud      string      `xml:"xmlns,attr"`
 	XmlnsOvf         string      `xml:"xmlns:ovf,attr"`
+	PowerOn          bool        `xml:"powerOn,attr,omitempty"` // True if the VM should be powered-on after creation. Defaults to false.
 	CreateItem       *CreateItem `xml:"CreateItem,omitempty"`
 	AllEULAsAccepted bool        `xml:"AllEULAsAccepted,omitempty"`
 }
@@ -100,7 +125,8 @@ type CreateItem struct {
 	VmSpecSection             *VmSpecSection             `xml:"VmSpecSection,omitempty"`
 	StorageProfile            *Reference                 `xml:"StorageProfile,omitempty"`
 	ComputePolicy             *ComputePolicy             `xml:"ComputePolicy,omitempty"` // accessible only from version API 33.0
-	BootImage                 *Media                     `xml:"Media,omitempty"`         // boot image as vApp template. Href, Id and name needed.
+	BootOptions               *BootOptions               `xml:"BootOptions,omitempty"`
+	BootImage                 *Media                     `xml:"Media,omitempty"` // boot image as vApp template. Href, Id and name needed.
 }
 
 // ComputePolicy represents structure to manage VM compute polices, part of RecomposeVAppParams structure.
@@ -144,7 +170,104 @@ type SourcedVmTemplateParams struct {
 	LocalityParams                *LocalityParams      `xml:"LocalityParams,omitempty"`                // Locality parameters provide a hint that may help optimize placement of a VM and an independent a Disk so that the VM can make efficient use of the disk.
 	Source                        *Reference           `xml:"Source"`                                  // A reference to an existing VM template
 	VmCapabilities                *VmCapabilities      `xml:"VmCapabilities,omitempty"`                // Describes the capabilities (hot swap, etc.) the instantiated VM should have.
-	VmGeneralParams               *VMGeneralParams     `xml:"VMGeneralParams,omitempty"`               // Specify name, description, and other properties of a VM during instantiation.
+	VmGeneralParams               *VMGeneralParams     `xml:"VmGeneralParams,omitempty"`               // Specify name, description, and other properties of a VM during instantiation.
 	VmTemplateInstantiationParams *InstantiationParams `xml:"VmTemplateInstantiationParams,omitempty"` // Same as InstantiationParams used for VMs within a vApp
 	StorageProfile                *Reference           `xml:"StorageProfile,omitempty"`                // A reference to a storage profile to be used for the VM. The specified storage profile must exist in the organization vDC that contains the composed vApp. If not specified, the default storage profile for the vDC is used.
+}
+
+// The OVF environment enables the guest software to access information about the virtualization platform, such as
+// the user-specified values for the properties defined in the OVF descriptor.
+type OvfEnvironment struct {
+	XMLName                xml.Name                `xml:"Environment"`
+	Ve                     string                  `xml:"ve,attr,omitempty"`                // Xml namespace
+	Id                     string                  `xml:"id,attr,omitempty"`                // Identification of VM from OVF Descriptor. Describes this virtual system.
+	VCenterId              string                  `xml:"vCenterId,attr,omitempty"`         // VM moref in the vCenter
+	PlatformSection        *PlatformSection        `xml:"PlatformSection,omitempty"`        // Describes the virtualization platform
+	PropertySection        *PropertySection        `xml:"PropertySection,omitempty"`        // Property elements with key/value pairs
+	EthernetAdapterSection *EthernetAdapterSection `xml:"EthernetAdapterSection,omitempty"` // Contains adapters info and virtual networks attached
+}
+
+// Provides information from the virtualization platform
+type PlatformSection struct {
+	XMLName xml.Name `xml:"PlatformSection"`
+	Kind    string   `xml:"Kind,omitempty"`    // Hypervisor kind is typically VMware ESXi
+	Version string   `xml:"Version,omitempty"` // Hypervisor version
+	Vendor  string   `xml:"Vendor,omitempty"`  // VMware, Inc.
+	Locale  string   `xml:"Locale,omitempty"`  // Hypervisor locale
+}
+
+// Contains a list of key/value pairs corresponding to properties defined in the OVF descriptor
+// Operating system level configuration, such as host names, IP address, subnets, gateways, etc.
+// Application-level configuration such as DNS name of active directory server, databases and
+// other external services.
+type PropertySection struct {
+	XMLName    xml.Name       `xml:"PropertySection"`
+	Properties []*OvfProperty `xml:"Property,omitempty"`
+}
+
+type OvfProperty struct {
+	Key   string `xml:"key,attr"`
+	Value string `xml:"value,attr"`
+}
+
+// Contains adapters info and virtual networks attached
+type EthernetAdapterSection struct {
+	XMLName  xml.Name   `xml:"EthernetAdapterSection"`
+	Adapters []*Adapter `xml:"Adapter,omitempty"`
+}
+
+type Adapter struct {
+	Mac        string `xml:"mac,attr"`
+	Network    string `xml:"network,attr"`
+	UnitNumber string `xml:"unitNumber,attr"`
+}
+
+// RequestVirtualHardwareSection is used to start a request in VM Extra Configuration set
+type RequestVirtualHardwareSection struct {
+	// Extends OVF Section_Type
+	XMLName xml.Name `xml:"ovf:VirtualHardwareSection"`
+	Xmlns   string   `xml:"xmlns,attr,omitempty"`
+	Ovf     string   `xml:"xmlns:ovf,attr"`
+	Vssd    string   `xml:"xmlns:vssd,attr"`
+	Rasd    string   `xml:"xmlns:rasd,attr"`
+	Ns2     string   `xml:"xmlns:ns2,attr"`
+	Ns3     string   `xml:"xmlns:ns3,attr"`
+	Ns4     string   `xml:"xmlns:ns4,attr"`
+	Vmw     string   `xml:"xmlns:vmw,attr"`
+
+	Info   string     `xml:"ovf:Info"`
+	HREF   string     `xml:"href,attr,omitempty"`
+	Type   string     `xml:"type,attr,omitempty"`
+	System []InnerXML `xml:"ovf:System,omitempty"`
+	Item   []InnerXML `xml:"ovf:Item,omitempty"`
+
+	ExtraConfigs []*ExtraConfigMarshal `xml:"vmw:ExtraConfig,omitempty"`
+}
+
+// ResponseVirtualHardwareSection is used to get a response
+type ResponseVirtualHardwareSection struct {
+	// Extends OVF Section_Type
+	XMLName xml.Name `xml:"VirtualHardwareSection"`
+	Xmlns   string   `xml:"vcloud,attr,omitempty"`
+	Ovf     string   `xml:"xmlns:ovf,attr"`
+	Ns4     string   `xml:"xmlns:ns4,attr"`
+	Vssd    string   `xml:"xmlns:vssd,attr"`
+	Rasd    string   `xml:"xmlns:rasd,attr"`
+	Vmw     string   `xml:"xmlns:vmw,attr"`
+
+	Info string `xml:"Info"`
+	HREF string `xml:"href,attr,omitempty"`
+	Type string `xml:"type,attr,omitempty"`
+
+	System []InnerXML `xml:"System,omitempty"`
+	Item   []InnerXML `xml:"Item,omitempty"`
+
+	ExtraConfigs []*ExtraConfig `xml:"ExtraConfig,omitempty"`
+}
+
+// ExtraConfig describes an Extra Configuration item
+type ExtraConfig struct {
+	Key      string `xml:"key,attr"`
+	Value    string `xml:"value,attr"`
+	Required bool   `xml:"required,attr"`
 }

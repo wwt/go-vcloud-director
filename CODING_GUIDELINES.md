@@ -115,7 +115,7 @@ func (client *Client) ExecuteRequestWithCustomError(pathURL, requestType, conten
 In addition to saving code and time by reducing the boilerplate, these functions also trigger debugging calls that make the code 
 easier to monitor.
 Using any of the above calls will result in the standard log i
-(See [LOGGING.md](https://github.com/vmware/go-vcloud-director/blob/master/util/LOGGING.md)) recording all the requests and responses
+(See [LOGGING.md](https://github.com/vmware/go-vcloud-director/blob/main/util/LOGGING.md)) recording all the requests and responses
 on demand, and also triggering debug output for specific calls (see `enableDebugShowRequest` and `enableDebugShowResponse`
 and the corresponding `disable*` in `api.go`).
 
@@ -348,7 +348,7 @@ To add a type to the search engine, we need the following:
 2. Add the list of supported fields to `queryFieldsOnDemand` (`query_metadata.go`)
 3. Implement the interface `QueryItem` (`filter_interface.go`), which requires a type localization (such as 
 `type QueryMedia  types.MediaRecordType`)
-4. Add a clause to `resultsToQueryItems` (`filter_interface.go`)
+4. Add a clause to `resultToQueryItems` (`filter_interface.go`)
 
 ## Data inspection checkpoints
 
@@ -365,6 +365,245 @@ they will be "NET1", "NET2", etc, and then activate them using
 In the code, we use the function `dataInspectionRequested(code)` that will check whether the environment variable contains
 the  given code.
 
+## Tenant Context
+
+Tenant context is a mechanism in the VCD API to run calls as a tenant when connected as a system administrator.
+It is used, for example, in the UI, to start a session as tenant administrator without having credentials for such a user,
+or even when there is no such user yet.
+The context change works by adding a header to the API call, containing these fields:
+
+```
+X-Vmware-Vcloud-Tenant-Context: [604cf889-b01e-408b-95ae-67b02a0ecf33]
+X-Vmware-Vcloud-Auth-Context:   [org-name]
+```
+
+The field `X-Vmware-Vcloud-Tenant-Context` contains the bare ID of the organization (it's just the UUID, without the
+prefix `urn:vcloud:org:`).
+The field `X-Vmware-Vcloud-Auth-Context` contains the organization name.
+
+### tenant context: data availability
+
+From the SDK standpoint, finding the data needed to put together the tenant context is relatively easy when the originator
+of the API call is the organization itself (such as `org.GetSomeEntityByName`).
+When we deal with objects down the hierarchy, however, things are more difficult. Running a call from a VDC means that
+we need to retrieve the parent organization, and extract ID and name. The ID is available through the `Link` structure
+of the VDC, but for the name we need to retrieve the organization itself.
+
+The approach taken in the SDK is to save the tenant context (or a pointer to the parent) in the object that we have just
+created. For example, when we create a VDC, we save the organization as a pointer in the `parent` field, and the organization 
+itself has a field `TenantContext` with the needed information.
+
+Here are the types that are needed for tenant context manipulation
+```go
+
+// tenant_context.go
+type TenantContext struct {
+	OrgId   string // The bare ID (without prefix) of an organization
+	OrgName string // The organization name
+}
+
+// tenant_context.go
+type organization interface {
+	orgId() string
+	orgName() string
+	tenantContext() (*TenantContext, error)
+	fullObject() interface{}
+}
+
+// org.go
+type Org struct {
+	Org           *types.Org
+	client        *Client
+	TenantContext *TenantContext
+}
+
+// adminorg.go
+type AdminOrg struct {
+	AdminOrg      *types.AdminOrg
+	client        *Client
+	TenantContext *TenantContext
+}
+
+// vdc.go
+type Vdc struct {
+	Vdc    *types.Vdc
+	client *Client
+	parent organization
+}
+```
+
+The `organization` type is an abstraction to include both `Org` and `AdminOrg`. Thus, the VDC object has a pointer to its
+parent that is only needed to get the tenant context quickly.
+
+Each object has a way to get the tenant context by means of a `entity.getTenantContext()`. The information
+trickles down from the hierarchy:
+
+* a VDC gets the tenant context directly from its `parent` field, which has a method `tenantContext()`
+* similarly, a Catalog has a `parent` field with the same functionality.
+* a vApp will get the tenant context by first retrieving its parent (`vapp.getParentVdc()`) and then asking the parent
+for the tenant context.
+
+### tenant context: usage
+
+Once we have the tenant context, we need to pass the information along to the HTTP request that builds the request header,
+so that our API call will run in the desired context.
+
+The basic OpenAPI methods (`Client.OpenApiDeleteItem`, `Client.OpenApiGetAllItems`, `Client.OpenApiGetItem`,
+`Client.OpenApiPostItem`, `Client.OpenApiPutItem`, `Client.OpenApiPutItemAsync`, `Client.OpenApiPutItemSync`)  all include
+a parameter `additionalHeader map[string]string` containing the information needed to build the tenant context header elements.
+
+Inside the function where we want to use tenant context, we do these two steps:
+
+1. retrieve the tenant context
+2. add the additional header to the API call.
+
+For example:
+
+```go
+func (adminOrg *AdminOrg) GetAllRoles(queryParameters url.Values) ([]*Role, error) {
+	tenantContext, err := adminOrg.getTenantContext()
+	if err != nil {
+		return nil, err
+	}
+	return getAllRoles(adminOrg.client, queryParameters, getTenantContextHeader(tenantContext))
+}
+```
+The function `getTenantContextHeader` takes a tenant context and returns a map of strings containing the right header
+keys. In the example above, the header is passed to `getAllRoles`, which in turn calls `Client.OpenApiGetAllItems`,
+which passes the additional header until it reaches `newOpenApiRequest`, where the tenent context data is inserted in
+the request header.
+
+When the tenant context is not needed (system administration calls), we just pass `nil` as `additionalHeader`.
+
+## Generic CRUD functions for OpenAPI entity implementation
+
+Generic CRUD functions are used to minimize boilerplate for entity implementation in the SDK. They
+might not always be the way to go when there are very specific operation needs as it is not worth
+having a generic function for single use case. In such cases, low level API client function set,
+that is located in `openapi.go` can help to perform such operations.
+
+### Terminology
+
+#### inner vs outer types
+
+For the context of generic CRUD function implementation (mainly in files
+`govcd/openapi_generic_outer_entities.go`, `govcd/openapi_generic_inner_entities.go`), such terms
+are commonly used:
+
+* `inner` type is the type that is responsible for marshaling/unmarshaling API
+  request payload and is usually inside `types` package. (e.g. `types.IpSpace`,
+  `types.NsxtAlbPoolMember`, etc.)
+* `outer` (type) - this is the type that wraps `inner` type and possibly any other entities that are
+  required to perform operations for a particular VCD entity. It will almost always include some
+  reference to client (`VCDClient` or `Client`), which is required to perform API operations. It may
+  contain additional fields.
+
+Here are the entities mapped in the example below: 
+
+* `DistributedFirewall` is the **`outer`** type
+* `types.DistributedFirewallRules` is the **`inner`** type (specified in
+  `DistributedFirewall.DistributedFirewallRuleContainer` field)
+* `client` field contains the client that is required for perfoming API operations
+* `VdcGroup` field contains additional data (VDC Group reference) that is required for
+implementation of this particular entity
+
+```go
+type DistributedFirewall struct {
+	DistributedFirewallRuleContainer *types.DistributedFirewallRules
+	client                           *Client
+	VdcGroup                         *VdcGroup
+}
+```
+
+#### crudConfig
+
+A special type `govcd.crudConfig` is used for passing configuration to both - `inner` and `outer`
+generic CRUD functions. It also has an internal `validate()` method, which is called upon execution
+of any `inner` and `outer` CRUD functions.
+
+See documentation of `govcd.crudConfig` for the options it provides.
+
+### Use cases
+
+The main consideration when to use which functions depends on whether one is dealing with `inner`
+types or `outer` types. Both types can be used for quicker development.
+
+Usually, `outer` type is used for a full featured entity (e.g. `IpSpace`, `NsxtEdgeGateway`), while
+`inner` suits cases where one needs to perform operations on an already existing or a read-only
+entity.
+
+**Hint:** return value of your entity method will always hint whether it is `inner` or `outer` one:
+
+`inner` type function signature example (returns `*types.VdcNetworkProfile`):
+
+```
+func (adminVdc *AdminVdc) UpdateVdcNetworkProfile(vdcNetworkProfileConfig *types.VdcNetworkProfile) (*types.VdcNetworkProfile, error) {
+```
+
+`outer` type function signature example (returns `*IpSpace`):
+
+```
+func (vcdClient *VCDClient) CreateIpSpace(ipSpaceConfig *types.IpSpace) (*IpSpace, error) {
+```
+
+#### inner CRUD functions
+
+The entities that match below criteria are usually going to use `inner` crud functions:
+* API property manipulation with separate API endpoints for an already existing entity (e.g. VDC
+  Network Profiles `Vdc.UpdateVdcNetworkProfile`)
+* Read only entities (e.g. NSX-T Segment Profiles `VCDClient.GetAllIpDiscoveryProfiles`)
+
+Inner types are more simple as they can be directly used without any additional overhead. There are
+7 functions that can be used:
+
+* `createInnerEntity`
+* `updateInnerEntity`
+* `updateInnerEntityWithHeaders`
+* `getInnerEntity`
+* `getInnerEntityWithHeaders`
+* `deleteEntityById`
+* `getAllInnerEntities`
+
+Existing examples of the implementation are:
+
+* `Vdc.GetVdcNetworkProfile`
+* `Vdc.UpdateVdcNetworkProfile`
+* `Vdc.DeleteVdcNetworkProfile`
+* `VCDClient.GetAllIpDiscoveryProfiles`
+
+#### outer CRUD functions
+
+The entities, that implement complete management of a VCD entity will usually rely on `outer` CRUD
+functions. Any `outer` type *must* implement `wrap` method (example signature provided below). It is
+required to satisfy generic interface constraint (so that generic functions are able to wrap `inner`
+type into `outer` type)
+
+```go
+func (o OuterEntity) wrap(inner *InnerEntity) *OuterEntity {
+	o.OuterEntity = inner
+	return &o
+}
+```
+There are 5 functions for handling CRU(D). 
+* `createOuterEntity`
+* `updateOuterEntity`
+* `getOuterEntity`
+* `getOuterEntityWithHeaders`
+* `getAllOuterEntities`
+
+*Note*: `D` (deletion) in `CRUD` is a simple operation that does not additionally handle data and
+`deleteEntityById` is sufficient.
+
+Existing examples of the implementation are:
+* `IpSpace`
+* `IpSpaceUplink`
+* `DistributedFirewall`
+* `DistributedFirewallRule`
+* `NsxtSegmentProfileTemplate`
+* `DefinedEntityType`
+* `DefinedInterface`
+* `DefinedEntity`
+
 ## Testing
 
-Every feature in the library must include testing. See [TESTING.md](https://github.com/vmware/go-vcloud-director/blob/master/TESTING.md) for more info.
+Every feature in the library must include testing. See [TESTING.md](https://github.com/vmware/go-vcloud-director/blob/main/TESTING.md) for more info.

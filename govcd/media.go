@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -132,7 +133,17 @@ func executeUpload(client *Client, media *types.Media, mediaFilePath, mediaName 
 		uploadError:              &uploadError,
 	}
 
-	go uploadFile(client, mediaFilePath, details)
+	// sending upload process to background, this allows not to lock and return task to client
+	// The error should be captured in details.uploadError, but just in case, we add a logging for the
+	// main error
+	go func() {
+		_, err = uploadFile(client, mediaFilePath, details)
+		if err != nil {
+			util.Logger.Println(strings.Repeat("*", 80))
+			util.Logger.Printf("*** [DEBUG - executeUpload] error calling uploadFile: %s\n", err)
+			util.Logger.Println(strings.Repeat("*", 80))
+		}
+	}()
 
 	var task Task
 	for _, item := range media.Tasks.Task {
@@ -173,7 +184,12 @@ func createMedia(client *Client, link, mediaName, mediaDescription string, fileS
 	if err != nil {
 		return nil, err
 	}
-	defer response.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			util.Logger.Printf("error closing response Body [createMedia]: %s", err)
+		}
+	}(response.Body)
 
 	mediaForUpload := &types.Media{}
 	if err = decodeBody(types.BodyTypeXML, response, mediaForUpload); err != nil {
@@ -251,12 +267,11 @@ func queryMedia(client *Client, mediaUrl string, newItemName string) (*types.Med
 
 // Verifies provided file header matches standard
 func verifyIso(filePath string) (bool, error) {
-	// #nosec G304 - linter does not like 'filePath' to be a variable. However this is necessary for file uploads.
-	file, err := os.Open(filePath)
+	file, err := os.Open(filepath.Clean(filePath))
 	if err != nil {
 		return false, err
 	}
-	defer file.Close()
+	defer safeClose(file)
 
 	return readHeader(file)
 }
@@ -274,21 +289,32 @@ func readHeader(reader io.Reader) (bool, error) {
 	if headerOk {
 		return true, nil
 	} else {
-		return false, errors.New("file header didn't match ISO standard")
+		return false, errors.New("file header didn't match ISO or UDF standard")
 	}
 }
 
-// Verify file header info: https://www.garykessler.net/library/file_sigs.html
+// Verify file header for ISO or UDF type. Info: https://www.garykessler.net/library/file_sigs.html
 func verifyHeader(buf []byte) bool {
-	// search for CD001(43 44 30 30 31) in specific file places.
-	//This signature usually occurs at byte offset 32769 (0x8001),
-	//34817 (0x8801), or 36865 (0x9001).
+	// ISO verification - search for CD001(43 44 30 30 31) in specific file places.
+	// This signature usually occurs at byte offset 32769 (0x8001),
+	// 34817 (0x8801), or 36865 (0x9001).
+	// UDF verification - search for BEA01(42 45 41 30 31) in specific file places.
+	// This signature usually occurs at byte offset 32769 (0x8001),
+	// 34817 (0x8801), or 36865 (0x9001).
+
 	return (buf[32769] == 0x43 && buf[32770] == 0x44 &&
 		buf[32771] == 0x30 && buf[32772] == 0x30 && buf[32773] == 0x31) ||
 		(buf[34817] == 0x43 && buf[34818] == 0x44 &&
 			buf[34819] == 0x30 && buf[34820] == 0x30 && buf[34821] == 0x31) ||
 		(buf[36865] == 0x43 && buf[36866] == 0x44 &&
-			buf[36867] == 0x30 && buf[36868] == 0x30 && buf[36869] == 0x31)
+			buf[36867] == 0x30 && buf[36868] == 0x30 && buf[36869] == 0x31) ||
+		(buf[32769] == 0x42 && buf[32770] == 0x45 &&
+			buf[32771] == 0x41 && buf[32772] == 0x30 && buf[32773] == 0x31) ||
+		(buf[34817] == 0x42 && buf[34818] == 0x45 &&
+			buf[34819] == 41 && buf[34820] == 0x30 && buf[34821] == 0x31) ||
+		(buf[36865] == 42 && buf[36866] == 45 &&
+			buf[36867] == 41 && buf[36868] == 0x30 && buf[36869] == 0x31)
+
 }
 
 // Reference for API usage http://pubs.vmware.com/vcloud-api-1-5/wwhelp/wwhimpl/js/html/wwhelp.htm#href=api_prog/GUID-9356B99B-E414-474A-853C-1411692AF84C.html
@@ -526,6 +552,7 @@ func (cat *Catalog) GetMediaByNameOrId(identifier string, refresh bool) (*Media,
 func (adminCatalog *AdminCatalog) GetMediaByHref(mediaHref string) (*Media, error) {
 	catalog := NewCatalog(adminCatalog.client)
 	catalog.Catalog = &adminCatalog.AdminCatalog.Catalog
+	catalog.parent = adminCatalog.parent
 	return catalog.GetMediaByHref(mediaHref)
 }
 
@@ -535,6 +562,7 @@ func (adminCatalog *AdminCatalog) GetMediaByHref(mediaHref string) (*Media, erro
 func (adminCatalog *AdminCatalog) GetMediaByName(mediaName string, refresh bool) (*Media, error) {
 	catalog := NewCatalog(adminCatalog.client)
 	catalog.Catalog = &adminCatalog.AdminCatalog.Catalog
+	catalog.parent = adminCatalog.parent
 	return catalog.GetMediaByName(mediaName, refresh)
 }
 
@@ -544,6 +572,7 @@ func (adminCatalog *AdminCatalog) GetMediaByName(mediaName string, refresh bool)
 func (adminCatalog *AdminCatalog) GetMediaById(mediaId string) (*Media, error) {
 	catalog := NewCatalog(adminCatalog.client)
 	catalog.Catalog = &adminCatalog.AdminCatalog.Catalog
+	catalog.parent = adminCatalog.parent
 	return catalog.GetMediaById(mediaId)
 }
 
@@ -553,6 +582,7 @@ func (adminCatalog *AdminCatalog) GetMediaById(mediaId string) (*Media, error) {
 func (adminCatalog *AdminCatalog) GetMediaByNameOrId(identifier string, refresh bool) (*Media, error) {
 	catalog := NewCatalog(adminCatalog.client)
 	catalog.Catalog = &adminCatalog.AdminCatalog.Catalog
+	catalog.parent = adminCatalog.parent
 	return catalog.GetMediaByNameOrId(identifier, refresh)
 }
 
@@ -606,7 +636,44 @@ func (catalog *Catalog) QueryMedia(mediaName string) (*MediaRecord, error) {
 func (adminCatalog *AdminCatalog) QueryMedia(mediaName string) (*MediaRecord, error) {
 	catalog := NewCatalog(adminCatalog.client)
 	catalog.Catalog = &adminCatalog.AdminCatalog.Catalog
+	catalog.parent = adminCatalog.parent
 	return catalog.QueryMedia(mediaName)
+}
+
+// QueryMediaById returns a MediaRecord associated to the given media item URN. Returns ErrorEntityNotFound
+// if it is not found, or an error if there's more than one result.
+func (vcdClient *VCDClient) QueryMediaById(mediaId string) (*MediaRecord, error) {
+	if mediaId == "" {
+		return nil, fmt.Errorf("media ID is empty")
+	}
+
+	filterType := types.QtMedia
+	if vcdClient.Client.IsSysAdmin {
+		filterType = types.QtAdminMedia
+	}
+	results, err := vcdClient.Client.QueryWithNotEncodedParams(nil, map[string]string{
+		"type":          filterType,
+		"filter":        fmt.Sprintf("id==%s", url.QueryEscape(mediaId)),
+		"filterEncoded": "true"})
+	if err != nil {
+		return nil, fmt.Errorf("error querying medias %s", err)
+	}
+	newMediaRecord := NewMediaRecord(&vcdClient.Client)
+
+	mediaResults := results.Results.MediaRecord
+	if vcdClient.Client.IsSysAdmin {
+		mediaResults = results.Results.AdminMediaRecord
+	}
+
+	if len(mediaResults) == 0 {
+		return nil, ErrorEntityNotFound
+	}
+	if len(mediaResults) > 1 {
+		return nil, fmt.Errorf("found %#v results with media ID %s", len(mediaResults), mediaId)
+	}
+
+	newMediaRecord.MediaRecord = mediaResults[0]
+	return newMediaRecord, nil
 }
 
 // Refresh refreshes the media information by href
@@ -679,4 +746,100 @@ func (vdc *Vdc) QueryAllMedia(mediaName string) ([]*MediaRecord, error) {
 
 	util.Logger.Printf("[TRACE] Found media records by name: %#v \n", mediaResults)
 	return newMediaRecords, nil
+}
+
+// enableDownload prepares a media item for download and returns a download link
+// Note: depending on the size of the item, it may take a long time.
+func (media *Media) enableDownload() (string, error) {
+	downloadUrl := getUrlFromLink(media.Media.Link, "enable", "")
+	if downloadUrl == "" {
+		return "", fmt.Errorf("no enable URL found")
+	}
+	// The result of this operation is the creation of an entry in the 'Files' field of the media structure
+	// Inside that field, there will be a Link entry with the URL for the download
+	// e.g.
+	//<Files>
+	//    <File size="25434" name="file">
+	//        <Link rel="download:default" href="https://example.com/transfer/1638969a-06da-4f6c-b097-7796c1556c54/file"/>
+	//    </File>
+	//</Files>
+	task, err := media.client.executeTaskRequest(
+		downloadUrl,
+		http.MethodPost,
+		types.MimeTask,
+		"error enabling download: %s",
+		nil,
+		media.client.APIVersion)
+	if err != nil {
+		return "", err
+	}
+	err = task.WaitTaskCompletion()
+	if err != nil {
+		return "", err
+	}
+
+	err = media.Refresh()
+	if err != nil {
+		return "", err
+	}
+
+	if media.Media.Files == nil || len(media.Media.Files.File) == 0 {
+		return "", fmt.Errorf("no downloadable file info found")
+	}
+	downloadHref := ""
+	for _, f := range media.Media.Files.File {
+		for _, l := range f.Link {
+			if l.Rel == "download:default" {
+				downloadHref = l.HREF
+				break
+			}
+			if downloadHref != "" {
+				break
+			}
+		}
+	}
+
+	if downloadHref == "" {
+		return "", fmt.Errorf("no download URL found")
+	}
+
+	return downloadHref, nil
+}
+
+// Download gets the contents of a media item as a byte stream
+// NOTE: the whole item will be saved in local memory. Do not attempt this operation for very large items
+func (media *Media) Download() ([]byte, error) {
+
+	downloadHref, err := media.enableDownload()
+	if err != nil {
+		return nil, err
+	}
+
+	downloadUrl, err := url.ParseRequestURI(downloadHref)
+	if err != nil {
+		return nil, fmt.Errorf("error getting download URL: %s", err)
+	}
+
+	request := media.client.NewRequest(map[string]string{}, http.MethodGet, *downloadUrl, nil)
+	resp, err := media.client.Http.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("error getting media download: %s", err)
+	}
+
+	if !isSuccessStatus(resp.StatusCode) {
+		return nil, fmt.Errorf("error downloading media: %s", resp.Status)
+	}
+	body, err := io.ReadAll(resp.Body)
+
+	defer func() {
+		err = resp.Body.Close()
+		if err != nil {
+			panic(fmt.Sprintf("error closing body: %s", err))
+		}
+	}()
+
+	if err != nil {
+		return nil, err
+	}
+	return body, nil
 }

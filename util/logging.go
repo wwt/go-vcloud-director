@@ -9,11 +9,12 @@ package util
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
@@ -33,12 +34,14 @@ const (
 	envLogOnScreen = "GOVCD_LOG_ON_SCREEN"
 
 	// Name of the environment variable that enables logging of passwords
+	// #nosec G101 -- This is not a password
 	envLogPasswords = "GOVCD_LOG_PASSWORDS"
 
 	// Name of the environment variable that enables logging of HTTP requests
 	envLogSkipHttpReq = "GOVCD_LOG_SKIP_HTTP_REQ"
 
 	// Name of the environment variable that enables logging of HTTP responses
+	// #nosec G101 -- Not a credential
 	envLogSkipHttpResp = "GOVCD_LOG_SKIP_HTTP_RESP"
 
 	// Name of the environment variable with a custom list of of responses to skip from logging
@@ -49,7 +52,7 @@ const (
 )
 
 var (
-	// All go-vcloud director logging goes through this logger
+	// All go-vcloud-director logging goes through this logger
 	Logger *log.Logger
 
 	// It's true if we're using an user provided logger
@@ -113,9 +116,9 @@ func newLogger(logpath string) *log.Logger {
 	var err error
 	var file *os.File
 	if OverwriteLog {
-		file, err = os.OpenFile(logpath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0640)
+		file, err = os.OpenFile(filepath.Clean(logpath), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	} else {
-		file, err = os.OpenFile(logpath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0640)
+		file, err = os.OpenFile(filepath.Clean(logpath), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
 	}
 
 	if err != nil {
@@ -137,7 +140,7 @@ func SetLog() {
 		return
 	}
 	if !EnableLogging {
-		Logger = log.New(ioutil.Discard, "", log.Ldate|log.Ltime)
+		Logger = log.New(io.Discard, "", log.Ldate|log.Ltime)
 		return
 	}
 
@@ -160,34 +163,50 @@ func SetLog() {
 	}
 }
 
-// hidePasswords hides passwords that may be used in a request
-func hidePasswords(in string, onScreen bool) string {
+// hideSensitive hides passwords, tokens, and certificate details
+func hideSensitive(in string, onScreen bool) string {
 	if !onScreen && LogPasswords {
 		return in
 	}
 	var out string
+
+	// Filters out the below:
+	// Regular passwords
 	re1 := regexp.MustCompile(`("[^\"]*[Pp]assword"\s*:\s*)"[^\"]+"`)
 	out = re1.ReplaceAllString(in, `${1}"********"`)
 
 	// Replace password in ADFS SAML request
 	re2 := regexp.MustCompile(`(\s*<o:Password.*ext">)(.*)(</o:Password>)`)
 	out = re2.ReplaceAllString(out, `${1}******${3}`)
-	return out
-}
 
-// hideTokens hides SAML auth response token
-func hideTokens(in string, onScreen bool) string {
-	if !onScreen && LogPasswords {
-		return in
-	}
-	var out string
-	// Filters out the below:
 	// Token data between <e:CipherValue> </e:CipherValue>
-	re1 := regexp.MustCompile(`(.*<e:CipherValue>)(.*)(</e:CipherValue>.*)`)
-	out = re1.ReplaceAllString(in, `${1}******${3}`)
+	re3 := regexp.MustCompile(`(.*<e:CipherValue>)(.*)(</e:CipherValue>.*)`)
+	out = re3.ReplaceAllString(out, `${1}******${3}`)
 	// Token data between <xenc:CipherValue> </xenc:CipherValue>
-	re2 := regexp.MustCompile(`(.*<xenc:CipherValue>)(.*)(</xenc:CipherValue>.*)`)
-	out = re2.ReplaceAllString(out, `${1}******${3}`)
+	re4 := regexp.MustCompile(`(.*<xenc:CipherValue>)(.*)(</xenc:CipherValue>.*)`)
+	out = re4.ReplaceAllString(out, `${1}******${3}`)
+
+	// Data inside certificates and private keys
+	re5 := regexp.MustCompile(`(-----BEGIN CERTIFICATE-----)(.*)(-----END CERTIFICATE-----)`)
+	out = re5.ReplaceAllString(out, `${1}******${3}`)
+	re6 := regexp.MustCompile(`(-----BEGIN ENCRYPTED PRIVATE KEY-----)(.*)(-----END ENCRYPTED PRIVATE KEY-----)`)
+	out = re6.ReplaceAllString(out, `${1}******${3}`)
+
+	// Token inside request body
+	re7 := regexp.MustCompile(`(refresh_token)=(\S+)`)
+	out = re7.ReplaceAllString(out, `${1}=*******`)
+
+	// Bearer token inside JSON response
+	re8 := regexp.MustCompile(`("access_token":\s*)"[^"]*`)
+	out = re8.ReplaceAllString(out, `${1}*******`)
+
+	// Token inside JSON response
+	re9 := regexp.MustCompile(`("refresh_token":\s*)"[^"]*`)
+	out = re9.ReplaceAllString(out, `${1}*******`)
+
+	// API Token inside CSE JSON payloads
+	re10 := regexp.MustCompile(`("apiToken":\s*)"[^"]*`)
+	out = re10.ReplaceAllString(out, `${1}*******`)
 
 	return out
 }
@@ -197,6 +216,13 @@ func isBinary(data string, req *http.Request) bool {
 	reContentRange := regexp.MustCompile(`(?i)content-range`)
 	reMultipart := regexp.MustCompile(`(?i)multipart/form`)
 	reMediaXml := regexp.MustCompile(`(?i)media+xml;`)
+	// Skip data transferred for vApp template or catalog item upload
+	if strings.Contains(req.URL.String(), "/transfer/") &&
+		(strings.HasSuffix(req.URL.String(), ".vmdk") || strings.HasSuffix(req.URL.String(), "/file")) &&
+		(req.Method == http.MethodPut || req.Method == http.MethodPost) {
+		return true
+	}
+	uiPlugin := regexp.MustCompile(`manifest\.json|bundle\.js`)
 	for key, value := range req.Header {
 		if reContentRange.MatchString(key) {
 			return true
@@ -210,7 +236,7 @@ func isBinary(data string, req *http.Request) bool {
 			}
 		}
 	}
-	return false
+	return uiPlugin.MatchString(data)
 }
 
 // SanitizedHeader returns a http.Header with sensitive fields masked
@@ -296,12 +322,13 @@ func ProcessRequestOutput(caller, operation, url, payload string, req *http.Requ
 	if isBinary(payload, req) {
 		payload = "[binary data]"
 	}
-	if dataSize > 0 {
-		Logger.Printf("Request data: [%d]\n%s\n", dataSize, hidePasswords(payload, false))
-	}
+	// Request header should be shown before Request data
 	Logger.Printf("Req header:\n")
 	logSanitizedHeader(req.Header)
 
+	if dataSize > 0 {
+		Logger.Printf("Request data: [%d]\n%s\n", dataSize, hideSensitive(payload, false))
+	}
 }
 
 // Logs the essentials of a HTTP response
@@ -345,9 +372,11 @@ func ProcessResponseOutput(caller string, resp *http.Response, result string) {
 	dataSize := len(result)
 	outTextSize := len(outText)
 	if outTextSize != dataSize {
-		Logger.Printf("Response text: [%d -> %d]\n%s\n", dataSize, outTextSize, hideTokens(outText, false))
+		Logger.Printf("Response text: [%d -> %d]\n%s\n", dataSize, outTextSize, hideSensitive(outText, false))
+	} else if dataSize == 0 {
+		Logger.Printf("Response text: [%d]\n", dataSize)
 	} else {
-		Logger.Printf("Response text: [%d]\n%s\n", dataSize, hideTokens(outText, false))
+		Logger.Printf("Response text: [%d]\n%s\n", dataSize, hideSensitive(outText, false))
 	}
 }
 

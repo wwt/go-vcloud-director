@@ -1,4 +1,4 @@
-// +build ALL openapi functional nsxt
+//go:build ALL || openapi || functional || nsxt
 
 /*
  * Copyright 2020 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -13,6 +13,7 @@ import (
 )
 
 func (vcd *TestVCD) Test_QueryNsxtManagerByName(check *C) {
+	vcd.skipIfNotSysAdmin(check)
 	skipNoNsxtConfiguration(vcd, check)
 	nsxtManagers, err := vcd.client.QueryNsxtManagerByName(vcd.config.VCD.Nsxt.Manager)
 	check.Assert(err, IsNil)

@@ -1,4 +1,4 @@
-// +build functional vapp catalog ALL
+//go:build functional || vapp || catalog || ALL
 
 /*
  * Copyright 2020 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.

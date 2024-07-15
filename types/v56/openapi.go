@@ -45,10 +45,10 @@ func (openApiError OpenApiError) ErrorWithStack() string {
 // Role defines access roles in VCD
 type Role struct {
 	ID          string `json:"id,omitempty"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	BundleKey   string `json:"bundleKey"`
-	ReadOnly    bool   `json:"readOnly"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+	BundleKey   string `json:"bundleKey,omitempty"`
+	ReadOnly    bool   `json:"readOnly,omitempty"`
 }
 
 // NsxtTier0Router defines NSX-T Tier 0 router
@@ -82,14 +82,85 @@ type ExternalNetworkV2 struct {
 	// Description of the network
 	Description string `json:"description"`
 	// Subnets define one or more subnets and IP allocation pools in edge gateway
-	Subnets ExternalNetworkV2Subnets `json:"subnets"`
+	Subnets ExternalNetworkV2Subnets `json:"subnets,omitempty"`
 	// NetworkBackings for this external network. Describes if this external network is backed by
 	// port groups, vCenter standard switch or an NSX-T Tier-0 router.
 	NetworkBackings ExternalNetworkV2Backings `json:"networkBackings"`
+
+	// UsingIpSpace indicates whether the external network is using IP Spaces or not. This field is
+	// applicable only to the external networks backed by NSX-T Tier-0 router.
+	// This field is only available in VCD 10.4.1+
+	UsingIpSpace *bool `json:"usingIpSpace,omitempty"`
+
+	// DedicatedEdgeGateway contains reference to the Edge Gateway that this external network is
+	// dedicated to. This is null if this is not a dedicated external network. This field is unset
+	// if external network is using IP Spaces.
+	DedicatedEdgeGateway *OpenApiReference `json:"dedicatedEdgeGateway,omitempty"`
+
+	// DedicatedOrg specifies the Organization that this external network belongs to. This is unset
+	// for the external networks which are available to more than one organization.
+	//
+	// If this external network is dedicated to an Edge Gateway, this field is read-only and will be
+	// set to the Organization of the Edge Gateway.
+	//
+	// If this external network is using IP Spaces, this field can
+	// be used to dedicate this external network to the specified Organization.
+	DedicatedOrg *OpenApiReference `json:"dedicatedOrg,omitempty"`
+
+	// NatAndFirewallServiceIntention defines different types of intentions to configure NAT and
+	// firewall rules:
+	// * PROVIDER_GATEWAY - Allow management of NAT and firewall rules only on Provider Gateways.
+	//
+	// * EDGE_GATEWAY - Allow management of NAT and firewall rules only on Edge Gateways.
+	//
+	// * PROVIDER_AND_EDGE_GATEWAY - Allow management of NAT and firewall rules on both the Provider
+	// and Edge gateways.
+	//
+	// This only applies to external networks backed by NSX-T Tier-0 router (i.e. Provider Gateway)
+	// and is unset otherwise. Public Provider Gateway supports only EDGE_GATEWAY_ONLY. All other
+	// values are ignored. Private Provider Gateway can support all the intentions and if unset, the
+	// default is EDGE_GATEWAY.
+	//
+	// This field requires VCD 10.5.1+ (API 38.1+)
+	NatAndFirewallServiceIntention string `json:"natAndFirewallServiceIntention,omitempty"`
+
+	// NetworkRouteAdvertisementIntention configures different types of route advertisement
+	// intentions for routed Org VDC network connected to Edge Gateway that is connected to this
+	// Provider Gateway. Possible values are:
+	//
+	// * IP_SPACE_UPLINKS_ADVERTISED_STRICT - All networks within IP Space associated with IP Space
+	// Uplink will be advertised by default. This can be changed on an individual network level
+	// later, if necessary. All other networks outside of IP Spaces associated with IP Space Uplinks
+	// cannot be configured to be advertised.
+	//
+	// * IP_SPACE_UPLINKS_ADVERTISED_FLEXIBLE - All networks within IP Space associated with IP
+	// Space Uplink will be advertised by default. This can be changed on an individual network
+	// level later, if necessary. All other networks outside of IP Spaces associated with IP Space
+	// Uplinks are not advertised by default but can be configured to be advertised after creation.
+	//
+	// * ALL_NETWORKS_ADVERTISED - All networks, regardless on whether they fall inside of any IP
+	// Spaces associated with IP Space Uplinks, will be advertised by default. This can be changed
+	// on an individual network level later, if necessary.
+	//
+	// This only applies to external networks backed by NSX-T Tier-0 router (i.e. Provider Gateway)
+	// and is unset otherwise. Public Provider Gateway supports only
+	// IP_SPACE_UPLINKS_ADVERTISED_STRICT. All other values are ignored. Private Provider Gateway
+	// can support all the intentions and if unset, the default is also
+	// IP_SPACE_UPLINKS_ADVERTISED_STRICT.
+	//
+	// This field requires VCD 10.5.1+ (API 38.1+)
+	NetworkRouteAdvertisementIntention string `json:"networkRouteAdvertisementIntention,omitempty"`
+
+	// TotalIpCount contains the number of IP addresses defined by the static ip pools. If the
+	// network contains any IPv6 subnets, the total ip count will be null.
+	TotalIpCount *int `json:"totalIpCount,omitempty"`
+
+	// UsedIpCount holds the number of IP address used from the static ip pools.
+	UsedIpCount *int `json:"usedIpCount,omitempty"`
 }
 
-// ExternalNetworkV2IPRange defines allocated IP pools for a subnet in external network
-type ExternalNetworkV2IPRange struct {
+// OpenApiIPRangeValues defines allocated IP pools for a subnet in external network
+type OpenApiIPRangeValues struct {
 	// StartAddress holds starting IP address in the range
 	StartAddress string `json:"startAddress"`
 	// EndAddress holds ending IP address in the range
@@ -97,8 +168,8 @@ type ExternalNetworkV2IPRange struct {
 }
 
 // ExternalNetworkV2IPRanges contains slice of ExternalNetworkV2IPRange
-type ExternalNetworkV2IPRanges struct {
-	Values []ExternalNetworkV2IPRange `json:"values"`
+type OpenApiIPRanges struct {
+	Values []OpenApiIPRangeValues `json:"values"`
 }
 
 // ExternalNetworkV2Subnets contains slice of ExternalNetworkV2Subnet
@@ -139,7 +210,12 @@ type ExternalNetworkV2Backing struct {
 	Name      string `json:"name,omitempty"`
 	// BackingType can be either ExternalNetworkBackingTypeNsxtTier0Router in case of NSX-T or one
 	// of ExternalNetworkBackingTypeNetwork or ExternalNetworkBackingDvPortgroup in case of NSX-V
-	BackingType string `json:"backingType"`
+	// Deprecated in favor of BackingTypeValue in API V35.0
+	BackingType string `json:"backingType,omitempty"`
+
+	// BackingTypeValue replaces BackingType in API V35.0 and adds support for additional network backing type
+	// ExternalNetworkBackingTypeNsxtSegment
+	BackingTypeValue string `json:"backingTypeValue,omitempty"`
 	// NetworkProvider defines backing network manager
 	NetworkProvider NetworkProvider `json:"networkProvider"`
 }
@@ -150,10 +226,11 @@ type NetworkProvider struct {
 	ID   string `json:"id"`
 }
 
-// VdcComputePolicy is represented as VM sizing policy in UI
+// VdcComputePolicy contains VDC specific configuration for workloads. (version 1.0.0)
+// Deprecated: Use VdcComputePolicyV2 instead (version 2.0.0)
 type VdcComputePolicy struct {
 	ID                         string   `json:"id,omitempty"`
-	Description                string   `json:"description,omitempty"`
+	Description                *string  `json:"description"` // It's a not-omitempty pointer to be able to send "null" values for empty descriptions.
 	Name                       string   `json:"name"`
 	CPUSpeed                   *int     `json:"cpuSpeed,omitempty"`
 	Memory                     *int     `json:"memory,omitempty"`
@@ -170,26 +247,45 @@ type VdcComputePolicy struct {
 		AdditionalProp2 string `json:"additionalProp2,omitempty"`
 		AdditionalProp3 string `json:"additionalProp3,omitempty"`
 	} `json:"extraConfigs,omitempty"`
-	PvdcComputePolicyRef *struct {
-		Name string `json:"name,omitempty"`
-		ID   string `json:"id,omitempty"`
-	} `json:"pvdcComputePolicyRef,omitempty"`
-	PvdcComputePolicy *struct {
-		Name string `json:"name,omitempty"`
-		ID   string `json:"id,omitempty"`
-	} `json:"pvdcComputePolicy,omitempty"`
-	CompatibleVdcTypes []string `json:"compatibleVdcTypes,omitempty"`
-	IsSizingOnly       bool     `json:"isSizingOnly,omitempty"`
-	PvdcID             string   `json:"pvdcId,omitempty"`
-	NamedVMGroups      [][]struct {
-		Name string `json:"name,omitempty"`
-		ID   string `json:"id,omitempty"`
-	} `json:"namedVmGroups,omitempty"`
-	LogicalVMGroupReferences []struct {
-		Name string `json:"name,omitempty"`
-		ID   string `json:"id,omitempty"`
-	} `json:"logicalVmGroupReferences,omitempty"`
-	IsAutoGenerated bool `json:"isAutoGenerated,omitempty"`
+	PvdcComputePolicyRef     *OpenApiReference   `json:"pvdcComputePolicyRef,omitempty"`
+	PvdcComputePolicy        *OpenApiReference   `json:"pvdcComputePolicy,omitempty"`
+	CompatibleVdcTypes       []string            `json:"compatibleVdcTypes,omitempty"`
+	IsSizingOnly             bool                `json:"isSizingOnly,omitempty"`
+	PvdcID                   string              `json:"pvdcId,omitempty"`
+	NamedVMGroups            []OpenApiReferences `json:"namedVmGroups,omitempty"`
+	LogicalVMGroupReferences OpenApiReferences   `json:"logicalVmGroupReferences,omitempty"`
+	IsAutoGenerated          bool                `json:"isAutoGenerated,omitempty"`
+}
+
+// VdcComputePolicyV2 contains VDC specific configuration for workloads (version 2.0.0)
+// https://developer.vmware.com/apis/vmware-cloud-director/latest/data-structures/VdcComputePolicy2/
+type VdcComputePolicyV2 struct {
+	VdcComputePolicy
+	PolicyType             string                   `json:"policyType"` // Required. Can be "VdcVmPolicy" or "VdcKubernetesPolicy"
+	IsVgpuPolicy           bool                     `json:"isVgpuPolicy,omitempty"`
+	PvdcNamedVmGroupsMap   []PvdcNamedVmGroupsMap   `json:"pvdcNamedVmGroupsMap,omitempty"`
+	PvdcLogicalVmGroupsMap []PvdcLogicalVmGroupsMap `json:"pvdcLogicalVmGroupsMap,omitempty"`
+	PvdcVgpuClustersMap    []PvdcVgpuClustersMap    `json:"pvdcVgpuClustersMap,omitempty"`
+	VgpuProfiles           []VgpuProfile            `json:"vgpuProfiles,omitempty"`
+}
+
+// PvdcNamedVmGroupsMap is a combination of a reference to a Provider VDC and a list of references to Named VM Groups.
+// This is used for VM Placement Policies (see VdcComputePolicyV2)
+type PvdcNamedVmGroupsMap struct {
+	NamedVmGroups []OpenApiReferences `json:"namedVmGroups,omitempty"`
+	Pvdc          OpenApiReference    `json:"pvdc,omitempty"`
+}
+
+// PvdcLogicalVmGroupsMap is a combination of a reference to a Provider VDC and a list of references to Logical VM Groups.
+// This is used for VM Placement Policies (see VdcComputePolicyV2)
+type PvdcLogicalVmGroupsMap struct {
+	LogicalVmGroups OpenApiReferences `json:"logicalVmGroups,omitempty"`
+	Pvdc            OpenApiReference  `json:"pvdc,omitempty"`
+}
+
+type PvdcVgpuClustersMap struct {
+	Clusters []string         `json:"clusters,omitempty"`
+	Pvdc     OpenApiReference `json:"pvdc,omitempty"`
 }
 
 // OpenApiReference is a generic reference type commonly used throughout OpenAPI endpoints
@@ -215,4 +311,452 @@ type VdcCapability struct {
 	Type string `json:"type"`
 	// Category of capability (e.g. "Security", "EdgeGateway", "OrgVdcNetwork")
 	Category string `json:"category"`
+}
+
+// A Right is a component of a role, a global role, or a rights bundle.
+// In this view, roles, global roles, and rights bundles are collections of rights.
+// Note that the rights are not stored in the above collection structures, but retrieved separately
+type Right struct {
+	Name             string             `json:"name"`
+	ID               string             `json:"id"`
+	Description      string             `json:"description,omitempty"`
+	BundleKey        string             `json:"bundleKey,omitempty"`        // key used for internationalization
+	Category         string             `json:"category,omitempty"`         // Category ID
+	ServiceNamespace string             `json:"serviceNamespace,omitempty"` // Not used
+	RightType        string             `json:"rightType,omitempty"`        // VIEW or MODIFY
+	ImpliedRights    []OpenApiReference `json:"impliedRights,omitempty"`
+}
+
+// RightsCategory defines the category to which the Right belongs
+type RightsCategory struct {
+	Name        string `json:"name"`
+	Id          string `json:"id"`
+	BundleKey   string `json:"bundleKey"` // key used for internationalization
+	Parent      string `json:"parent"`
+	RightsCount struct {
+		View   int `json:"view"`
+		Modify int `json:"modify"`
+	} `json:"rightsCount"`
+	SubCategories []string `json:"subCategories"`
+}
+
+// RightsBundle is a collection of Rights to be assigned to a tenant(= organization).
+// Changing a rights bundle and publishing it for a given tenant will limit
+// the rights that the global roles implement in such tenant.
+type RightsBundle struct {
+	Name        string `json:"name"`
+	Id          string `json:"id"`
+	Description string `json:"description,omitempty"`
+	BundleKey   string `json:"bundleKey,omitempty"` // key used for internationalization
+	ReadOnly    bool   `json:"readOnly"`
+	PublishAll  *bool  `json:"publishAll"`
+}
+
+// GlobalRole is a Role definition implemented in the provider that is passed on to tenants (=organizations)
+// Modifying an existing global role has immediate effect on the corresponding roles in the tenants (no need
+// to re-publish) while creating a new GlobalRole is only passed to the tenants if it is published.
+type GlobalRole struct {
+	Name        string `json:"name"`
+	Id          string `json:"id"`
+	Description string `json:"description,omitempty"`
+	BundleKey   string `json:"bundleKey,omitempty"` // key used for internationalization
+	ReadOnly    bool   `json:"readOnly"`
+	PublishAll  *bool  `json:"publishAll"`
+}
+
+// OpenApiItems defines the input when multiple items need to be passed to a POST or PUT operation
+// All the fields are optional, except Values
+// This structure is the same as OpenApiPages, except for the type of Values, which is explicitly
+// defined as a collection of name+ID structures
+type OpenApiItems struct {
+	ResultTotal  int                `json:"resultTotal,omitempty"`
+	PageCount    int                `json:"pageCount,omitempty"`
+	Page         int                `json:"page,omitempty"`
+	PageSize     int                `json:"pageSize,omitempty"`
+	Associations interface{}        `json:"associations,omitempty"`
+	Values       []OpenApiReference `json:"values"` // a collection of items defined by an ID + a name
+}
+
+// CertificateLibraryItem is a Certificate Library definition of stored Certificate details
+type CertificateLibraryItem struct {
+	Alias                string `json:"alias"`
+	Id                   string `json:"id,omitempty"`
+	Certificate          string `json:"certificate"` // PEM encoded certificate
+	Description          string `json:"description,omitempty"`
+	PrivateKey           string `json:"privateKey,omitempty"`           // PEM encoded private key. Required if providing a certificate chain
+	PrivateKeyPassphrase string `json:"privateKeyPassphrase,omitempty"` // passphrase for the private key. Required if the private key is encrypted
+}
+
+// CurrentSessionInfo gives information about the current session
+type CurrentSessionInfo struct {
+	ID                        string            `json:"id"`                        // Session ID
+	User                      OpenApiReference  `json:"user"`                      // Name of the user associated with this session
+	Org                       OpenApiReference  `json:"org"`                       // Organization for this connection
+	Location                  string            `json:"location"`                  // Location ID: unknown usage
+	Roles                     []string          `json:"roles"`                     // Roles associated with the session user
+	RoleRefs                  OpenApiReferences `json:"roleRefs"`                  // Roles references for the session user
+	SessionIdleTimeoutMinutes int               `json:"sessionIdleTimeoutMinutes"` // session idle timeout
+}
+
+// VdcGroup is a VDC group definition
+type VdcGroup struct {
+	Description                string                 `json:"description,omitempty"`                // The description of this group.
+	DfwEnabled                 bool                   `json:"dfwEnabled,omitempty"`                 // Whether Distributed Firewall is enabled for this vDC Group. Only applicable for NSX_T vDC Groups.
+	ErrorMessage               string                 `json:"errorMessage,omitempty"`               // If the group has an error status, a more detailed error message is set here.
+	Id                         string                 `json:"id,omitempty"`                         // The unique ID for the vDC Group (read-only).
+	LocalEgress                bool                   `json:"localEgress,omitempty"`                // Determines whether local egress is enabled for a universal router belonging to a universal vDC group. This value is used on create if universalNetworkingEnabled is set to true. This cannot be updated. This value is always false for local vDC groups.
+	Name                       string                 `json:"name"`                                 // The name of this group. The name must be unique.
+	NetworkPoolId              string                 `json:"networkPoolId,omitempty"`              // ID of network pool to use if creating a local vDC group router. Must be set if creating a local group. Ignored if creating a universal group.
+	NetworkPoolUniversalId     string                 `json:"networkPoolUniversalId,omitempty"`     // The network provider’s universal id that is backing the universal network pool. This field is read-only and is derived from the list of participating vDCs if a universal vDC group is created. For universal vDC groups, each participating vDC should have a universal network pool that is backed by this same id.
+	NetworkProviderType        string                 `json:"networkProviderType,omitempty"`        // The values currently supported are NSX_V and NSX_T. Defines the networking provider backing the vDC Group. This is used on create. If not specified, NSX_V value will be used. NSX_V is used for existing vDC Groups and vDC Groups where Cross-VC NSX is used for the underlying technology. NSX_T is used when the networking provider type for the Organization vDCs in the group is NSX-T. NSX_T only supports groups of type LOCAL (single site).
+	OrgId                      string                 `json:"orgId"`                                // The organization that this group belongs to.
+	ParticipatingOrgVdcs       []ParticipatingOrgVdcs `json:"participatingOrgVdcs"`                 // The list of organization vDCs that are participating in this group.
+	Status                     string                 `json:"status,omitempty"`                     // The status that the group can be in. Possible values are: SAVING, SAVED, CONFIGURING, REALIZED, REALIZATION_FAILED, DELETING, DELETE_FAILED, OBJECT_NOT_FOUND, UNCONFIGURED
+	Type                       string                 `json:"type,omitempty"`                       // Defines the group as LOCAL or UNIVERSAL. This cannot be changed. Local vDC Groups can have networks stretched across multiple vDCs in a single Cloud Director instance. Local vDC Groups share the same broadcast domain/transport zone and network provider scope. Universal vDC groups can have networks stretched across multiple vDCs in a single or multiple Cloud Director instance(s). Universal vDC groups are backed by a broadcast domain/transport zone that strectches across a single or multiple Cloud Director instance(s). Local vDC groups are supported for both NSX-V and NSX-T Network Provider Types. Universal vDC Groups are supported for only NSX_V Network Provider Type. Possible values are: LOCAL , UNIVERSAL
+	UniversalNetworkingEnabled bool                   `json:"universalNetworkingEnabled,omitempty"` // True means that a vDC group router has been created. If set to true for vdc group creation, a universal router will also be created.
+}
+
+// ParticipatingOrgVdcs is a participating Org VDCs definition
+type ParticipatingOrgVdcs struct {
+	FaultDomainTag       string           `json:"faultDomainTag,omitempty"`       // Represents the fault domain of a given organization vDC. For NSX_V backed organization vDCs, this is the network provider scope. For NSX_T backed organization vDCs, this can vary (for example name of the provider vDC or compute provider scope).
+	NetworkProviderScope string           `json:"networkProviderScope,omitempty"` // Read-only field that specifies the network provider scope of the vDC.
+	OrgRef               OpenApiReference `json:"orgRef,omitempty"`               // Read-only field that specifies what organization this vDC is in.
+	RemoteOrg            bool             `json:"remoteOrg,omitempty"`            // Read-only field that specifies whether the vDC is local to this VCD site.
+	SiteRef              OpenApiReference `json:"siteRef,omitempty"`              // The site ID that this vDC belongs to. Required for universal vDC groups.
+	Status               string           `json:"status,omitempty"`               // The status that the vDC can be in. An example is if the vDC has been deleted from the system but is still part of the group. Possible values are: SAVING, SAVED, CONFIGURING, REALIZED, REALIZATION_FAILED, DELETING, DELETE_FAILED, OBJECT_NOT_FOUND, UNCONFIGURED
+	VdcRef               OpenApiReference `json:"vdcRef"`                         // The reference to the vDC that is part of this a vDC group.
+}
+
+// CandidateVdc defines possible candidate VDCs for VDC group
+type CandidateVdc struct {
+	FaultDomainTag       string           `json:"faultDomainTag"`
+	Id                   string           `json:"id"`
+	Name                 string           `json:"name"`
+	NetworkProviderScope string           `json:"networkProviderScope"`
+	OrgRef               OpenApiReference `json:"orgRef"`
+	SiteRef              OpenApiReference `json:"siteRef"`
+}
+
+// DfwPolicies defines Distributed firewall policies
+type DfwPolicies struct {
+	Enabled       bool           `json:"enabled"`
+	DefaultPolicy *DefaultPolicy `json:"defaultPolicy,omitempty"`
+}
+
+// DefaultPolicy defines Default policy for Distributed firewall
+type DefaultPolicy struct {
+	Description string        `json:"description,omitempty"` // Description for the security policy.
+	Enabled     *bool         `json:"enabled,omitempty"`     // Whether this security policy is enabled.
+	Id          string        `json:"id,omitempty"`          // The unique id of this security policy. On updates, the id is required for the policy, while for create a new id will be generated. This id is not a VCD URN.
+	Name        string        `json:"name"`                  // Name for the security policy.
+	Version     *VersionField `json:"version,omitempty"`     // This property describes the current version of the entity. To prevent clients from overwriting each other’s changes, update operations must include the version which can be obtained by issuing a GET operation. If the version number on an update call is missing, the operation will be rejected. This is only needed on update calls.
+}
+
+// VersionField defines Version
+type VersionField struct {
+	Version int `json:"version"`
+}
+
+// TestConnection defines the parameters used when testing a connection, including SSL handshake and hostname verification.
+type TestConnection struct {
+	Host                          string               `json:"host"`                                    // The host (or IP address) to connect to.
+	Port                          int                  `json:"port"`                                    // The port to use when connecting.
+	Secure                        *bool                `json:"secure,omitempty"`                        // If the connection should use https.
+	Timeout                       int                  `json:"timeout,omitempty"`                       // Maximum time (in seconds) any step in the test should wait for a response.
+	HostnameVerificationAlgorithm string               `json:"hostnameVerificationAlgorithm,omitempty"` // Endpoint/Hostname verification algorithm to be used during SSL/TLS/DTLS handshake.
+	AdditionalCAIssuers           []string             `json:"additionalCAIssuers,omitempty"`           // A list of URLs being authorized by the user to retrieve additional CA certificates from, if necessary, to complete the certificate chain to its trust anchor.
+	ProxyConnection               *ProxyTestConnection `json:"proxyConnection,omitempty"`               // Proxy connection to use for test. Only one of proxyConnection and preConfiguredProxy can be specified.
+	PreConfiguredProxy            string               `json:"preConfiguredProxy,omitempty"`            // The URN of a ProxyConfiguration to use for the test. Only one of proxyConnection or preConfiguredProxy can be specified. If neither is specified then no proxy is used to test the connection.
+}
+
+// ProxyTestConnection defines the proxy connection to use for TestConnection (if any).
+type ProxyTestConnection struct {
+	ProxyHost     string `json:"proxyHost"`               // The host (or IP address) of the proxy.
+	ProxyPort     int    `json:"proxyPort"`               // The port to use when connecting to the proxy.
+	ProxyUsername string `json:"proxyUsername,omitempty"` // Username to authenticate to the proxy.
+	ProxyPassword string `json:"proxyPassword,omitempty"` // Password to authenticate to the proxy.
+	ProxySecure   *bool  `json:"proxySecure,omitempty"`   // If the connection to the proxy should use https.
+}
+
+// TestConnectionResult is the result of a connection test.
+type TestConnectionResult struct {
+	TargetProbe *ProbeResult `json:"targetProbe,omitempty"` // Results of a connection test to a specific endpoint.
+	ProxyProbe  *ProbeResult `json:"proxyProbe,omitempty"`  // Results of a connection test to a specific endpoint.
+}
+
+// ProbeResult results of a connection test to a specific endpoint.
+type ProbeResult struct {
+	Result              string   `json:"result,omitempty"`              // Localized message describing the connection result stating success or an error message with a brief summary.
+	ResolvedIp          string   `json:"resolvedIp,omitempty"`          // The IP address the host was resolved to, if not going through a proxy.
+	CanConnect          bool     `json:"canConnect,omitempty"`          // If vCD can establish a connection on the specified port.
+	SSLHandshake        bool     `json:"sslHandshake,omitempty"`        // If an SSL Handshake succeeded (secure requests only).
+	ConnectionResult    string   `json:"connectionResult,omitempty"`    // A code describing the result of establishing a connection. It can be either SUCCESS, ERROR_CANNOT_RESOLVE_IP or ERROR_CANNOT_CONNECT.
+	SSLResult           string   `json:"sslResult,omitempty"`           // A code describing the result of the SSL handshake. It can be either SUCCESS, ERROR_SSL_ERROR, ERROR_UNTRUSTED_CERTIFICATE, ERROR_CANNOT_VERIFY_HOSTNAME or null.
+	CertificateChain    string   `json:"certificateChain,omitempty"`    // The SSL certificate chain presented by the server if a secure connection was made.
+	AdditionalCAIssuers []string `json:"additionalCAIssuers,omitempty"` // URLs supplied by Certificate Authorities to retrieve signing certificates, when those certificates are not included in the chain.
+}
+
+// LogicalVmGroup is used to create VM Placement Policies in VCD.
+type LogicalVmGroup struct {
+	Name                   string            `json:"name,omitempty"` // Display name
+	Description            string            `json:"description,omitempty"`
+	ID                     string            `json:"id,omitempty"`                     // UUID for LogicalVmGroup. This is immutable
+	NamedVmGroupReferences OpenApiReferences `json:"namedVmGroupReferences,omitempty"` // List of named VM Groups associated with LogicalVmGroup.
+	PvdcID                 string            `json:"pvdcId,omitempty"`                 // URN for Provider VDC
+}
+
+// DefinedInterface defines a interface for a defined entity. The combination of nss+version+vendor should be unique
+type DefinedInterface struct {
+	ID         string `json:"id,omitempty"`       // The id of the defined interface type in URN format
+	Name       string `json:"name,omitempty"`     // The name of the defined interface
+	Nss        string `json:"nss,omitempty"`      // A unique namespace associated with the interface
+	Version    string `json:"version,omitempty"`  // The interface's version. The version should follow semantic versioning rules
+	Vendor     string `json:"vendor,omitempty"`   // The vendor name
+	IsReadOnly bool   `json:"readonly,omitempty"` // True if the entity type cannot be modified
+}
+
+// Behavior defines a concept similar to a "procedure" that lives inside Defined Interfaces or Defined Entity Types as overrides.
+type Behavior struct {
+	ID          string                 `json:"id,omitempty"`          // The Behavior ID is generated and is an output-only property
+	Description string                 `json:"description,omitempty"` // A description specifying the contract of the Behavior
+	Execution   map[string]interface{} `json:"execution,omitempty"`   // The Behavior execution mechanism. Can be defined both in an Interface and in a Defined Entity Type as an override
+	Ref         string                 `json:"ref,omitempty"`         // The Behavior invocation reference to be used for polymorphic behavior invocations. It is generated and is an output-only property
+	Name        string                 `json:"name,omitempty"`
+}
+
+// BehaviorAccess defines the access control configuration of a Behavior.
+type BehaviorAccess struct {
+	AccessLevelId string `json:"accessLevelId,omitempty"` // The ID of an AccessLevel
+	BehaviorId    string `json:"behaviorId,omitempty"`    // The ID of the Behavior. It can be both a behavior-interface or an overridden behavior-type ID
+}
+
+// BehaviorInvocation is an invocation of a Behavior on a Defined Entity instance. Currently, the Behavior interfaces are key-value maps specified in the Behavior description.
+type BehaviorInvocation struct {
+	Arguments interface{} `json:"arguments,omitempty"`
+	Metadata  interface{} `json:"metadata,omitempty"`
+}
+
+// DefinedEntityType describes what a Defined Entity Type should look like.
+type DefinedEntityType struct {
+	ID               string                 `json:"id,omitempty"`               // The id of the defined entity type in URN format
+	Name             string                 `json:"name,omitempty"`             // The name of the defined entity type
+	Nss              string                 `json:"nss,omitempty"`              // A unique namespace specific string. The combination of nss and version must be unique
+	Version          string                 `json:"version,omitempty"`          // The version of the defined entity. The combination of nss and version must be unique. The version string must follow semantic versioning rules
+	Description      string                 `json:"description,omitempty"`      // Description of the defined entity
+	ExternalId       string                 `json:"externalId,omitempty"`       // An external entity’s id that this definition may apply to
+	Hooks            map[string]string      `json:"hooks,omitempty"`            // A mapping defining which behaviors should be invoked upon specific lifecycle events, like PostCreate, PostUpdate, PreDelete. For example: "hooks": { "PostCreate": "urn:vcloud:behavior-interface:postCreateHook:vendorA:containerCluster:1.0.0" }. Added in 36.0
+	InheritedVersion string                 `json:"inheritedVersion,omitempty"` // To be used when creating a new version of a defined entity type. Specifies the version of the type that will be the template for the authorization configuration of the new version. The Type ACLs and the access requirements of the Type Behaviors of the new version will be copied from those of the inherited version. If the value of this property is ‘0’, then the new type version will not inherit another version and will have the default authorization settings, just like the first version of a new type. Added in 36.0
+	Interfaces       []string               `json:"interfaces,omitempty"`       // List of interface IDs that this defined entity type is referenced by
+	MaxImplicitRight string                 `json:"maxImplicitRight,omitempty"` // The maximum Type Right level that will be implied from the user’s Type ACLs if this field is defined. For example, “maxImplicitRight”: “urn:vcloud:accessLevel:ReadWrite” would mean that a user with RO , RW, and FC ACLs to the Type would implicitly get the “Read: ” and “Write: ” rights, but not the “Full Control: ” right. The valid values are “urn:vcloud:accessLevel:ReadOnly”, “urn:vcloud:accessLevel:ReadWrite”, “urn:vcloud:accessLevel:FullControl”
+	IsReadOnly       bool                   `json:"readonly,omitempty"`         // `true` if the entity type cannot be modified
+	Schema           map[string]interface{} `json:"schema,omitempty"`           // The JSON-Schema valid definition of the defined entity type. If no JSON Schema version is specified, version 4 will be assumed
+	Vendor           string                 `json:"vendor,omitempty"`           // The vendor name
+}
+
+// DefinedEntity describes an instance of a defined entity type.
+type DefinedEntity struct {
+	ID         string                 `json:"id,omitempty"`         // The id of the defined entity in URN format
+	EntityType string                 `json:"entityType,omitempty"` // The URN ID of the defined entity type that the entity is an instance of. This is a read-only field
+	Name       string                 `json:"name,omitempty"`       // The name of the defined entity
+	ExternalId string                 `json:"externalId,omitempty"` // An external entity's id that this entity may have a relation to.
+	Entity     map[string]interface{} `json:"entity,omitempty"`     // A JSON value representation. The JSON will be validated against the schema of the DefinedEntityType that the entity is an instance of
+	State      *string                `json:"state,omitempty"`      // Every entity is created in the "PRE_CREATED" state. Once an entity is ready to be validated against its schema, it will transition in another state - RESOLVED, if the entity is valid according to the schema, or RESOLUTION_ERROR otherwise. If an entity in an "RESOLUTION_ERROR" state is updated, it will transition to the inital "PRE_CREATED" state without performing any validation. If its in the "RESOLVED" state, then it will be validated against the entity type schema and throw an exception if its invalid
+	Owner      *OpenApiReference      `json:"owner,omitempty"`      // The owner of the defined entity
+	Org        *OpenApiReference      `json:"org,omitempty"`        // The organization of the defined entity.
+	Message    string                 `json:"message,omitempty"`    // A message field that might be populated in case entity Resolution fails
+}
+
+// DefinedEntityAccess describes Access Control structure for an RDE
+type DefinedEntityAccess struct {
+	Id            string           `json:"id,omitempty"`
+	Tenant        OpenApiReference `json:"tenant"`
+	GrantType     string           `json:"grantType"`
+	ObjectId      string           `json:"objectId,omitempty"`
+	AccessLevelID string           `json:"accessLevelId"`
+	MemberID      string           `json:"memberId"`
+}
+
+type VSphereVirtualCenter struct {
+	VcId                      string `json:"vcId"`
+	Name                      string `json:"name"`
+	Description               string `json:"description"`
+	Username                  string `json:"username"`
+	Password                  string `json:"password"`
+	Url                       string `json:"url"`
+	IsEnabled                 bool   `json:"isEnabled"`
+	VsphereWebClientServerUrl string `json:"vsphereWebClientServerUrl"`
+	HasProxy                  bool   `json:"hasProxy"`
+	RootFolder                string `json:"rootFolder"`
+	VcNoneNetwork             string `json:"vcNoneNetwork"`
+	TenantVisibleName         string `json:"tenantVisibleName"`
+	IsConnected               bool   `json:"isConnected"`
+	Mode                      string `json:"mode"`
+	ListenerState             string `json:"listenerState"`
+	ClusterHealthStatus       string `json:"clusterHealthStatus"`
+	VcVersion                 string `json:"vcVersion"`
+	BuildNumber               string `json:"buildNumber"`
+	Uuid                      string `json:"uuid"`
+	NsxVManager               struct {
+		Username        string `json:"username"`
+		Password        string `json:"password"`
+		Url             string `json:"url"`
+		SoftwareVersion string `json:"softwareVersion"`
+	} `json:"nsxVManager"`
+	ProxyConfigurationUrn string `json:"proxyConfigurationUrn"`
+}
+
+type ResourcePoolSummary struct {
+	Associations []struct {
+		EntityId      string `json:"entityId"`
+		AssociationId string `json:"associationId"`
+	} `json:"associations"`
+	Values []ResourcePool `json:"values"`
+}
+
+// ResourcePool defines a vSphere Resource Pool
+type ResourcePool struct {
+	Moref             string `json:"moref"`
+	ClusterMoref      string `json:"clusterMoref"`
+	Name              string `json:"name"`
+	VcId              string `json:"vcId"`
+	Eligible          bool   `json:"eligible"`
+	KubernetesEnabled bool   `json:"kubernetesEnabled"`
+	VgpuEnabled       bool   `json:"vgpuEnabled"`
+}
+
+// OpenApiSupportedHardwareVersions is the list of versions supported by a given resource
+type OpenApiSupportedHardwareVersions struct {
+	Versions          []string `json:"versions"`
+	SupportedVersions []struct {
+		IsDefault bool   `json:"isDefault"`
+		Name      string `json:"name"`
+	} `json:"supportedVersions"`
+}
+
+// NetworkPool is the full data retrieved for a provider network pool
+type NetworkPool struct {
+	Status             string             `json:"status,omitempty"`
+	Id                 string             `json:"id,omitempty"`
+	Name               string             `json:"name"`
+	Description        string             `json:"description"`
+	PoolType           string             `json:"poolType"`
+	PromiscuousMode    bool               `json:"promiscuousMode,omitempty"`
+	TotalBackingsCount int                `json:"totalBackingsCount,omitempty"`
+	UsedBackingsCount  int                `json:"usedBackingsCount,omitempty"`
+	ManagingOwnerRef   OpenApiReference   `json:"managingOwnerRef"`
+	Backing            NetworkPoolBacking `json:"backing"`
+}
+
+// NetworkPoolBacking is the definition of the objects supporting the network pool
+type NetworkPoolBacking struct {
+	VlanIdRanges     VlanIdRanges       `json:"vlanIdRanges,omitempty"`
+	VdsRefs          []OpenApiReference `json:"vdsRefs,omitempty"`
+	PortGroupRefs    []OpenApiReference `json:"portGroupRefs,omitempty"`
+	TransportZoneRef OpenApiReference   `json:"transportZoneRef,omitempty"`
+	ProviderRef      OpenApiReference   `json:"providerRef"`
+}
+
+type VlanIdRanges struct {
+	Values []VlanIdRange `json:"values"`
+}
+
+// VlanIdRange is a component of a network pool of type VLAN
+type VlanIdRange struct {
+	StartId int `json:"startId"`
+	EndId   int `json:"endId"`
+}
+
+// OpenApiStorageProfile defines a storage profile before it is assigned to a provider VDC
+type OpenApiStorageProfile struct {
+	Moref string `json:"moref"`
+	Name  string `json:"name"`
+}
+
+// UIPluginMetadata gives meta information about a UI Plugin
+type UIPluginMetadata struct {
+	ID             string `json:"id,omitempty"`
+	Vendor         string `json:"vendor,omitempty"`
+	License        string `json:"license,omitempty"`
+	Link           string `json:"link,omitempty"`
+	PluginName     string `json:"pluginName,omitempty"`
+	Version        string `json:"version,omitempty"`
+	Description    string `json:"description,omitempty"`
+	ProviderScoped bool   `json:"provider_scoped,omitempty"`
+	TenantScoped   bool   `json:"tenant_scoped,omitempty"`
+	Enabled        bool   `json:"enabled,omitempty"`
+	PluginStatus   string `json:"plugin_status,omitempty"`
+}
+
+// UploadSpec gives information about an upload
+type UploadSpec struct {
+	FileName     string `json:"fileName,omitempty"`
+	Size         int64  `json:"size,omitempty"`
+	Checksum     string `json:"checksum,omitempty"`
+	ChecksumAlgo string `json:"checksumAlgo,omitempty"`
+}
+
+type TransportZones struct {
+	Values []*TransportZone `json:"values"`
+}
+
+// TransportZone is a backing component of a network pool of type 'GENEVE' (NSX-T backed)
+type TransportZone struct {
+	Id              string `json:"id"`
+	Name            string `json:"name"`
+	Type            string `json:"type,omitempty"`
+	AlreadyImported bool   `json:"alreadyImported"`
+}
+
+// VcenterDistributedSwitch is a backing component of a network pool of type VLAN
+type VcenterDistributedSwitch struct {
+	BackingRef    OpenApiReference `json:"backingRef"`
+	VirtualCenter OpenApiReference `json:"virtualCenter"`
+}
+
+// OpenApiMetadataEntry represents a metadata entry in VCD.
+type OpenApiMetadataEntry struct {
+	ID           string                  `json:"id,omitempty"`         // UUID for OpenApiMetadataEntry. This is immutable
+	IsPersistent bool                    `json:"persistent,omitempty"` // Persistent entries can be copied over on some entity operation, for example: Creating a copy of an Org VDC, capturing a vApp to a template, instantiating a catalog item as a VM, etc.
+	IsReadOnly   bool                    `json:"readOnly,omitempty"`   // The kind of level of access organizations of the entry’s domain have
+	KeyValue     OpenApiMetadataKeyValue `json:"keyValue,omitempty"`   // Contains core metadata entry data
+}
+
+// OpenApiMetadataKeyValue contains core metadata entry data.
+type OpenApiMetadataKeyValue struct {
+	Domain    string                    `json:"domain,omitempty"`    // Only meaningful for providers. Allows them to share entries with their tenants. Currently, accepted values are: `TENANT`, `PROVIDER`, where that is the ascending sort order of the enumeration.
+	Key       string                    `json:"key,omitempty"`       // Key of the metadata entry
+	Value     OpenApiMetadataTypedValue `json:"value,omitempty"`     // Value of the metadata entry
+	Namespace string                    `json:"namespace,omitempty"` // Namespace of the metadata entry
+}
+
+// OpenApiMetadataTypedValue the type and value of the metadata entry.
+type OpenApiMetadataTypedValue struct {
+	Value interface{} `json:"value,omitempty"` // The Value is anything because it depends on the Type field.
+	Type  string      `json:"type,omitempty"`
+}
+
+// VgpuProfile uniquely represents a type of vGPU
+// vGPU Profiles are fetched from your NVIDIA GRID GPU enabled Clusters in vCenter.
+type VgpuProfile struct {
+	Id                 string `json:"id"`
+	Name               string `json:"name"`
+	TenantFacingName   string `json:"tenantFacingName"`
+	Instructions       string `json:"instructions,omitempty"`
+	AllowMultiplePerVm bool   `json:"allowMultiplePerVm"`
+	Count              int    `json:"count,omitempty"`
+}
+
+type OpenApiOrg struct {
+	Id             string `json:"id"`
+	Name           string `json:"name"`
+	DisplayName    string `json:"displayName"`
+	Description    string `json:"description"`
+	IsEnabled      bool   `json:"isEnabled"`
+	OrgVdcCount    int    `json:"orgVdcCount"`
+	CatalogCount   int    `json:"catalogCount"`
+	VappCount      int    `json:"vappCount"`
+	RunningVMCount int    `json:"runningVMCount"`
+	UserCount      int    `json:"userCount"`
+	DiskCount      int    `json:"diskCount"`
+	CanPublish     bool   `json:"canPublish"`
 }

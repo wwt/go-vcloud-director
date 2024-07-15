@@ -1,4 +1,4 @@
-// +build functional vapp ALL
+//go:build functional || vapp || ALL
 
 /*
  * Copyright 2020 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -34,6 +34,7 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 		check.Skip("Test_VappAccessControl: VDC name not given.")
 		return
 	}
+	vcd.checkSkipWhenApiToken(check)
 	org, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
@@ -54,10 +55,10 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 	}
 
 	// Create a new vApp
-	vapp, err := makeEmptyVapp(vdc, vappName)
+	vapp, err := makeEmptyVapp(vdc, vappName, "")
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
-	AddToCleanupList(vappName, "vapp", vcd.config.VCD.Org+"|"+vcd.config.VCD.Vdc, "Test_VappAccessControl")
+	AddToCleanupList(vappName, "vapp", vcd.config.VCD.Vdc, "Test_VappAccessControl")
 
 	checkEmpty := func() {
 		settings, err := vapp.GetAccessControl(vappTenantContext)
@@ -97,7 +98,7 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 
 	// Set access control to every user and group
 	allUsersSettings := types.ControlAccessParams{
-		EveryoneAccessLevel: takeStringPointer(types.ControlAccessReadOnly),
+		EveryoneAccessLevel: addrOf(types.ControlAccessReadOnly),
 		IsSharedToEveryone:  true,
 	}
 
@@ -106,7 +107,7 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 	check.Assert(err, IsNil)
 
 	allUsersSettings = types.ControlAccessParams{
-		EveryoneAccessLevel: takeStringPointer(types.ControlAccessReadWrite),
+		EveryoneAccessLevel: addrOf(types.ControlAccessReadWrite),
 		IsSharedToEveryone:  true,
 	}
 	err = testAccessControl("vapp all users R/W", vapp, allUsersSettings, allUsersSettings, true, vappTenantContext, check)
@@ -117,8 +118,8 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 		IsSharedToEveryone:  false,
 		EveryoneAccessLevel: nil,
 		AccessSettings: &types.AccessSettingList{
-			[]*types.AccessSetting{
-				&types.AccessSetting{
+			AccessSetting: []*types.AccessSetting{
+				{
 					Subject: &types.LocalSubject{
 						HREF: users[0].user.User.Href,
 						Name: users[0].user.User.Name,
@@ -149,8 +150,8 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 		IsSharedToEveryone:  false,
 		EveryoneAccessLevel: nil,
 		AccessSettings: &types.AccessSettingList{
-			[]*types.AccessSetting{
-				&types.AccessSetting{
+			AccessSetting: []*types.AccessSetting{
+				{
 					Subject: &types.LocalSubject{
 						HREF: users[0].user.User.Href,
 						//Name: users[0].user.User.Name, // Pass info without name for one of the subjects
@@ -159,7 +160,7 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 					ExternalSubject: nil,
 					AccessLevel:     types.ControlAccessReadOnly,
 				},
-				&types.AccessSetting{
+				{
 					Subject: &types.LocalSubject{
 						HREF: users[1].user.User.Href,
 						Name: users[1].user.User.Name,
@@ -184,8 +185,8 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 		IsSharedToEveryone:  false,
 		EveryoneAccessLevel: nil,
 		AccessSettings: &types.AccessSettingList{
-			[]*types.AccessSetting{
-				&types.AccessSetting{
+			AccessSetting: []*types.AccessSetting{
+				{
 					Subject: &types.LocalSubject{
 						HREF: users[0].user.User.Href,
 						Name: users[0].user.User.Name,
@@ -194,7 +195,7 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 					ExternalSubject: nil,
 					AccessLevel:     types.ControlAccessReadOnly,
 				},
-				&types.AccessSetting{
+				{
 					Subject: &types.LocalSubject{
 						HREF: users[1].user.User.Href,
 						//Name: users[1].user.User.Name,// Pass info without name for one of the subjects
@@ -203,7 +204,7 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 					ExternalSubject: nil,
 					AccessLevel:     types.ControlAccessFullControl,
 				},
-				&types.AccessSetting{
+				{
 					Subject: &types.LocalSubject{
 						HREF: users[2].user.User.Href,
 						Name: users[2].user.User.Name,
@@ -229,6 +230,6 @@ func (vcd *TestVCD) Test_VappAccessControl(check *C) {
 
 	orgInfo, err := vapp.getOrgInfo()
 	check.Assert(err, IsNil)
-	check.Assert(orgInfo.id, Equals, extractUuid(org.AdminOrg.ID))
-	check.Assert(orgInfo.name, Equals, org.AdminOrg.Name)
+	check.Assert(orgInfo.OrgId, Equals, extractUuid(org.AdminOrg.ID))
+	check.Assert(orgInfo.OrgName, Equals, org.AdminOrg.Name)
 }

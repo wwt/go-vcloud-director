@@ -1,4 +1,4 @@
-// +build system functional ALL
+//go:build system || functional || ALL
 
 /*
  * Copyright 2019 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -8,6 +8,7 @@ package govcd
 
 import (
 	"fmt"
+	"strings"
 
 	. "gopkg.in/check.v1"
 
@@ -118,6 +119,11 @@ func (vcd *TestVCD) Test_CreateOrg(check *C) {
 		}
 		orgName := TestCreateOrg + "_" + od.name
 
+		if vcd.client.Client.APIVCDMaxVersionIs("= 37.2") && !od.enabled {
+			// TODO revisit once bug is fixed in VCD
+			fmt.Println("[INFO] VCD 10.4.2 has a bug that prevents creating a disabled Org - Changing 'enabled' parameter to 'true'")
+			od.enabled = true
+		}
 		fmt.Printf("# org %s (enabled: %v - catalogs: %v [%d %d])\n", orgName, od.enabled, od.canPublishCatalogs, od.storedVmQuota, od.deployedVmQuota)
 		settings.OrgGeneralSettings.CanPublishCatalogs = od.canPublishCatalogs
 		settings.OrgGeneralSettings.DeployedVMQuota = od.deployedVmQuota
@@ -150,7 +156,7 @@ func (vcd *TestVCD) Test_CreateOrg(check *C) {
 }
 
 func (vcd *TestVCD) Test_CreateDeleteEdgeGateway(check *C) {
-
+	vcd.skipIfNotSysAdmin(check)
 	if vcd.config.VCD.ExternalNetwork == "" {
 		check.Skip("No external network provided")
 	}
@@ -258,18 +264,18 @@ func (vcd *TestVCD) Test_CreateDeleteEdgeGatewayAdvanced(check *C) {
 		Name:        edgeName,
 		Description: edgeName,
 		Configuration: &types.GatewayConfiguration{
-			HaEnabled:            takeBoolPointer(false),
+			HaEnabled:            addrOf(false),
 			GatewayBackingConfig: "compact",
 			GatewayInterfaces: &types.GatewayInterfaces{
 				GatewayInterface: []*types.GatewayInterface{},
 			},
-			AdvancedNetworkingEnabled:  takeBoolPointer(true),
-			DistributedRoutingEnabled:  takeBoolPointer(false),
-			UseDefaultRouteForDNSRelay: takeBoolPointer(true),
+			AdvancedNetworkingEnabled:  addrOf(true),
+			DistributedRoutingEnabled:  addrOf(false),
+			UseDefaultRouteForDNSRelay: addrOf(true),
 		},
 	}
 
-	edgeGatewayConfig.Configuration.FipsModeEnabled = takeBoolPointer(false)
+	edgeGatewayConfig.Configuration.FipsModeEnabled = addrOf(false)
 
 	// Create subnet participation structure
 	subnetParticipation := make([]*types.SubnetParticipation, len(externalNetwork.Configuration.IPScopes.IPScope))
@@ -374,6 +380,7 @@ func (vcd *TestVCD) Test_FindBadlyNamedStorageProfile(check *C) {
 
 // Test getting network pool by href and vdc client
 func (vcd *TestVCD) Test_GetNetworkPoolByHREF(check *C) {
+	vcd.skipIfNotSysAdmin(check)
 	if vcd.config.VCD.ProviderVdc.NetworkPool == "" {
 		check.Skip("Skipping test because network pool is not configured")
 	}
@@ -453,7 +460,7 @@ func (vcd *TestVCD) Test_QueryOrgVdcNetworkByNameWithSpace(check *C) {
 	}
 	check.Assert(task.Task.HREF, Not(Equals), "")
 
-	AddToCleanupList(networkName, "network", vcd.org.Org.Name+"|"+vcd.vdc.Vdc.Name, "Test_CreateOrgVdcNetworkDirect")
+	AddToCleanupList(networkName, "network", vcd.org.Org.Name+"|"+vcd.vdc.Vdc.Name, check.TestName())
 
 	// err = task.WaitTaskCompletion()
 	err = task.WaitInspectTaskCompletion(LogTask, 10)
@@ -467,9 +474,16 @@ func (vcd *TestVCD) Test_QueryOrgVdcNetworkByNameWithSpace(check *C) {
 	check.Assert(len(orgVdcNetwork), Not(Equals), 0)
 	check.Assert(orgVdcNetwork[0].Name, Equals, networkName)
 	check.Assert(orgVdcNetwork[0].ConnectedTo, Equals, externalNetwork.ExternalNetwork.Name)
+	network, err := vcd.vdc.GetOrgVdcNetworkByName(networkName, true)
+	check.Assert(err, IsNil)
+	task, err = network.Delete()
+	check.Assert(err, IsNil)
+	err = task.WaitTaskCompletion()
+	check.Assert(err, IsNil)
 }
 
 func (vcd *TestVCD) Test_QueryProviderVdcEntities(check *C) {
+	vcd.skipIfNotSysAdmin(check)
 	providerVdcName := vcd.config.VCD.ProviderVdc.Name
 	networkPoolName := vcd.config.VCD.ProviderVdc.NetworkPool
 	storageProfileName := vcd.config.VCD.ProviderVdc.StorageProfile
@@ -519,7 +533,7 @@ func (vcd *TestVCD) Test_QueryProviderVdcEntities(check *C) {
 	if storageProfileName == "" {
 		check.Skip("Skipping storage profile query: no storage profile was given")
 	}
-	storageProfiles, err := vcd.client.QueryProviderVdcStorageProfiles()
+	storageProfiles, err := vcd.client.Client.QueryAllProviderVdcStorageProfiles()
 	check.Assert(err, IsNil)
 	check.Assert(len(storageProfiles) > 0, Equals, true)
 	storageProfileFound := false
@@ -542,6 +556,7 @@ func (vcd *TestVCD) Test_QueryProviderVdcEntities(check *C) {
 }
 
 func (vcd *TestVCD) Test_QueryProviderVdcByName(check *C) {
+	vcd.skipIfNotSysAdmin(check)
 	if vcd.config.VCD.ProviderVdc.Name == "" {
 		check.Skip("Skipping Provider VDC query: no provider VDC was given")
 	}
@@ -567,7 +582,77 @@ func (vcd *TestVCD) Test_QueryProviderVdcByName(check *C) {
 
 }
 
+func (vcd *TestVCD) Test_QueryAdminOrgVdcStorageProfileByID(check *C) {
+	if !vcd.client.Client.IsSysAdmin {
+		check.Skip("Skipping Admin VDC StorageProfile query: can't query as tenant user")
+	}
+	if vcd.config.VCD.StorageProfile.SP1 == "" {
+		check.Skip("Skipping VDC StorageProfile query: no StorageProfile ID was given")
+	}
+	ref, err := vcd.vdc.FindStorageProfileReference(vcd.config.VCD.StorageProfile.SP1)
+	check.Assert(err, IsNil)
+	expectedStorageProfileID, err := GetUuidFromHref(ref.HREF, true)
+	check.Assert(err, IsNil)
+	vdcStorageProfile, err := QueryAdminOrgVdcStorageProfileByID(vcd.client, ref.ID)
+	check.Assert(err, IsNil)
+
+	storageProfileFound := false
+
+	storageProfileID, err := GetUuidFromHref(vdcStorageProfile.HREF, true)
+	check.Assert(err, IsNil)
+	if storageProfileID == expectedStorageProfileID {
+		storageProfileFound = true
+	}
+
+	if testVerbose {
+		fmt.Printf("StorageProfile %s\n", vdcStorageProfile.Name)
+		fmt.Printf("\t href    %s\n", vdcStorageProfile.HREF)
+		fmt.Printf("\t enabled %v\n", vdcStorageProfile.IsEnabled)
+		fmt.Println("")
+	}
+
+	check.Assert(storageProfileFound, Equals, true)
+}
+
+func (vcd *TestVCD) Test_QueryOrgVdcStorageProfileByID(check *C) {
+	if vcd.config.VCD.StorageProfile.SP1 == "" {
+		check.Skip("Skipping VDC StorageProfile query: no StorageProfile ID was given")
+	}
+
+	// Setup Org user and connection
+	adminOrg, err := vcd.client.GetAdminOrgByName(vcd.config.VCD.Org)
+	check.Assert(err, IsNil)
+
+	orgUserVcdClient, _, err := newOrgUserConnection(adminOrg, "query-org-vdc-storage-profile-by-id", "CHANGE-ME", vcd.config.Provider.Url, true)
+	check.Assert(err, IsNil)
+
+	ref, err := vcd.vdc.FindStorageProfileReference(vcd.config.VCD.StorageProfile.SP1)
+	check.Assert(err, IsNil)
+	expectedStorageProfileID, err := GetUuidFromHref(ref.HREF, true)
+	check.Assert(err, IsNil)
+	vdcStorageProfile, err := QueryOrgVdcStorageProfileByID(orgUserVcdClient, ref.ID)
+	check.Assert(err, IsNil)
+
+	storageProfileFound := false
+
+	storageProfileID, err := GetUuidFromHref(vdcStorageProfile.HREF, true)
+	check.Assert(err, IsNil)
+	if storageProfileID == expectedStorageProfileID {
+		storageProfileFound = true
+	}
+
+	if testVerbose {
+		fmt.Printf("StorageProfile %s\n", vdcStorageProfile.Name)
+		fmt.Printf("\t href    %s\n", vdcStorageProfile.HREF)
+		fmt.Printf("\t enabled %v\n", vdcStorageProfile.IsEnabled)
+		fmt.Println("")
+	}
+
+	check.Assert(storageProfileFound, Equals, true)
+}
+
 func (vcd *TestVCD) Test_QueryNetworkPoolByName(check *C) {
+	vcd.skipIfNotSysAdmin(check)
 	if vcd.config.VCD.ProviderVdc.NetworkPool == "" {
 		check.Skip("Skipping Provider VDC network pool query: no provider VDC network pool was given")
 	}
@@ -591,8 +676,8 @@ func (vcd *TestVCD) Test_QueryNetworkPoolByName(check *C) {
 
 }
 
-// Test getting storage profile by href and vdc client
-func (vcd *TestVCD) Test_GetStorageProfileByHref(check *C) {
+// Test_GetStorageProfile tests all the getters of Storage Profile
+func (vcd *TestVCD) Test_GetStorageProfile(check *C) {
 	if vcd.config.VCD.ProviderVdc.StorageProfile == "" {
 		check.Skip("Skipping test because storage profile is not configured")
 	}
@@ -608,10 +693,17 @@ func (vcd *TestVCD) Test_GetStorageProfileByHref(check *C) {
 	check.Assert(adminVdc, NotNil)
 
 	// Get storage profile by href
-	foundStorageProfile, err := GetStorageProfileByHref(vcd.client, adminVdc.AdminVdc.VdcStorageProfiles.VdcStorageProfile[0].HREF)
+	foundStorageProfile, err := vcd.client.Client.GetStorageProfileByHref(adminVdc.AdminVdc.VdcStorageProfiles.VdcStorageProfile[0].HREF)
 	check.Assert(err, IsNil)
-	check.Assert(foundStorageProfile, Not(Equals), types.VdcStorageProfile{})
 	check.Assert(foundStorageProfile, NotNil)
+	check.Assert(foundStorageProfile.IopsSettings, NotNil)
+	check.Assert(foundStorageProfile, Not(Equals), types.VdcStorageProfile{})
+	check.Assert(foundStorageProfile.IopsSettings, Not(Equals), types.VdcStorageProfileIopsSettings{})
+
+	// Get storage profile by ID
+	foundStorageProfile2, err := vcd.client.GetStorageProfileById(foundStorageProfile.ID)
+	check.Assert(err, IsNil)
+	check.Assert(foundStorageProfile, DeepEquals, foundStorageProfile2)
 }
 
 func (vcd *TestVCD) Test_GetOrgList(check *C) {
@@ -629,4 +721,193 @@ func (vcd *TestVCD) Test_GetOrgList(check *C) {
 		}
 		check.Assert(foundOrg, Equals, true)
 	}
+}
+
+func (vcd *TestVCD) TestQueryAllVdcs(check *C) {
+	if vcd.skipAdminTests {
+		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
+	}
+
+	allVdcs, err := vcd.client.Client.QueryAllVdcs()
+	check.Assert(err, IsNil)
+
+	// Check for at least that many VDCs in VCD
+	// expectedVdcCountInSystem = 1 NSX-V VDC
+	expectedVdcCountInSystem := 1
+	// If an NSX-T VDC exists - then expected count of VDCs is at least 2
+	if vcd.config.VCD.Nsxt.Vdc != "" {
+		expectedVdcCountInSystem++
+	}
+
+	if testVerbose {
+		fmt.Printf("# List contains at least %d VDCs.", expectedVdcCountInSystem)
+	}
+	check.Assert(len(allVdcs) >= expectedVdcCountInSystem, Equals, true)
+	// Check that known VDCs are inside the list
+
+	knownVdcs := []string{vcd.config.VCD.Vdc}
+	if vcd.config.VCD.Nsxt.Vdc != "" {
+		knownVdcs = append(knownVdcs, vcd.config.VCD.Nsxt.Vdc)
+	}
+
+	foundVdcNames := make([]string, len(allVdcs))
+	for vdcIndex, vdc := range allVdcs {
+		foundVdcNames[vdcIndex] = vdc.Name
+	}
+
+	if testVerbose {
+		fmt.Printf("# Checking result contains all known VDCs (%s).", strings.Join((knownVdcs), ", "))
+	}
+	for _, knownVdcName := range knownVdcs {
+		check.Assert(contains(knownVdcName, foundVdcNames), Equals, true)
+	}
+}
+
+func (vcd *TestVCD) Test_NsxtGlobalDefaultSegmentProfileTemplate(check *C) {
+	skipNoNsxtConfiguration(vcd, check)
+	vcd.skipIfNotSysAdmin(check)
+
+	nsxtManager, err := vcd.client.GetNsxtManagerByName(vcd.config.VCD.Nsxt.Manager)
+	check.Assert(err, IsNil)
+	check.Assert(nsxtManager, NotNil)
+	nsxtManagerUrn, err := nsxtManager.Urn()
+	check.Assert(err, IsNil)
+
+	// Filter by NSX-T Manager
+	queryParams := copyOrNewUrlValues(nil)
+	queryParams = queryParameterFilterAnd(fmt.Sprintf("nsxTManagerRef.id==%s", nsxtManagerUrn), queryParams)
+
+	// Lookup prerequisite profiles for Segment Profile template creation
+	ipDiscoveryProfile, err := vcd.client.GetIpDiscoveryProfileByName(vcd.config.VCD.Nsxt.IpDiscoveryProfile, queryParams)
+	check.Assert(err, IsNil)
+	macDiscoveryProfile, err := vcd.client.GetMacDiscoveryProfileByName(vcd.config.VCD.Nsxt.MacDiscoveryProfile, queryParams)
+	check.Assert(err, IsNil)
+	spoofGuardProfile, err := vcd.client.GetSpoofGuardProfileByName(vcd.config.VCD.Nsxt.SpoofGuardProfile, queryParams)
+	check.Assert(err, IsNil)
+	qosProfile, err := vcd.client.GetQoSProfileByName(vcd.config.VCD.Nsxt.QosProfile, queryParams)
+	check.Assert(err, IsNil)
+	segmentSecurityProfile, err := vcd.client.GetSegmentSecurityProfileByName(vcd.config.VCD.Nsxt.SegmentSecurityProfile, queryParams)
+	check.Assert(err, IsNil)
+
+	config := &types.NsxtSegmentProfileTemplate{
+		Name:                   check.TestName(),
+		Description:            check.TestName() + "-description",
+		IPDiscoveryProfile:     &types.Reference{ID: ipDiscoveryProfile.ID},
+		MacDiscoveryProfile:    &types.Reference{ID: macDiscoveryProfile.ID},
+		QosProfile:             &types.Reference{ID: qosProfile.ID},
+		SegmentSecurityProfile: &types.Reference{ID: segmentSecurityProfile.ID},
+		SpoofGuardProfile:      &types.Reference{ID: spoofGuardProfile.ID},
+		SourceNsxTManagerRef:   &types.OpenApiReference{ID: nsxtManager.NsxtManager.ID},
+	}
+
+	createdSegmentProfileTemplate, err := vcd.client.CreateSegmentProfileTemplate(config)
+	check.Assert(err, IsNil)
+	check.Assert(createdSegmentProfileTemplate, NotNil)
+
+	// Add to cleanup list
+	openApiEndpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointNsxtSegmentProfileTemplates + createdSegmentProfileTemplate.NsxtSegmentProfileTemplate.ID
+	AddToCleanupListOpenApi(config.Name, check.TestName(), openApiEndpoint)
+
+	// Set global profile template
+	globalDefaultSegmentProfileConfig := &types.NsxtGlobalDefaultSegmentProfileTemplate{
+		VappNetworkSegmentProfileTemplateRef: &types.OpenApiReference{ID: createdSegmentProfileTemplate.NsxtSegmentProfileTemplate.ID},
+		VdcNetworkSegmentProfileTemplateRef:  &types.OpenApiReference{ID: createdSegmentProfileTemplate.NsxtSegmentProfileTemplate.ID},
+	}
+
+	updatedDefaults, err := vcd.client.UpdateGlobalDefaultSegmentProfileTemplates(globalDefaultSegmentProfileConfig)
+	check.Assert(err, IsNil)
+	check.Assert(updatedDefaults, NotNil)
+	check.Assert(updatedDefaults.VappNetworkSegmentProfileTemplateRef.ID, Equals, createdSegmentProfileTemplate.NsxtSegmentProfileTemplate.ID)
+	check.Assert(updatedDefaults.VdcNetworkSegmentProfileTemplateRef.ID, Equals, createdSegmentProfileTemplate.NsxtSegmentProfileTemplate.ID)
+
+	openApiEndpoint = types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointNsxtGlobalDefaultSegmentProfileTemplates
+	PrependToCleanupList(openApiEndpoint, "OpenApiEntityGlobalDefaultSegmentProfileTemplate", "", check.TestName())
+
+	// Cleanup
+	resetDefaults, err := vcd.client.UpdateGlobalDefaultSegmentProfileTemplates(&types.NsxtGlobalDefaultSegmentProfileTemplate{})
+	check.Assert(err, IsNil)
+	check.Assert(resetDefaults, NotNil)
+	check.Assert(resetDefaults.VappNetworkSegmentProfileTemplateRef, IsNil)
+	check.Assert(resetDefaults.VdcNetworkSegmentProfileTemplateRef, IsNil)
+
+	err = createdSegmentProfileTemplate.Delete()
+	check.Assert(err, IsNil)
+}
+
+// Test retrieval of all Orgs
+func (vcd *TestVCD) Test_QueryAllOrgs(check *C) {
+	vcd.skipIfNotSysAdmin(check)
+	if vcd.config.VCD.Org == "" {
+		check.Skip("Test_QueryOrgByName: Org Name not given")
+		return
+	}
+
+	orgs, err := vcd.client.QueryAllOrgs()
+	check.Assert(err, IsNil)
+	check.Assert(orgs, NotNil)
+
+	foundOrg := false
+	for _, org := range orgs {
+		if org.Name == vcd.config.VCD.Org {
+			foundOrg = true
+		}
+	}
+	check.Assert(foundOrg, Equals, true)
+}
+
+// Tests Org retrieval by name, by ID, and by a combination of name and ID
+func (vcd *TestVCD) Test_QueryOrgByName(check *C) {
+	vcd.skipIfNotSysAdmin(check)
+	if vcd.config.VCD.Org == "" {
+		check.Skip("Test_QueryOrgByName: Org Name not given")
+		return
+	}
+
+	org, err := vcd.client.QueryOrgByName(vcd.config.VCD.Org)
+	check.Assert(err, IsNil)
+
+	orgFound := false
+	if vcd.config.VCD.Org == org.Name {
+		orgFound = true
+	}
+
+	if testVerbose {
+		fmt.Printf("Org %s\n", org.Name)
+		fmt.Printf("\t href    %s\n", org.HREF)
+		fmt.Printf("\t enabled %v\n", org.IsEnabled)
+		fmt.Println("")
+	}
+
+	check.Assert(orgFound, Equals, true)
+}
+
+// Tests Org retrieval by name, by ID, and by a combination of name and ID
+func (vcd *TestVCD) Test_QueryOrgById(check *C) {
+	vcd.skipIfNotSysAdmin(check)
+	if vcd.config.VCD.Org == "" {
+		check.Skip("Test_QueryOrgByName: Org Name not given")
+		return
+	}
+
+	namedOrg, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+	check.Assert(err, IsNil)
+
+	orgFound := false
+	if vcd.config.VCD.Org == namedOrg.Org.Name {
+
+		idOrg, err := vcd.client.QueryOrgByID(namedOrg.Org.ID)
+		check.Assert(err, IsNil)
+
+		if idOrg.HREF == namedOrg.Org.HREF {
+			orgFound = true
+		}
+
+		if testVerbose {
+			fmt.Printf("Org %s\n", namedOrg.Org.Name)
+			fmt.Printf("\t Org HREF (by Name): %s\n", namedOrg.Org.HREF)
+			fmt.Printf("\t Org HREF (by ID): %s\n", idOrg.HREF)
+			fmt.Println("")
+		}
+	}
+	check.Assert(orgFound, Equals, true)
 }

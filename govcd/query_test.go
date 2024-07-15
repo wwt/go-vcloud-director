@@ -1,4 +1,4 @@
-// +build query functional ALL
+//go:build query || functional || ALL
 
 /*
  * Copyright 2018 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.

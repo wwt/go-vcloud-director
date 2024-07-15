@@ -1,4 +1,4 @@
-// +build vapp vm functional ALL
+//go:build vapp || vm || functional || ALL
 
 /*
  * Copyright 2019 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -103,10 +103,10 @@ type getGuestCustomizationSectionGetSetter interface {
 // out settings on all objects implementing such interface
 func guestCustomizationPropertyTester(vcd *TestVCD, check *C, object getGuestCustomizationSectionGetSetter) {
 	setupedGuestCustomizationSection := &types.GuestCustomizationSection{
-		Enabled: takeBoolPointer(true), JoinDomainEnabled: takeBoolPointer(false), UseOrgSettings: takeBoolPointer(false),
+		Enabled: addrOf(true), JoinDomainEnabled: addrOf(false), UseOrgSettings: addrOf(false),
 		DomainUserName: "", DomainName: "", DomainUserPassword: "",
-		AdminPasswordEnabled: takeBoolPointer(true), AdminPassword: "adminPass", AdminPasswordAuto: takeBoolPointer(false),
-		AdminAutoLogonEnabled: takeBoolPointer(true), AdminAutoLogonCount: 15, ResetPasswordRequired: takeBoolPointer(true),
+		AdminPasswordEnabled: addrOf(true), AdminPassword: "adminPass", AdminPasswordAuto: addrOf(false),
+		AdminAutoLogonEnabled: addrOf(true), AdminAutoLogonCount: 15, ResetPasswordRequired: addrOf(true),
 		CustomizationScript: "ls", ComputerName: "Cname18"}
 
 	guestCustomizationSection, err := object.SetGuestCustomizationSection(setupedGuestCustomizationSection)

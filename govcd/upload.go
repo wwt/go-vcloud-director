@@ -67,8 +67,7 @@ func uploadFile(client *Client, filePath string, uDetails uploadDetails) (int64,
 	var count int
 	var pieceSize int64
 
-	// #nosec G304 - linter does not like 'filePath' to be a variable. However this is necessary for file uploads.
-	file, err := os.Open(filePath)
+	file, err := os.Open(filepath.Clean(filePath))
 	if err != nil {
 		util.Logger.Printf("[ERROR] during upload process - file open issue : %s, error %s ", filePath, err)
 		*uDetails.uploadError = err
@@ -82,7 +81,7 @@ func uploadFile(client *Client, filePath string, uDetails uploadDetails) (int64,
 		return 0, err
 	}
 
-	defer file.Close()
+	defer safeClose(file)
 
 	fileSize := fileInfo.Size()
 	// when file size in OVF does not exist, use real file size instead
@@ -160,8 +159,9 @@ func newFileUploadRequest(client *Client, requestUrl string, filePart []byte, of
 	rangeExpression := "bytes " + strconv.FormatInt(int64(offset), 10) + "-" + strconv.FormatInt(int64(offset+filePartSize-1), 10) + "/" + strconv.FormatInt(int64(fileSizeToUpload), 10)
 	uploadReq.Header.Set("Content-Range", rangeExpression)
 
-	for key, value := range uploadReq.Header {
-		util.Logger.Printf("[TRACE] Header: %s :%s \n", key, value)
+	sanitizedHeader := util.SanitizedHeader(uploadReq.Header)
+	for key, value := range sanitizedHeader {
+		util.Logger.Printf("[TRACE] Header: %s: %s \n", key, value)
 	}
 
 	return uploadReq, nil
@@ -185,7 +185,10 @@ func uploadPartFile(client *Client, part []byte, partDataSize int64, uDetails up
 	if err != nil {
 		return fmt.Errorf("file upload failed. Err: %s", err)
 	}
-	response.Body.Close()
+	err = response.Body.Close()
+	if err != nil {
+		return fmt.Errorf("file closing failed. Err: %s", err)
+	}
 
 	uDetails.callBack(uDetails.uploadedBytesForCallback+partDataSize, uDetails.allFilesSize)
 
@@ -197,8 +200,11 @@ func makeEmptyRequest(client *Client) {
 	apiEndpoint := client.VCDHREF
 	apiEndpoint.Path += "/query?type=task&format=records&page=1&pageSize=5&"
 
-	_, _ = client.ExecuteRequest(apiEndpoint.String(), http.MethodGet,
+	_, err := client.ExecuteRequest(apiEndpoint.String(), http.MethodGet,
 		"", "error making empty request: %s", nil, nil)
+	if err != nil {
+		util.Logger.Printf("[DEBUG - makeEmptyRequest] error executing request: %s", err)
+	}
 }
 
 func getUploadLink(files *types.FilesList) (*url.URL, error) {

@@ -1,8 +1,8 @@
-# go-vcloud-director [![Build Status](https://travis-ci.org/vmware/go-vcloud-director.svg?branch=master)](https://travis-ci.org/vmware/go-vcloud-director) [![Coverage Status](https://coveralls.io/repos/vmware/go-vcloud-director/badge.svg?branch=master&service=github)](https://coveralls.io/github/vmware/go-vcloud-director?branch=master) [![GoDoc](https://godoc.org/github.com/vmware/go-vcloud-director?status.svg)](http://godoc.org/github.com/vmware/go-vcloud-director) [![Chat](https://img.shields.io/badge/chat-on%20slack-brightgreen.svg)](https://vmwarecode.slack.com/messages/CBBBXVB16)
+# go-vcloud-director [![GoDoc](https://godoc.org/github.com/vmware/go-vcloud-director?status.svg)](http://godoc.org/github.com/vmware/go-vcloud-director) [![Chat](https://img.shields.io/badge/chat-on%20slack-brightgreen.svg)](https://vmwarecode.slack.com/messages/CBBBXVB16)
 
 This repo contains the `go-vcloud-director` package which implements
-an SDK for vCloud Director. The project serves the needs of Golang
-developers who need to integrate with vCloud Director. It is also the
+an SDK for VMware Cloud Director. The project serves the needs of Golang
+developers who need to integrate with VMware Cloud Director. It is also the
 basis of the [vCD Terraform
 Provider](https://github.com/vmware/terraform-provider-vcd).
 
@@ -37,7 +37,7 @@ To show the SDK in action run the example:
 ```
 mkdir ~/govcd_example
 go mod init govcd_example
-go get github.com/vmware/go-vcloud-director/v2@master
+go get github.com/vmware/go-vcloud-director/v2@main
 go build -o example
 ./example user_name "password" org_name vcd_IP vdc_name 
 ```
@@ -114,7 +114,7 @@ func main() {
 
 ## Authentication
 
-You can authenticate to the vCD in four ways:
+You can authenticate to the vCD in five ways:
 
 * With a System Administration user and password (`administrator@system`)
 * With an Organization user and password (`tenant-admin@org-name`)
@@ -132,6 +132,11 @@ For the above two methods, you use:
 ```
 The file `scripts/get_token.sh` provides a handy method of extracting the token
 (`x-vcloud-authorization` value) for future use.
+
+* With a service account token (the file needs to have `r+w` rights)
+```go
+	err := vcdClient.SetServiceAccountApiToken(Org, "tokenfile.json")
+```
 
 * SAML user and password (works with ADFS as IdP using WS-TRUST endpoint
   "/adfs/services/trust/13/usernamemixed"). One must pass `govcd.WithSamlAdfs(true,customAdfsRptId)`

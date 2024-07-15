@@ -1,5 +1,4 @@
-// +build lb functional integration ALL
-// +build !skipLong
+//go:build (lb || functional || integration || ALL) && !skipLong
 
 /*
  * Copyright 2019 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -9,7 +8,7 @@ package govcd
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -202,8 +201,11 @@ func checkLb(queryUrl string, expectedResponses []string, maxRetryTimeout int) e
 
 			if err == nil {
 				fmt.Printf(".") // progress bar when waiting for responses from all nodes
-				body, _ := ioutil.ReadAll(resp.Body)
-				resp.Body.Close()
+				body, _ := io.ReadAll(resp.Body)
+				err = resp.Body.Close()
+				if err != nil {
+					return err
+				}
 				// check if the element is in the list
 				for index, value := range expectedResponses {
 					if value == string(body) {

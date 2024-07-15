@@ -1,4 +1,4 @@
-// +build vapp functional ALL
+//go:build vapp || functional || ALL
 
 /*
  * Copyright 2020 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -8,7 +8,6 @@ package govcd
 
 import (
 	"fmt"
-
 	. "gopkg.in/check.v1"
 
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
@@ -83,7 +82,7 @@ func (vcd *TestVCD) Test_UpdateNetworkFirewallRules(check *C) {
 func (vcd *TestVCD) prepareVappWithVappNetwork(check *C, vappName, orgVdcNetworkName string) (*VApp, string, *types.NetworkConfigSection, error) {
 	fmt.Printf("Running: %s\n", check.TestName())
 
-	vapp, err := createVappForTest(vcd, vappName)
+	vapp, err := deployVappForTest(vcd, vappName)
 	check.Assert(err, IsNil)
 	check.Assert(vapp, NotNil)
 
@@ -226,7 +225,7 @@ func (vcd *TestVCD) Test_UpdateNetworkNatRules(check *C) {
 		&types.NatRule{OneToOneVMRule: &types.NatOneToOneVMRule{
 			MappingMode: "manual", VMNicID: 0,
 			VAppScopedVMID:    vm2.VM.VAppScopedLocalID,
-			ExternalIPAddress: takeStringPointer("192.168.100.1")}}},
+			ExternalIPAddress: addrOf("192.168.100.1")}}},
 		false, "ipTranslation", "allowTrafficIn")
 	check.Assert(err, IsNil)
 	check.Assert(result, NotNil)
@@ -314,13 +313,14 @@ func createRoutedNetwork(vcd *TestVCD, check *C, networkName string) {
 }
 
 func (vcd *TestVCD) Test_UpdateNetworkStaticRoutes(check *C) {
-	createRoutedNetwork(vcd, check, "Test_UpdateNetworkStaticRoutes")
-	vapp, networkName, vappNetworkConfig, err := vcd.prepareVappWithVappNetwork(check, "Test_UpdateNetworkStaticRoutes", "Test_UpdateNetworkStaticRoutes")
+	testName := check.TestName()
+	createRoutedNetwork(vcd, check, testName)
+	vapp, vappNetworkName, vappNetworkConfig, err := vcd.prepareVappWithVappNetwork(check, testName, testName)
 	check.Assert(err, IsNil)
 
 	networkFound := types.VAppNetworkConfiguration{}
 	for _, networkConfig := range vappNetworkConfig.NetworkConfig {
-		if networkConfig.NetworkName == networkName {
+		if networkConfig.NetworkName == vappNetworkName {
 			networkFound = networkConfig
 		}
 	}
@@ -332,7 +332,7 @@ func (vcd *TestVCD) Test_UpdateNetworkStaticRoutes(check *C) {
 		&types.NetworkConnection{
 			IsConnected:             true,
 			IPAddressAllocationMode: types.IPAllocationModePool,
-			Network:                 "Test_UpdateNetworkStaticRoutes",
+			Network:                 vappNetworkName,
 			NetworkConnectionIndex:  0,
 		})
 
@@ -374,4 +374,10 @@ func (vcd *TestVCD) Test_UpdateNetworkStaticRoutes(check *C) {
 	err = task.WaitTaskCompletion()
 	check.Assert(err, IsNil)
 	check.Assert(task.Task.Status, Equals, "success")
+	network, err := vcd.vdc.GetOrgVdcNetworkByName(testName, true)
+	check.Assert(err, IsNil)
+	task, err = network.Delete()
+	check.Assert(err, IsNil)
+	err = task.WaitTaskCompletion()
+	check.Assert(err, IsNil)
 }

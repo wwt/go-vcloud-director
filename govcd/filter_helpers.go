@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
+	"github.com/vmware/go-vcloud-director/v2/util"
 )
 
 // This file contains functions that help create tests for filtering.
@@ -98,7 +99,7 @@ func HelperMakeFiltersFromNetworks(vdc *Vdc) ([]FilterMatch, error) {
 			return nil, err
 		}
 
-		filter, err = vdc.client.metadataToFilter(net.HREF, filter)
+		filter, err = vdc.client.metadataToFilter(net.HREF, net.Name, filter)
 		if err != nil {
 			return nil, err
 		}
@@ -152,18 +153,33 @@ func makeDateFilter(items []DateItem) ([]FilterMatch, error) {
 			earliestFound = true
 		}
 		exactFilter := NewFilterDef()
-		_ = exactFilter.AddFilter(types.FilterDate, "=="+item.Date)
+		err = exactFilter.AddFilter(types.FilterDate, "=="+item.Date)
+		if err != nil {
+			return nil, fmt.Errorf("error adding filter '%s' '%s': %s", types.FilterDate, "=="+item.Date, err)
+		}
 		filters = append(filters, FilterMatch{exactFilter, item.Name, item.Entity, item.EntityType})
 	}
 
 	if earliestFound && latestFound && earliestDate != latestDate {
 		earlyFilter := NewFilterDef()
-		_ = earlyFilter.AddFilter(types.FilterDate, "<"+latestDate)
-		_ = earlyFilter.AddFilter(types.FilterEarliest, "true")
+		err := earlyFilter.AddFilter(types.FilterDate, "<"+latestDate)
+		if err != nil {
+			return nil, err
+		}
+		err = earlyFilter.AddFilter(types.FilterEarliest, "true")
+		if err != nil {
+			return nil, err
+		}
 
 		lateFilter := NewFilterDef()
-		_ = lateFilter.AddFilter(types.FilterDate, ">"+earliestDate)
-		_ = lateFilter.AddFilter(types.FilterLatest, "true")
+		err = lateFilter.AddFilter(types.FilterDate, ">"+earliestDate)
+		if err != nil {
+			return nil, err
+		}
+		err = lateFilter.AddFilter(types.FilterLatest, "true")
+		if err != nil {
+			return nil, err
+		}
 
 		filters = append(filters, FilterMatch{earlyFilter, earliestName, earliestEntity, entityType})
 		filters = append(filters, FilterMatch{lateFilter, latestName, latestEntity, entityType})
@@ -191,7 +207,7 @@ func HelperMakeFiltersFromCatalogs(org *AdminOrg) ([]FilterMatch, error) {
 
 		dateInfo = append(dateInfo, dInfo...)
 
-		filter, err = org.client.metadataToFilter(cat.HREF, filter)
+		filter, err = org.client.metadataToFilter(cat.HREF, cat.Name, filter)
 		if err != nil {
 			return nil, err
 		}
@@ -229,7 +245,7 @@ func HelperMakeFiltersFromMedia(vdc *Vdc, catalogName string) ([]FilterMatch, er
 
 		dateInfo = append(dateInfo, dInfo...)
 
-		filter, err = vdc.client.metadataToFilter(item.HREF, filter)
+		filter, err = vdc.client.metadataToFilter(item.HREF, item.Name, filter)
 		if err != nil {
 			return nil, err
 		}
@@ -286,7 +302,7 @@ func HelperMakeFiltersFromCatalogItem(catalog *Catalog) ([]FilterMatch, error) {
 
 		dateInfo = append(dateInfo, dInfo...)
 
-		filter, err = catalog.client.metadataToFilter(item.HREF, filter)
+		filter, err = catalog.client.metadataToFilter(item.HREF, item.Name, filter)
 		if err != nil {
 			return nil, err
 		}
@@ -322,7 +338,7 @@ func HelperMakeFiltersFromVappTemplate(catalog *Catalog) ([]FilterMatch, error) 
 
 		dateInfo = append(dateInfo, dInfo...)
 
-		filter, err = catalog.client.metadataToFilter(item.HREF, filter)
+		filter, err = catalog.client.metadataToFilter(item.HREF, item.Name, filter)
 		if err != nil {
 			return nil, err
 		}
@@ -415,6 +431,32 @@ func HelperCreateMultipleCatalogItems(catalog *Catalog, requestData []VappTempla
 	return data, nil
 }
 
+func HelperMakeFiltersFromOrgVdc(org *Org) ([]FilterMatch, error) {
+	var filters []FilterMatch
+	items, err := org.QueryOrgVdcList()
+	if err != nil {
+		return filters, err
+	}
+	for _, item := range items {
+		localItem := QueryOrgVdc(*item)
+		qItem := QueryItem(localItem)
+
+		filter, _, err := queryItemToFilter(qItem, "QueryOrgVdc")
+		if err != nil {
+			return nil, err
+		}
+
+		filter, err = org.client.metadataToFilter(item.HREF, item.Name, filter)
+		if err != nil {
+			return nil, err
+		}
+
+		filters = append(filters, FilterMatch{filter, item.Name, localItem, "QueryOrgVdc"})
+	}
+
+	return filters, nil
+}
+
 // ipToRegex creates a regular expression that matches an IP without the last element
 func ipToRegex(ip string) string {
 	elements := strings.Split(ip, ".")
@@ -428,15 +470,25 @@ func ipToRegex(ip string) string {
 // strToRegex creates a regular expression that matches perfectly with the input query
 func strToRegex(s string) string {
 	var result strings.Builder
-	result.WriteString("^")
+	var err error
+	_, err = result.WriteString("^")
+	if err != nil {
+		util.Logger.Printf("[DEBUG - strToRegex] error writing to string: %s", err)
+	}
 	for _, ch := range s {
 		if ch == '.' {
-			result.WriteString(fmt.Sprintf("\\%c", ch))
+			_, err = result.WriteString(fmt.Sprintf("\\%c", ch))
 		} else {
-			result.WriteString(fmt.Sprintf("[%c]", ch))
+			_, err = result.WriteString(fmt.Sprintf("[%c]", ch))
+		}
+		if err != nil {
+			util.Logger.Printf("[DEBUG - strToRegex] error writing to string: %s", err)
 		}
 	}
-	result.WriteString("$")
+	_, err = result.WriteString("$")
+	if err != nil {
+		util.Logger.Printf("[DEBUG - strToRegex] error writing to string: %s", err)
+	}
 	return result.String()
 }
 
@@ -444,7 +496,7 @@ func strToRegex(s string) string {
 // If the value looks like a number, or a true/false value, the corresponding type is returned
 // Otherwise, we assume it's a string.
 // We do this because the API doesn't return the metadata type
-// (it would if the field TypedValue.XsiType were defined as `xml:"type,attr"`, but then metadata updates would fail.)
+// (it would if the field MetadataTypedValue.XsiType were defined as `xml:"type,attr"`, but then metadata updates would fail.)
 func guessMetadataType(value string) string {
 	fType := "STRING"
 	reNumber := regexp.MustCompile(`^[0-9]+$`)
@@ -461,14 +513,18 @@ func guessMetadataType(value string) string {
 // metadataToFilter adds metadata elements to an existing filter
 // href is the address of the entity for which we want to retrieve metadata
 // filter is an existing filter to which we want to add metadata elements
-func (client *Client) metadataToFilter(href string, filter *FilterDef) (*FilterDef, error) {
+// objectName is the name of the entity for which we want to retrieve metadata
+func (client *Client) metadataToFilter(href, objectName string, filter *FilterDef) (*FilterDef, error) {
 	if filter == nil {
 		filter = &FilterDef{}
 	}
-	metadata, err := getMetadata(client, href)
+	metadata, err := getMetadata(client, href, objectName)
 	if err == nil && metadata != nil && len(metadata.MetadataEntry) > 0 {
 		for _, md := range metadata.MetadataEntry {
-			isSystem := md.Domain == "SYSTEM"
+			isSystem := false
+			if md.Domain != nil && md.Domain.Domain == "SYSTEM" {
+				isSystem = true
+			}
 			var fType string
 			var ok bool
 			if md.TypedValue.XsiType == "" {

@@ -1,4 +1,4 @@
-// +build extnetwork network functional openapi ALL
+//go:build extnetwork || network || nsxt || functional || openapi || ALL
 
 /*
  * Copyright 2020 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -14,22 +14,21 @@ import (
 )
 
 func (vcd *TestVCD) Test_CreateExternalNetworkV2Nsxt(check *C) {
-	vcd.testCreateExternalNetworkV2Nsxt(check, vcd.config.VCD.Nsxt.Tier0router, types.ExternalNetworkBackingTypeNsxtTier0Router)
+	vcd.testCreateExternalNetworkV2Nsxt(check, vcd.config.VCD.Nsxt.Tier0router, types.ExternalNetworkBackingTypeNsxtTier0Router, false, "", "", "")
 }
 
 func (vcd *TestVCD) Test_CreateExternalNetworkV2NsxtVrf(check *C) {
-	// The documented backing type of NSX-T VRF router is "NSXT_VRF_TIER0" (types.ExternalNetworkBackingTypeNsxtVrfTier0Router)
-	// but although it is documented - it fails and requires the same "NSXT_TIER0" (types.ExternalNetworkBackingTypeNsxtTier0Router)
-	// backing type to be specified
-	// As of 10.1.2 release it is not officially supported (support only introduced in 10.2.0) therefore skipping this test for
-	// 10.1.X. 10.1.1 allowed to create it, but 10.1.2 introduced a validator and throws error.
-	if vcd.client.Client.APIVCDMaxVersionIs("< 35") {
-		check.Skip("NSX-T VRF-Lite backed external networks are officially supported only in 10.2.0+")
-	}
-	vcd.testCreateExternalNetworkV2Nsxt(check, vcd.config.VCD.Nsxt.Tier0routerVrf, types.ExternalNetworkBackingTypeNsxtTier0Router)
+	vcd.testCreateExternalNetworkV2Nsxt(check, vcd.config.VCD.Nsxt.Tier0routerVrf, types.ExternalNetworkBackingTypeNsxtTier0Router, false, "", "", "")
 }
 
-func (vcd *TestVCD) testCreateExternalNetworkV2Nsxt(check *C, nsxtTier0Router, backingType string) {
+func (vcd *TestVCD) Test_CreateExternalNetworkV2NsxtSegment(check *C) {
+	vcd.testCreateExternalNetworkV2Nsxt(check, vcd.config.VCD.Nsxt.NsxtImportSegment, types.ExternalNetworkBackingTypeNsxtSegment, false, "", "", "")
+}
+
+func (vcd *TestVCD) testCreateExternalNetworkV2Nsxt(check *C, backingName, backingType string, useIpSpace bool, ownerOrgId, natAndFwIntention, raIntention string) {
+	if vcd.skipAdminTests {
+		check.Skip(fmt.Sprintf(TestRequiresSysAdminPrivileges, check.TestName()))
+	}
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointExternalNetworks
 	skipOpenApiEndpointTest(vcd, check, endpoint)
 	skipNoNsxtConfiguration(vcd, check)
@@ -42,11 +41,10 @@ func (vcd *TestVCD) testCreateExternalNetworkV2Nsxt(check *C, nsxtTier0Router, b
 	nsxtManagerId, err := BuildUrnWithUuid("urn:vcloud:nsxtmanager:", extractUuid(man[0].HREF))
 	check.Assert(err, IsNil)
 
-	tier0RouterVrf, err := vcd.client.GetImportableNsxtTier0RouterByName(nsxtTier0Router, nsxtManagerId)
-	check.Assert(err, IsNil)
+	backingId := getBackingIdByNameAndType(check, backingName, backingType, vcd, nsxtManagerId)
 
 	// Create network and test CRUD capabilities
-	netNsxt := testExternalNetworkV2(check.TestName(), backingType, tier0RouterVrf.NsxtTier0Router.ID, nsxtManagerId)
+	netNsxt := testExternalNetworkV2(check.TestName(), backingType, backingId, nsxtManagerId, useIpSpace, ownerOrgId, natAndFwIntention, raIntention)
 	createdNet, err := CreateExternalNetworkV2(vcd.client, netNsxt)
 	check.Assert(err, IsNil)
 
@@ -85,7 +83,28 @@ func (vcd *TestVCD) testCreateExternalNetworkV2Nsxt(check *C, nsxtTier0Router, b
 	check.Assert(ContainsNotFound(err), Equals, true)
 }
 
+// getBackingIdByNameAndType looks up Backing ID by name and type
+func getBackingIdByNameAndType(check *C, backingName string, backingType string, vcd *TestVCD, nsxtManagerId string) string {
+	var backingId string
+	switch {
+	case backingType == types.ExternalNetworkBackingTypeNsxtTier0Router || backingType == types.ExternalNetworkBackingTypeNsxtVrfTier0Router: // Lookup T0 or T0 VRF
+		tier0RouterVrf, err := vcd.client.GetImportableNsxtTier0RouterByName(backingName, nsxtManagerId)
+		check.Assert(err, IsNil)
+		backingId = tier0RouterVrf.NsxtTier0Router.ID
+	case backingType == types.ExternalNetworkBackingTypeNsxtSegment: // Lookup segment ID
+		bareNsxtManagerId, err := getBareEntityUuid(nsxtManagerId)
+		check.Assert(err, IsNil)
+		filter := map[string]string{"nsxTManager": bareNsxtManagerId}
+
+		nsxtSegment, err := vcd.client.GetFilteredNsxtImportableSwitches(filter)
+		check.Assert(err, IsNil)
+		backingId = nsxtSegment[0].NsxtImportableSwitch.ID
+	}
+	return backingId
+}
+
 func (vcd *TestVCD) Test_CreateExternalNetworkV2Nsxv(check *C) {
+	vcd.skipIfNotSysAdmin(check)
 	endpoint := types.OpenApiPathVersion1_0_0 + types.OpenApiEndpointExternalNetworks
 	skipOpenApiEndpointTest(vcd, check, endpoint)
 
@@ -108,14 +127,14 @@ func (vcd *TestVCD) Test_CreateExternalNetworkV2Nsxv(check *C) {
 	// Query
 	vcHref, err := getVcenterHref(vcd.client, vcd.config.VCD.VimServer)
 	check.Assert(err, IsNil)
-	vcuuid := extractUuid(vcHref)
+	vcUuid := extractUuid(vcHref)
 
-	vcUrn, err := BuildUrnWithUuid("urn:vcloud:vimserver:", vcuuid)
+	vcUrn, err := BuildUrnWithUuid("urn:vcloud:vimserver:", vcUuid)
 	check.Assert(err, IsNil)
 
-	neT := testExternalNetworkV2(check.TestName(), vcd.config.VCD.ExternalNetworkPortGroupType, pgs[0].MoRef, vcUrn)
+	net := testExternalNetworkV2(check.TestName(), vcd.config.VCD.ExternalNetworkPortGroupType, pgs[0].MoRef, vcUrn, false, "", "", "")
 
-	r, err := CreateExternalNetworkV2(vcd.client, neT)
+	r, err := CreateExternalNetworkV2(vcd.client, net)
 	check.Assert(err, IsNil)
 
 	// Use generic "OpenApiEntity" resource cleanup type
@@ -131,19 +150,21 @@ func (vcd *TestVCD) Test_CreateExternalNetworkV2Nsxv(check *C) {
 	check.Assert(err, IsNil)
 }
 
-func testExternalNetworkV2(name, backingType, backingId, NetworkProviderId string) *types.ExternalNetworkV2 {
-	neT := &types.ExternalNetworkV2{
-		ID:          "",
-		Name:        name,
-		Description: "",
-		Subnets: types.ExternalNetworkV2Subnets{[]types.ExternalNetworkV2Subnet{
+func testExternalNetworkV2(name, backingType, backingId, NetworkProviderId string, useIpSpace bool, ownerOrgId, natAndFwIntention, raIntention string) *types.ExternalNetworkV2 {
+	net := &types.ExternalNetworkV2{
+		ID:                                 "",
+		Name:                               name,
+		Description:                        "",
+		NatAndFirewallServiceIntention:     natAndFwIntention,
+		NetworkRouteAdvertisementIntention: raIntention,
+		Subnets: types.ExternalNetworkV2Subnets{Values: []types.ExternalNetworkV2Subnet{
 			{
 				Gateway:      "1.1.1.1",
 				PrefixLength: 24,
 				DNSSuffix:    "",
 				DNSServer1:   "",
 				DNSServer2:   "",
-				IPRanges: types.ExternalNetworkV2IPRanges{[]types.ExternalNetworkV2IPRange{
+				IPRanges: types.ExternalNetworkV2IPRanges{Values: []types.ExternalNetworkV2IPRange{
 					{
 						StartAddress: "1.1.1.3",
 						EndAddress:   "1.1.1.50",
@@ -154,20 +175,77 @@ func testExternalNetworkV2(name, backingType, backingId, NetworkProviderId strin
 				TotalIPCount: 0,
 			},
 		}},
-		NetworkBackings: types.ExternalNetworkV2Backings{[]types.ExternalNetworkV2Backing{
+		NetworkBackings: types.ExternalNetworkV2Backings{Values: []types.ExternalNetworkV2Backing{
 			{
 				BackingID: backingId,
-				// Name:        tier0Router.NsxtTier0Router.DisplayName,
-				BackingType: backingType,
 				NetworkProvider: types.NetworkProvider{
-					// Name: vcd.config.Nsxt.Manager,
 					ID: NetworkProviderId,
 				},
+				BackingTypeValue: backingType,
 			},
 		}},
 	}
 
-	return neT
+	if useIpSpace {
+		// removing subnet definition when using IP Spaces
+		net.Subnets = types.ExternalNetworkV2Subnets{}
+		net.UsingIpSpace = &useIpSpace
+	}
+
+	if ownerOrgId != "" {
+		net.DedicatedOrg = &types.OpenApiReference{ID: ownerOrgId}
+	}
+
+	return net
+}
+
+func (vcd *TestVCD) Test_CreateExternalNetworkV2NsxtIpSpaceT0(check *C) {
+	if vcd.client.Client.APIVCDMaxVersionIs("< 37.1") {
+		check.Skip("IP Spaces are supported in VCD 10.4.1+")
+	}
+	vcd.testCreateExternalNetworkV2Nsxt(check, vcd.config.VCD.Nsxt.Tier0router, types.ExternalNetworkBackingTypeNsxtTier0Router, true, "", "", "")
+}
+
+func (vcd *TestVCD) Test_CreateExternalNetworkV2NsxtIpSpaceVrf(check *C) {
+	if vcd.client.Client.APIVCDMaxVersionIs("< 37.1") {
+		check.Skip("IP Spaces are supported in VCD 10.4.1+")
+	}
+	vcd.testCreateExternalNetworkV2Nsxt(check, vcd.config.VCD.Nsxt.Tier0routerVrf, types.ExternalNetworkBackingTypeNsxtTier0Router, true, "", "", "")
+}
+
+func (vcd *TestVCD) Test_CreateExternalNetworkV2NsxtIpSpaceT0DedicatedOrg(check *C) {
+	if vcd.client.Client.APIVCDMaxVersionIs("< 37.1") {
+		check.Skip("IP Spaces are supported in VCD 10.4.1+")
+	}
+	vcd.testCreateExternalNetworkV2Nsxt(check, vcd.config.VCD.Nsxt.Tier0router, types.ExternalNetworkBackingTypeNsxtTier0Router, true, vcd.org.Org.ID, "", "")
+}
+
+func (vcd *TestVCD) Test_CreateExternalNetworkV2NsxtIpSpaceVrfDedicatedOrg(check *C) {
+	if vcd.client.Client.APIVCDMaxVersionIs("< 37.1") {
+		check.Skip("IP Spaces are supported in VCD 10.4.1+")
+	}
+	vcd.testCreateExternalNetworkV2Nsxt(check, vcd.config.VCD.Nsxt.Tier0routerVrf, types.ExternalNetworkBackingTypeNsxtTier0Router, true, vcd.org.Org.ID, "", "")
+}
+
+func (vcd *TestVCD) Test_CreateExternalNetworkV2NsxtNatAndFwIntentionProviderGateway(check *C) {
+	if vcd.client.Client.APIVCDMaxVersionIs("< 38.1") {
+		check.Skip("NAT and Firewall intentions are supported in VCD 10.5.1+")
+	}
+	vcd.testCreateExternalNetworkV2Nsxt(check, vcd.config.VCD.Nsxt.Tier0routerVrf, types.ExternalNetworkBackingTypeNsxtTier0Router, true, vcd.org.Org.ID, "PROVIDER_GATEWAY", "IP_SPACE_UPLINKS_ADVERTISED_FLEXIBLE")
+}
+
+func (vcd *TestVCD) Test_CreateExternalNetworkV2NsxtNatAndFwIntentionProviderAndEdgeGateway(check *C) {
+	if vcd.client.Client.APIVCDMaxVersionIs("< 38.1") {
+		check.Skip("NAT and Firewall intentions are supported in VCD 10.5.1+")
+	}
+	vcd.testCreateExternalNetworkV2Nsxt(check, vcd.config.VCD.Nsxt.Tier0routerVrf, types.ExternalNetworkBackingTypeNsxtTier0Router, true, vcd.org.Org.ID, "PROVIDER_AND_EDGE_GATEWAY", "ALL_NETWORKS_ADVERTISED")
+}
+
+func (vcd *TestVCD) Test_CreateExternalNetworkV2NsxtNatAndFwIntentionEdgeGateway(check *C) {
+	if vcd.client.Client.APIVCDMaxVersionIs("< 38.1") {
+		check.Skip("NAT and Firewall intentions are supported in VCD 10.5.1+")
+	}
+	vcd.testCreateExternalNetworkV2Nsxt(check, vcd.config.VCD.Nsxt.Tier0routerVrf, types.ExternalNetworkBackingTypeNsxtTier0Router, true, vcd.org.Org.ID, "EDGE_GATEWAY", "IP_SPACE_UPLINKS_ADVERTISED_STRICT")
 }
 
 func getVcenterHref(vcdClient *VCDClient, name string) (string, error) {

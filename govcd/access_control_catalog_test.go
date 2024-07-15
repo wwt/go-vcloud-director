@@ -1,4 +1,4 @@
-// +build functional catalog ALL
+//go:build functional || catalog || ALL
 
 /*
  * Copyright 2020 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -34,6 +34,7 @@ func (vcd *TestVCD) Test_AdminCatalogAccessControl(check *C) {
 		check.Skip("Test_AdminCatalogAccessControl: Org name not given.")
 		return
 	}
+	vcd.checkSkipWhenApiToken(check)
 	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
@@ -51,8 +52,8 @@ func (vcd *TestVCD) Test_AdminCatalogAccessControl(check *C) {
 
 	orgInfo, err := adminCatalog.getOrgInfo()
 	check.Assert(err, IsNil)
-	check.Assert(orgInfo.id, Equals, extractUuid(adminorg.AdminOrg.ID))
-	check.Assert(orgInfo.name, Equals, adminorg.AdminOrg.Name)
+	check.Assert(orgInfo.OrgId, Equals, extractUuid(adminorg.AdminOrg.ID))
+	check.Assert(orgInfo.OrgName, Equals, adminorg.AdminOrg.Name)
 
 	err = adminCatalog.Delete(true, true)
 	check.Assert(err, IsNil)
@@ -63,6 +64,7 @@ func (vcd *TestVCD) Test_CatalogAccessControl(check *C) {
 		check.Skip("Test_CatalogAccessControl: Org name not given.")
 		return
 	}
+	vcd.checkSkipWhenApiToken(check)
 	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
 	check.Assert(err, IsNil)
 	check.Assert(org, NotNil)
@@ -82,8 +84,8 @@ func (vcd *TestVCD) Test_CatalogAccessControl(check *C) {
 
 	orgInfo, err := catalog.getOrgInfo()
 	check.Assert(err, IsNil)
-	check.Assert(orgInfo.id, Equals, extractUuid(adminorg.AdminOrg.ID))
-	check.Assert(orgInfo.name, Equals, adminorg.AdminOrg.Name)
+	check.Assert(orgInfo.OrgId, Equals, extractUuid(adminorg.AdminOrg.ID))
+	check.Assert(orgInfo.OrgName, Equals, adminorg.AdminOrg.Name)
 
 	err = catalog.Delete(true, true)
 	check.Assert(err, IsNil)
@@ -153,7 +155,7 @@ func (vcd *TestVCD) testCatalogAccessControl(adminOrg *AdminOrg, catalog accessC
 	checkEmpty()
 	//globalSettings := types.ControlAccessParams{
 	//	IsSharedToEveryone:  true,
-	//	EveryoneAccessLevel: takeStringPointer(types.ControlAccessReadWrite),
+	//	EveryoneAccessLevel: addrOf(types.ControlAccessReadWrite),
 	//	AccessSettings: nil,
 	//}
 	//err = testAccessControl(catalogName+" catalog global", catalog, globalSettings, globalSettings, true, check)
@@ -164,8 +166,8 @@ func (vcd *TestVCD) testCatalogAccessControl(adminOrg *AdminOrg, catalog accessC
 		IsSharedToEveryone:  false,
 		EveryoneAccessLevel: nil,
 		AccessSettings: &types.AccessSettingList{
-			[]*types.AccessSetting{
-				&types.AccessSetting{
+			AccessSetting: []*types.AccessSetting{
+				{
 					Subject: &types.LocalSubject{
 						HREF: users[0].user.User.Href,
 						Name: users[0].user.User.Name,
@@ -196,8 +198,8 @@ func (vcd *TestVCD) testCatalogAccessControl(adminOrg *AdminOrg, catalog accessC
 		IsSharedToEveryone:  false,
 		EveryoneAccessLevel: nil,
 		AccessSettings: &types.AccessSettingList{
-			[]*types.AccessSetting{
-				&types.AccessSetting{
+			AccessSetting: []*types.AccessSetting{
+				{
 					Subject: &types.LocalSubject{
 						HREF: users[0].user.User.Href,
 						//Name: users[0].user.User.Name, // Pass info without name for one of the subjects
@@ -206,7 +208,7 @@ func (vcd *TestVCD) testCatalogAccessControl(adminOrg *AdminOrg, catalog accessC
 					ExternalSubject: nil,
 					AccessLevel:     types.ControlAccessReadOnly,
 				},
-				&types.AccessSetting{
+				{
 					Subject: &types.LocalSubject{
 						HREF: users[1].user.User.Href,
 						Name: users[1].user.User.Name,
@@ -231,8 +233,8 @@ func (vcd *TestVCD) testCatalogAccessControl(adminOrg *AdminOrg, catalog accessC
 		IsSharedToEveryone:  false,
 		EveryoneAccessLevel: nil,
 		AccessSettings: &types.AccessSettingList{
-			[]*types.AccessSetting{
-				&types.AccessSetting{
+			AccessSetting: []*types.AccessSetting{
+				{
 					Subject: &types.LocalSubject{
 						HREF: users[0].user.User.Href,
 						Name: users[0].user.User.Name,
@@ -241,7 +243,7 @@ func (vcd *TestVCD) testCatalogAccessControl(adminOrg *AdminOrg, catalog accessC
 					ExternalSubject: nil,
 					AccessLevel:     types.ControlAccessReadOnly,
 				},
-				&types.AccessSetting{
+				{
 					Subject: &types.LocalSubject{
 						HREF: users[1].user.User.Href,
 						//Name: users[1].user.User.Name,// Pass info without name for one of the subjects
@@ -250,7 +252,7 @@ func (vcd *TestVCD) testCatalogAccessControl(adminOrg *AdminOrg, catalog accessC
 					ExternalSubject: nil,
 					AccessLevel:     types.ControlAccessFullControl,
 				},
-				&types.AccessSetting{
+				{
 					Subject: &types.LocalSubject{
 						HREF: users[2].user.User.Href,
 						Name: users[2].user.User.Name,
@@ -272,8 +274,8 @@ func (vcd *TestVCD) testCatalogAccessControl(adminOrg *AdminOrg, catalog accessC
 			IsSharedToEveryone:  false,
 			EveryoneAccessLevel: nil,
 			AccessSettings: &types.AccessSettingList{
-				[]*types.AccessSetting{
-					&types.AccessSetting{
+				AccessSetting: []*types.AccessSetting{
+					{
 						Subject: &types.LocalSubject{
 							HREF: users[0].user.User.Href,
 							Name: users[0].user.User.Name,
@@ -282,7 +284,7 @@ func (vcd *TestVCD) testCatalogAccessControl(adminOrg *AdminOrg, catalog accessC
 						ExternalSubject: nil,
 						AccessLevel:     types.ControlAccessReadOnly,
 					},
-					&types.AccessSetting{
+					{
 						Subject: &types.LocalSubject{
 							HREF: users[1].user.User.Href,
 							//Name: users[1].user.User.Name,// Pass info without name for one of the subjects
@@ -291,7 +293,7 @@ func (vcd *TestVCD) testCatalogAccessControl(adminOrg *AdminOrg, catalog accessC
 						ExternalSubject: nil,
 						AccessLevel:     types.ControlAccessFullControl,
 					},
-					&types.AccessSetting{
+					{
 						Subject: &types.LocalSubject{
 							HREF: users[2].user.User.Href,
 							Name: users[2].user.User.Name,
@@ -300,7 +302,7 @@ func (vcd *TestVCD) testCatalogAccessControl(adminOrg *AdminOrg, catalog accessC
 						ExternalSubject: nil,
 						AccessLevel:     types.ControlAccessReadWrite,
 					},
-					&types.AccessSetting{
+					{
 						Subject: &types.LocalSubject{
 							HREF: newOrg.AdminOrg.HREF,
 							Name: newOrg.AdminOrg.Name,
@@ -324,8 +326,8 @@ func (vcd *TestVCD) testCatalogAccessControl(adminOrg *AdminOrg, catalog accessC
 			IsSharedToEveryone:  false,
 			EveryoneAccessLevel: nil,
 			AccessSettings: &types.AccessSettingList{
-				[]*types.AccessSetting{
-					&types.AccessSetting{
+				AccessSetting: []*types.AccessSetting{
+					{
 						Subject: &types.LocalSubject{
 							HREF: adminOrg.AdminOrg.HREF,
 							Name: adminOrg.AdminOrg.Name,
@@ -334,7 +336,7 @@ func (vcd *TestVCD) testCatalogAccessControl(adminOrg *AdminOrg, catalog accessC
 						ExternalSubject: nil,
 						AccessLevel:     types.ControlAccessFullControl,
 					},
-					&types.AccessSetting{
+					{
 						Subject: &types.LocalSubject{
 							HREF: newOrg.AdminOrg.HREF,
 							Name: newOrg.AdminOrg.Name,
@@ -348,6 +350,12 @@ func (vcd *TestVCD) testCatalogAccessControl(adminOrg *AdminOrg, catalog accessC
 		}
 		err = testAccessControl(catalogName+" catalog two org", catalog, twoOrgsSettings, twoOrgsSettings, true, catalogTenantContext, check)
 		check.Assert(err, IsNil)
+		catalogs, err := vcd.client.Client.QueryCatalogRecords(catalogName, TenantContext{newOrg.AdminOrg.ID, newOrg.AdminOrg.Name})
+		check.Assert(err, IsNil)
+		check.Assert(len(catalogs), Equals, 1)
+		foundCatalog, err := vcd.client.Client.GetAdminCatalogByHref(catalogs[0].HREF)
+		check.Assert(err, IsNil)
+		check.Assert(foundCatalog.AdminCatalog.ID, Equals, catalog.GetId())
 	}
 
 	// Set empty settings explicitly

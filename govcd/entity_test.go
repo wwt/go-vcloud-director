@@ -1,4 +1,4 @@
-// +build api functional catalog org extnetwork vm vdc system user nsxv network vapp vm affinity ALL
+//go:build api || functional || catalog || org || extnetwork || vm || vdc || system || user || nsxv || network || vapp || vm || affinity || ALL
 
 /*
  * Copyright 2019 VMware, Inc.  All rights reserved.  Licensed under the Apache v2 License.
@@ -90,31 +90,31 @@ func (vmar *VmAffinityRule) id() string   { return vmar.VmAffinityRule.ID }
 // and within the caller it must define the getter functions
 // Example usage:
 //
-// func (vcd *TestVCD) Test_OrgGetVdc(check *C) {
-//	if vcd.config.VCD.Org == "" {
-//		check.Skip("Test_OrgGetVdc: Org name not given.")
-//		return
-//	}
-//	org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
-//	check.Assert(err, IsNil)
-//	check.Assert(org, NotNil)
+//	func (vcd *TestVCD) Test_OrgGetVdc(check *C) {
+//		if vcd.config.VCD.Org == "" {
+//			check.Skip("Test_OrgGetVdc: Org name not given.")
+//			return
+//		}
+//		org, err := vcd.client.GetOrgByName(vcd.config.VCD.Org)
+//		check.Assert(err, IsNil)
+//		check.Assert(org, NotNil)
 //
-//	getByName := func(name string, refresh bool) (genericEntity, error) { return org.GetVDCByName(name, refresh) }
-//	getById := func(id string, refresh bool) (genericEntity, error) { return org.GetVDCById(id, refresh) }
-//	getByNameOrId := func(id string, refresh bool) (genericEntity, error) { return org.GetVDCByNameOrId(id, refresh) }
+//		getByName := func(name string, refresh bool) (genericEntity, error) { return org.GetVDCByName(name, refresh) }
+//		getById := func(id string, refresh bool) (genericEntity, error) { return org.GetVDCById(id, refresh) }
+//		getByNameOrId := func(id string, refresh bool) (genericEntity, error) { return org.GetVDCByNameOrId(id, refresh) }
 //
-//	var def = getterTestDefinition{
-//		parentType:       "Org",
-//		parentName:       vcd.config.VCD.Org,
-//		entityType:       "Vdc",
-//		getterPrefix:     "VDC",
-//		entityName:       vcd.config.VCD.Vdc,
-//		getByName:        getByName,
-//		getById:          getById,
-//		getByNameOrId:    getByNameOrId,
+//		var def = getterTestDefinition{
+//			parentType:       "Org",
+//			parentName:       vcd.config.VCD.Org,
+//			entityType:       "Vdc",
+//			getterPrefix:     "VDC",
+//			entityName:       vcd.config.VCD.Vdc,
+//			getByName:        getByName,
+//			getById:          getById,
+//			getByNameOrId:    getByNameOrId,
+//		}
+//		vcd.testFinderGetGenericEntity(def, check)
 //	}
-//	vcd.testFinderGetGenericEntity(def, check)
-// }
 func (vcd *TestVCD) testFinderGetGenericEntity(def getterTestDefinition, check *C) {
 	entityName := def.entityName
 	if entityName == "" {
@@ -142,7 +142,7 @@ func (vcd *TestVCD) testFinderGetGenericEntity(def getterTestDefinition, check *
 		check.Skip(fmt.Sprintf("testFinderGetGenericEntity: %s %s not found.", def.entityType, def.entityName))
 		return
 	}
-	entity1 := ge.(genericEntity)
+	entity1 := ge
 
 	wantedType := fmt.Sprintf("*govcd.%s", def.entityType)
 	if testVerbose {
@@ -157,12 +157,12 @@ func (vcd *TestVCD) testFinderGetGenericEntity(def getterTestDefinition, check *
 
 	// 2. Get the entity by ID
 	if testVerbose {
-		fmt.Printf("#Testing %s.Get%sById\n", def.parentType, def.getterPrefix)
+		fmt.Printf("#Testing %s.Get%sById (using ID '%s')\n", def.parentType, def.getterPrefix, entityId)
 	}
 	ge, err = def.getById(entityId, false)
 	check.Assert(err, IsNil)
 	check.Assert(ge, NotNil)
-	entity2 := ge.(genericEntity)
+	entity2 := ge
 	check.Assert(entity2, NotNil)
 	check.Assert(entity2.name(), Equals, entityName)
 	check.Assert(entity2.id(), Equals, entityId)
@@ -175,7 +175,7 @@ func (vcd *TestVCD) testFinderGetGenericEntity(def getterTestDefinition, check *
 	ge, err = def.getByNameOrId(entityId, false)
 	check.Assert(err, IsNil)
 	check.Assert(ge, NotNil)
-	entity3 := ge.(genericEntity)
+	entity3 := ge
 	check.Assert(entity3, NotNil)
 	check.Assert(entity3.name(), Equals, entityName)
 	check.Assert(entity3.id(), Equals, entityId)
@@ -183,12 +183,13 @@ func (vcd *TestVCD) testFinderGetGenericEntity(def getterTestDefinition, check *
 
 	// 4. Get the entity by Name or ID, using the entity name
 	if testVerbose {
-		fmt.Printf("#Testing %s.Get%sByNameOrId\n", def.parentType, def.getterPrefix)
+		fmt.Printf("#Testing %s.Get%sByNameOrId (name '%s', ID '%s')\n",
+			def.parentType, def.getterPrefix, entityName, entityId)
 	}
 	ge, err = def.getByNameOrId(entityName, false)
-	check.Assert(ge, NotNil)
-	entity4 := ge.(genericEntity)
 	check.Assert(err, IsNil)
+	check.Assert(ge, NotNil)
+	entity4 := ge
 	check.Assert(entity4, NotNil)
 	check.Assert(entity4.name(), Equals, entityName)
 	check.Assert(entity4.id(), Equals, entityId)

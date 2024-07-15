@@ -62,13 +62,24 @@ func queryFieldsOnDemand(queryType string) ([]string, error) {
 		vmFields = []string{"catalogName", "container", "containerName", "datastoreName", "description",
 			"gcStatus", "guestOs", "hardwareVersion", "hostName", "isAutoNature", "isDeleted", "isDeployed", "isPublished",
 			"isVAppTemplate", "isVdcEnabled", "memoryMB", "moref", "name", "numberOfCpus", "org", "status",
-			"storageProfileName", "vc", "vdc", "vmToolsVersion", "containerStatus", "pvdcHighestSupportedHardwareVersion",
+			"storageProfileName", "vc", "vdc", "vdcName", "vmToolsVersion", "containerStatus", "pvdcHighestSupportedHardwareVersion",
 			"isComputePolicyCompliant", "vmSizingPolicyId", "vmPlacementPolicyId", "encrypted", "dateCreated",
 			"totalStorageAllocatedMb", "isExpired"}
 		vappFields = []string{"creationDate", "isBusy", "isDeployed", "isEnabled", "isExpired", "isInMaintenanceMode", "isPublic",
 			"ownerName", "status", "vdc", "vdcName", "numberOfVMs", "numberOfCpus", "cpuAllocationMhz", "cpuAllocationInMhz",
 			"storageKB", "memoryAllocationMB", "isAutoDeleteNotified", "isAutoUndeployNotified", "isVdcEnabled", "honorBookOrder",
 			"pvdcHighestSupportedHardwareVersion", "lowestHardwareVersionInVApp"}
+		orgVdcFields = []string{"name", "description", "isEnabled", "cpuAllocationMhz", "cpuLimitMhz", "cpuUsedMhz",
+			"memoryAllocationMB", "memoryLimitMB", "memoryUsedMB", "storageLimitMB", "storageUsedMB", "providerVdcName",
+			"providerVdc", "orgName", "org", "allocationModel", "numberOfVApps", "numberOfUnmanagedVApps", "numberOfMedia",
+			"numberOfDisks", "numberOfVAppTemplates", "vcName", "isBusy", "status", "networkPool", "numberOfResourcePools",
+			"numberOfStorageProfiles", "usedNetworksInVdc", "numberOfVMs", "numberOfRunningVMs", "numberOfDeployedVApps",
+			"numberOfDeployedUnmanagedVApps", "isThinProvisioned", "isFastProvisioned", "networkProviderType",
+			"cpuOverheadMhz", "isVCEnabled", "memoryReservedMB", "cpuReservedMhz", "storageOverheadMB", "memoryOverheadMB", "vc"}
+		taskFields = []string{"href", "id", "type", "org", "orgName", "name", "operationFull", "message", "startDate",
+			"endDate", "status", "progress", "ownerName", "object", "objectType", "objectName", "serviceNamespace"}
+		orgFields = []string{"href", "id", "type", "name", "displayName", "isEnabled", "isReadOnly", "canPublishCatalogs",
+			"deployedVMQuota", "storedVMQuota", "numberOfCatalogs", "numberOfVdcs", "numberOfVApps", "numberOfGroups", "numberOfDisks"}
 		fieldsOnDemand = map[string][]string{
 			types.QtVappTemplate:      vappTemplatefields,
 			types.QtAdminVappTemplate: vappTemplatefields,
@@ -84,6 +95,11 @@ func queryFieldsOnDemand(queryType string) ([]string, error) {
 			types.QtAdminVm:           vmFields,
 			types.QtVapp:              vappFields,
 			types.QtAdminVapp:         vappFields,
+			types.QtOrgVdc:            orgVdcFields,
+			types.QtAdminOrgVdc:       orgVdcFields,
+			types.QtTask:              taskFields,
+			types.QtAdminTask:         taskFields,
+			types.QtOrg:               orgFields,
 		}
 	)
 
@@ -141,7 +157,48 @@ func addResults(queryType string, cumulativeResults, newResults Results) (Result
 	case types.QtAdminVapp:
 		cumulativeResults.Results.AdminVAppRecord = append(cumulativeResults.Results.AdminVAppRecord, newResults.Results.AdminVAppRecord...)
 		size = len(newResults.Results.AdminVAppRecord)
-
+	case types.QtOrgVdc:
+		cumulativeResults.Results.OrgVdcRecord = append(cumulativeResults.Results.OrgVdcRecord, newResults.Results.OrgVdcRecord...)
+		size = len(newResults.Results.OrgVdcRecord)
+	case types.QtAdminOrgVdc:
+		cumulativeResults.Results.OrgVdcAdminRecord = append(cumulativeResults.Results.OrgVdcAdminRecord, newResults.Results.OrgVdcAdminRecord...)
+		size = len(newResults.Results.OrgVdcAdminRecord)
+	case types.QtTask:
+		cumulativeResults.Results.TaskRecord = append(cumulativeResults.Results.TaskRecord, newResults.Results.TaskRecord...)
+		size = len(newResults.Results.TaskRecord)
+	case types.QtAdminTask:
+		cumulativeResults.Results.AdminTaskRecord = append(cumulativeResults.Results.AdminTaskRecord, newResults.Results.AdminTaskRecord...)
+		size = len(newResults.Results.AdminTaskRecord)
+	case types.QtNetworkPool:
+		cumulativeResults.Results.NetworkPoolRecord = append(cumulativeResults.Results.NetworkPoolRecord, newResults.Results.NetworkPoolRecord...)
+		size = len(newResults.Results.NetworkPoolRecord)
+	case types.QtProviderVdcStorageProfile:
+		cumulativeResults.Results.ProviderVdcStorageProfileRecord = append(cumulativeResults.Results.ProviderVdcStorageProfileRecord, newResults.Results.ProviderVdcStorageProfileRecord...)
+		size = len(newResults.Results.ProviderVdcStorageProfileRecord)
+	case types.QtResourcePool:
+		cumulativeResults.Results.ResourcePoolRecord = append(cumulativeResults.Results.ResourcePoolRecord, newResults.Results.ResourcePoolRecord...)
+		size = len(newResults.Results.ResourcePoolRecord)
+	case types.QtVappNetwork:
+		cumulativeResults.Results.VappNetworkRecord = append(cumulativeResults.Results.VappNetworkRecord, newResults.Results.VappNetworkRecord...)
+		size = len(newResults.Results.VappNetworkRecord)
+	case types.QtAdminVappNetwork:
+		cumulativeResults.Results.AdminVappNetworkRecord = append(cumulativeResults.Results.AdminVappNetworkRecord, newResults.Results.AdminVappNetworkRecord...)
+		size = len(newResults.Results.AdminVappNetworkRecord)
+	case types.QtSiteAssociation:
+		cumulativeResults.Results.SiteAssociationRecord = append(cumulativeResults.Results.SiteAssociationRecord, newResults.Results.SiteAssociationRecord...)
+		size = len(newResults.Results.SiteAssociationRecord)
+	case types.QtOrgAssociation:
+		cumulativeResults.Results.OrgAssociationRecord = append(cumulativeResults.Results.OrgAssociationRecord, newResults.Results.OrgAssociationRecord...)
+		size = len(newResults.Results.OrgAssociationRecord)
+	case types.QtOrg:
+		cumulativeResults.Results.OrgRecord = append(cumulativeResults.Results.OrgRecord, newResults.Results.OrgRecord...)
+		size = len(newResults.Results.OrgRecord)
+	case types.QtAdminOrgVdcTemplate:
+		cumulativeResults.Results.AdminOrgVdcTemplateRecord = append(cumulativeResults.Results.AdminOrgVdcTemplateRecord, newResults.Results.AdminOrgVdcTemplateRecord...)
+		size = len(newResults.Results.AdminOrgVdcTemplateRecord)
+	case types.QtOrgVdcTemplate:
+		cumulativeResults.Results.OrgVdcTemplateRecord = append(cumulativeResults.Results.OrgVdcTemplateRecord, newResults.Results.OrgVdcTemplateRecord...)
+		size = len(newResults.Results.OrgVdcTemplateRecord)
 	default:
 		return Results{}, 0, fmt.Errorf("query type %s not supported", queryType)
 	}
@@ -151,6 +208,11 @@ func addResults(queryType string, cumulativeResults, newResults Results) (Result
 
 // cumulativeQuery runs a paginated query and collects all elements until the total number of records is retrieved
 func (client *Client) cumulativeQuery(queryType string, params, notEncodedParams map[string]string) (Results, error) {
+	return client.cumulativeQueryWithHeaders(queryType, params, notEncodedParams, nil)
+}
+
+// cumulativeQueryWithHeaders is the same as cumulativeQuery() but let you add headers to the query
+func (client *Client) cumulativeQueryWithHeaders(queryType string, params, notEncodedParams map[string]string, headers map[string]string) (Results, error) {
 	var supportedQueryTypes = []string{
 		types.QtVappTemplate,
 		types.QtAdminVappTemplate,
@@ -166,6 +228,20 @@ func (client *Client) cumulativeQuery(queryType string, params, notEncodedParams
 		types.QtAdminVm,
 		types.QtVapp,
 		types.QtAdminVapp,
+		types.QtOrgVdc,
+		types.QtAdminOrgVdc,
+		types.QtTask,
+		types.QtAdminTask,
+		types.QtResourcePool,
+		types.QtNetworkPool,
+		types.QtProviderVdcStorageProfile,
+		types.QtVappNetwork,
+		types.QtAdminVappNetwork,
+		types.QtSiteAssociation,
+		types.QtOrgAssociation,
+		types.QtOrg,
+		types.QtOrgVdcTemplate,
+		types.QtAdminOrgVdcTemplate,
 	}
 	// Make sure the query type is supported
 	// We need to check early, as queries that would return less than 25 items (default page size) would succeed,
@@ -181,7 +257,14 @@ func (client *Client) cumulativeQuery(queryType string, params, notEncodedParams
 		return Results{}, fmt.Errorf("[cumulativeQuery] query type %s not supported", queryType)
 	}
 
-	result, err := client.QueryWithNotEncodedParams(params, notEncodedParams)
+	if params == nil {
+		params = make(map[string]string)
+	}
+	if len(notEncodedParams) == 0 {
+		notEncodedParams = map[string]string{"type": queryType}
+	}
+
+	result, err := client.QueryWithNotEncodedParamsWithHeaders(params, notEncodedParams, headers)
 	if err != nil {
 		return Results{}, err
 	}
@@ -204,7 +287,7 @@ func (client *Client) cumulativeQuery(queryType string, params, notEncodedParams
 		page++
 		notEncodedParams["page"] = fmt.Sprintf("%d", page)
 		var size int
-		newResult, err := client.QueryWithNotEncodedParams(params, notEncodedParams)
+		newResult, err := client.QueryWithNotEncodedParamsWithHeaders(params, notEncodedParams, headers)
 		if err != nil {
 			return Results{}, err
 		}
