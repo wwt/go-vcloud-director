@@ -237,12 +237,17 @@ type NetworkConfiguration struct {
 	// When they are both nil, it means the "internal" interface (the default) will be used.
 	// When one of them is set, the corresponding interface will be used.
 	// They cannot be both set (we'll get an API error if we do).
-	SubInterface         *bool `xml:"SubInterface,omitempty"`
-	DistributedInterface *bool `xml:"DistributedInterface,omitempty"`
-	GuestVlanAllowed     *bool `xml:"GuestVlanAllowed,omitempty"`
+	SubInterface         *bool      `xml:"SubInterface,omitempty"`
+	DistributedInterface *bool      `xml:"DistributedInterface,omitempty"`
+	GuestVlanAllowed     *bool      `xml:"GuestVlanAllowed,omitempty"`
+	RouterInfo           RouterInfo `xml:"RouterInfo,omitempty"`
 	// TODO: Not Implemented
-	// RouterInfo                     RouterInfo           `xml:"RouterInfo,omitempty"`
 	// SyslogServerSettings           SyslogServerSettings `xml:"SyslogServerSettings,omitempty"`
+}
+
+// RouterInfo represents the router information for a network.
+type RouterInfo struct {
+	ExternalIP string `xml:"ExternalIp,omitempty"`
 }
 
 // VAppNetworkConfiguration represents a vApp network configuration
@@ -2901,6 +2906,7 @@ type QueryResultVAppRecordType struct {
 	Name                    string    `xml:"name,attr"`                   // The name of the entity.
 	CreationDate            string    `xml:"creationDate,attr,omitempty"` // Creation date/time of the vApp.
 	Busy                    bool      `xml:"isBusy,attr,omitempty"`
+	Description             string    `xml:"description,attr,omitempty"`
 	Deployed                bool      `xml:"isDeployed,attr,omitempty"` // True if the vApp is deployed.
 	Enabled                 bool      `xml:"isEnabled,attr,omitempty"`
 	Expired                 bool      `xml:"isExpired,attr,omitempty"`
