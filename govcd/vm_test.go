@@ -8,6 +8,7 @@
 package govcd
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -30,7 +31,7 @@ func (vcd *TestVCD) Test_FindVMByHREF(check *C) {
 	}
 
 	fmt.Printf("Running: %s\n", check.TestName())
-	vapp := vcd.findFirstVapp()
+	vapp := vcd.findFirstVapp(ctx)
 	if vapp.VApp.Name == "" {
 		check.Skip("Disabled: No suitable vApp found in vDC")
 	}
@@ -39,7 +40,7 @@ func (vcd *TestVCD) Test_FindVMByHREF(check *C) {
 		check.Skip("Disabled: No suitable VM found in vDC")
 	}
 
-	newVM, err := vcd.client.Client.GetVMByHref(vm.HREF)
+	newVM, err := vcd.client.Client.GetVMByHref(ctx, vm.HREF)
 	check.Assert(err, IsNil)
 	check.Assert(newVM.VM.Name, Equals, vmName)
 	check.Assert(newVM.VM.VirtualHardwareSection.Item, NotNil)
@@ -52,7 +53,7 @@ func (vcd *TestVCD) Test_VMAttachOrDetachDisk(check *C) {
 		check.Skip("Skipping test because vapp was not successfully created at setup")
 	}
 
-	vapp := vcd.findFirstVapp()
+	vapp := vcd.findFirstVapp(ctx)
 	vmType, vmName := vcd.findFirstVm(vapp)
 	if vmName == "" {
 		check.Skip("skipping test because no VM is found")
@@ -81,7 +82,7 @@ func (vcd *TestVCD) Test_VMAttachOrDetachDisk(check *C) {
 		Disk: diskCreateParamsDisk,
 	}
 
-	task, err := vcd.vdc.CreateDisk(diskCreateParams)
+	task, err := vcd.vdc.CreateDisk(ctx, diskCreateParams)
 	check.Assert(err, IsNil)
 
 	check.Assert(task.Task.Owner.Type, Equals, types.MimeDisk)
@@ -95,14 +96,14 @@ func (vcd *TestVCD) Test_VMAttachOrDetachDisk(check *C) {
 
 	// Verify created disk
 	check.Assert(diskHREF, Not(Equals), "")
-	disk, err := vcd.vdc.GetDiskByHref(diskHREF)
+	disk, err := vcd.vdc.GetDiskByHref(ctx, diskHREF)
 	check.Assert(err, IsNil)
 	check.Assert(disk.Disk.Name, Equals, diskCreateParamsDisk.Name)
 	check.Assert(disk.Disk.SizeMb, Equals, diskCreateParamsDisk.SizeMb)
 	check.Assert(disk.Disk.Description, Equals, diskCreateParamsDisk.Description)
 
 	// Attach disk
-	attachDiskTask, err := vm.attachOrDetachDisk(&types.DiskAttachOrDetachParams{
+	attachDiskTask, err := vm.attachOrDetachDisk(ctx, &types.DiskAttachOrDetachParams{
 		Disk: &types.Reference{
 			HREF: disk.Disk.HREF,
 		},
@@ -113,13 +114,13 @@ func (vcd *TestVCD) Test_VMAttachOrDetachDisk(check *C) {
 	check.Assert(err, IsNil)
 
 	// Get attached VM
-	vmRef, err := disk.AttachedVM()
+	vmRef, err := disk.AttachedVM(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(vmRef, NotNil)
 	check.Assert(vmRef.Name, Equals, vm.VM.Name)
 
 	// Detach disk
-	detachDiskTask, err := vm.attachOrDetachDisk(&types.DiskAttachOrDetachParams{
+	detachDiskTask, err := vm.attachOrDetachDisk(ctx, &types.DiskAttachOrDetachParams{
 		Disk: &types.Reference{
 			HREF: disk.Disk.HREF,
 		},
@@ -138,7 +139,7 @@ func (vcd *TestVCD) Test_VMAttachAndDetachDisk(check *C) {
 	}
 
 	// Find VM
-	vapp := vcd.findFirstVapp()
+	vapp := vcd.findFirstVapp(ctx)
 	vmType, vmName := vcd.findFirstVm(vapp)
 	if vmName == "" {
 		check.Skip("skipping test because no VM is found")
@@ -167,7 +168,7 @@ func (vcd *TestVCD) Test_VMAttachAndDetachDisk(check *C) {
 		Disk: diskCreateParamsDisk,
 	}
 
-	task, err := vcd.vdc.CreateDisk(diskCreateParams)
+	task, err := vcd.vdc.CreateDisk(ctx, diskCreateParams)
 	check.Assert(err, IsNil)
 
 	check.Assert(task.Task.Owner.Type, Equals, types.MimeDisk)
@@ -182,14 +183,14 @@ func (vcd *TestVCD) Test_VMAttachAndDetachDisk(check *C) {
 
 	// Verify created disk
 	check.Assert(diskHREF, Not(Equals), "")
-	disk, err := vcd.vdc.GetDiskByHref(diskHREF)
+	disk, err := vcd.vdc.GetDiskByHref(ctx, diskHREF)
 	check.Assert(err, IsNil)
 	check.Assert(disk.Disk.Name, Equals, diskCreateParamsDisk.Name)
 	check.Assert(disk.Disk.SizeMb, Equals, diskCreateParamsDisk.SizeMb)
 	check.Assert(disk.Disk.Description, Equals, diskCreateParamsDisk.Description)
 
 	// Attach disk
-	attachDiskTask, err := vm.AttachDisk(&types.DiskAttachOrDetachParams{
+	attachDiskTask, err := vm.AttachDisk(ctx, &types.DiskAttachOrDetachParams{
 		Disk: &types.Reference{
 			HREF: disk.Disk.HREF,
 		},
@@ -200,13 +201,13 @@ func (vcd *TestVCD) Test_VMAttachAndDetachDisk(check *C) {
 	check.Assert(err, IsNil)
 
 	// Get attached VM
-	vmRef, err := disk.AttachedVM()
+	vmRef, err := disk.AttachedVM(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(vmRef, NotNil)
 	check.Assert(vmRef.Name, Equals, vm.VM.Name)
 
 	// Detach disk
-	detachDiskTask, err := vm.DetachDisk(&types.DiskAttachOrDetachParams{
+	detachDiskTask, err := vm.DetachDisk(ctx, &types.DiskAttachOrDetachParams{
 		Disk: &types.Reference{
 			HREF: disk.Disk.HREF,
 		},
@@ -232,7 +233,7 @@ func (vcd *TestVCD) Test_HandleInsertOrEjectMedia(check *C) {
 		check.Skip("skipping test because no vApp is found")
 	}
 
-	vapp := vcd.findFirstVapp()
+	vapp := vcd.findFirstVapp(ctx)
 	vmType, vmName := vcd.findFirstVm(vapp)
 	if vmName == "" {
 		check.Skip("skipping test because no VM is found")
@@ -242,37 +243,37 @@ func (vcd *TestVCD) Test_HandleInsertOrEjectMedia(check *C) {
 	vm.VM = &vmType
 
 	// Upload Media
-	catalog, err := vcd.org.GetCatalogByName(vcd.config.VCD.Catalog.Name, false)
+	catalog, err := vcd.org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, false)
 	check.Assert(err, IsNil)
 	check.Assert(catalog, NotNil)
 
-	uploadTask, err := catalog.UploadMediaImage(itemName, "upload from test", vcd.config.Media.MediaPath, 1024)
+	uploadTask, err := catalog.UploadMediaImage(ctx, itemName, "upload from test", vcd.config.Media.MediaPath, 1024)
 	check.Assert(err, IsNil)
 	err = uploadTask.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	AddToCleanupList(itemName, "mediaCatalogImage", vcd.org.Org.Name+"|"+vcd.config.VCD.Catalog.Name, "Test_HandleInsertOrEjectMedia")
 
-	catalog, err = vcd.org.GetCatalogByName(vcd.config.VCD.Catalog.Name, true)
+	catalog, err = vcd.org.GetCatalogByName(ctx, vcd.config.VCD.Catalog.Name, true)
 	check.Assert(err, IsNil)
 	check.Assert(catalog, NotNil)
 
-	media, err := catalog.GetMediaByName(itemName, false)
+	media, err := catalog.GetMediaByName(ctx, itemName, false)
 	check.Assert(err, IsNil)
 	check.Assert(media, NotNil)
 
-	insertMediaTask, err := vm.HandleInsertMedia(vcd.org, vcd.config.VCD.Catalog.Name, itemName)
+	insertMediaTask, err := vm.HandleInsertMedia(ctx, vcd.org, vcd.config.VCD.Catalog.Name, itemName)
 	check.Assert(err, IsNil)
 
 	err = insertMediaTask.WaitTaskCompletion(context.Background())
 	check.Assert(err, IsNil)
 
 	//verify
-	err = vm.Refresh()
+	err = vm.Refresh(ctx)
 	check.Assert(err, IsNil)
 	check.Assert(isMediaInjected(vm.VM.VirtualHardwareSection.Item), Equals, true)
 
-	vm, err = vm.HandleEjectMediaAndAnswer(vcd.org, vcd.config.VCD.Catalog.Name, itemName, true)
+	vm, err = vm.HandleEjectMediaAndAnswer(ctx, vcd.org, vcd.config.VCD.Catalog.Name, itemName, true)
 	check.Assert(err, IsNil)
 
 	//verify
